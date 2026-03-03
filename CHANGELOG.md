@@ -1,9 +1,15 @@
 # Changelog
 
+## Version 0.4.2 (2026-03-01)
+
+Improvements of the PreviewPanel and Dashboard
+- Add support for previewing images (PNG, SVG, WebP, JPEG, JPG)
+- Add go back button for the fullscreen preview
+- Add to the dashboard a list of tax return statements that are coming soon
+
 ## Version 0.4.1 (2026-03-01)
 
 Multi-project storage and full German UI translation
-
 - **Multi-project storage** — receipts, PDFs, and debug output are now grouped under `~/.finanzamt/<project>/`; the default project lives at `~/.finanzamt/default/` (breaking change from the flat layout)
 - **Project selector** — create, switch, and delete named projects directly from the header without restarting the server
 - **German translation** — complete DE/EN localisation for Sidebar, PreviewPanel, Dashboard, and the project selector; language toggle in the header
@@ -11,18 +17,14 @@ Multi-project storage and full German UI translation
 - **Category and type translation** — receipt type (Ausgabe/Einnahme) and all category labels are now translated in the preview panel and category charts
 - **DB creation guard** — the database file is created only on first upload, not on the initial page load; prevents stray files in the wrong directory
 
----
-
 ## Version 0.4.0 (2026-03-01)
 
 Agentic workflow improvement
-
 - **Four-agent pipeline** — metadata, counterparty, amounts, and line items are each extracted by a dedicated agent with a short focused prompt, improving reliability on local models
 - **Debug output** — full prompt, raw model response, and parsed JSON are saved per agent to `~/.finanzamt/debug/<receipt_id>/` for inspection
 - **Rule-based extraction removed** — all structured data now comes from the LLM pipeline
 
 UI and database improvements
-
 - **Period filter** — sidebar lets you filter receipts by year, quarter, or month; Dashboard reflects the active selection
 - **Sidebar translation** — DE/EN locale support added to the sidebar
 - **Counterparty verification** — mark a counterparty as verified in the preview panel and reuse it across receipts via the verified-counterparty picker
