@@ -72,12 +72,12 @@ Other models that work well: `qwen3:8b`, `llama3.2`, `llama3.1`.
 ### Interactive UI
 
 ```bash
-pip install finanzamt[ui]
+pip install "finanzamt[ui]"
 finanzamt --ui
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yauheniya-ai/finanzamt/main/docs/images/Screenshot.png" width="100%" />
+  <img src="https://raw.githubusercontent.com/yauheniya-ai/finanzamt/main/docs/images/Demo.webp" width="100%" />
   <em>Interactive UI to upload receipts and manage tax statements</em>
 </p>
 
