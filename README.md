@@ -26,8 +26,8 @@ A Python library for extracting structured data from receipts and invoices and p
 - <img src="https://api.iconify.design/devicon:react.svg" width="16" height="16"> React — interactive frontend
 - <img src="https://api.iconify.design/simple-icons:paddlepaddle.svg" width="16" height="16"> PaddleOCR — OCR for scanned PDFs 
 - <img src="https://api.iconify.design/devicon:google.svg" width="16" height="16"> Tesseract — OCR for scanned PDFs and images when PaddleOCR fails or times out
-- <img src="https://api.iconify.design/devicon:ollama.svg" width="16" height="16"> Ollama — local LLM for structured extraction
-- <img src="https://api.iconify.design/hugeicons:qwen.svg" width="16" height="16"> Qwen – laptop-compatible local LLMs for text and vision
+- <img src="https://api.iconify.design/devicon:ollama.svg" width="16" height="16"> Ollama — local LLMs for structured extraction of information from receipts and invoices
+- <img src="https://api.iconify.design/hugeicons:qwen.svg" width="16" height="16"> Qwen – laptop-compatible LLMs with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
 - <img src="https://api.iconify.design/devicon:sqlite.svg" width="16" height="16"> SQLite – local database for original receipts and extracted data
 
 ## Installation
