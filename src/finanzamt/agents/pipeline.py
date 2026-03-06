@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from finanzamt import progress as _progress
 from typing import Optional, Union
 
 from ..models import (
@@ -226,7 +227,7 @@ def run_pipeline(
         debug_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Agent 1: metadata ──────────────────────────────────────────────────
-    print(f"  {_ts()} → Agent 1: metadata", flush=True)
+    _progress.emit(f"  {_ts()} → Agent 1: metadata")
     raw1 = call_llm(
         prompt=        build_agent1_prompt(raw_text),
         cfg=           agent_cfg,
@@ -237,7 +238,7 @@ def run_pipeline(
     meta = _validate_agent1(raw1)
 
     # ── Agent 2: counterparty ──────────────────────────────────────────────
-    print(f"  {_ts()} → Agent 2: counterparty", flush=True)
+    _progress.emit(f"  {_ts()} → Agent 2: counterparty")
     raw2 = call_llm(
         prompt=        build_agent2_prompt(raw_text, receipt_type),
         cfg=           agent_cfg,
@@ -249,7 +250,7 @@ def run_pipeline(
     counterparty = _validate_agent2(raw2)
 
     # ── Agent 3: amounts ───────────────────────────────────────────────────
-    print(f"  {_ts()} → Agent 3: amounts", flush=True)
+    _progress.emit(f"  {_ts()} → Agent 3: amounts")
     raw3 = call_llm(
         prompt=        build_agent3_prompt(raw_text),
         cfg=           agent_cfg,
@@ -260,7 +261,7 @@ def run_pipeline(
     amounts = _validate_agent3(raw3)
 
     # ── Agent 4: line items ────────────────────────────────────────────────
-    print(f"  {_ts()} → Agent 4: line items", flush=True)
+    _progress.emit(f"  {_ts()} → Agent 4: line items")
     raw4 = call_llm(
         prompt=        build_agent4_prompt(raw_text),
         cfg=           agent_cfg,

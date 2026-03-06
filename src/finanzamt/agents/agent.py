@@ -23,6 +23,7 @@ from __future__ import annotations
 import logging
 import shutil
 import time
+from finanzamt import progress as _progress
 from pathlib import Path
 from typing import Optional, Union
 
@@ -103,8 +104,8 @@ class FinanceAgent:
         try:
             # 1 — OCR -------------------------------------------------------
             name = Path(pdf_path).name if isinstance(pdf_path, (str, Path)) else "<bytes>"
-            print(f"[finanzamt] {name}", flush=True)
-            print(f"  {time.strftime('[%H:%M:%S]')} → PyMuPDF ...", flush=True)
+            _progress.emit(f"[finanzamt] {name}")
+            _progress.emit(f"  {time.strftime('[%H:%M:%S]')} → PyMuPDF ...")
             raw_text = self.ocr.extract_text_from_pdf(pdf_path)
             if not raw_text.strip():
                 return ExtractionResult(
@@ -129,7 +130,7 @@ class FinanceAgent:
                         )
 
             # 3-7 — Multi-agent extraction ----------------------------------
-            print(f"  {time.strftime('[%H:%M:%S]')} → Extraction pipeline ...", flush=True)
+            _progress.emit(f"  {time.strftime('[%H:%M:%S]')} → Extraction pipeline ...")
             pdf_file_path: Optional[Path] = (
                 Path(pdf_path) if isinstance(pdf_path, (str, Path)) else None
             )

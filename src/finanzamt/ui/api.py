@@ -26,6 +26,8 @@ GET    /tax/ustva?quarter=1&year=2024
 
 from __future__ import annotations
 
+import asyncio
+import json
 import tempfile
 from datetime import date
 from pathlib import Path
@@ -33,7 +35,7 @@ from typing import Annotated, Optional
 
 from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 # ---------------------------------------------------------------------------
@@ -321,6 +323,104 @@ def list_databases(active_db: Optional[str] = Query(default=None)):
 # ---------------------------------------------------------------------------
 # Receipts
 # ---------------------------------------------------------------------------
+
+@app.post("/receipts/upload/stream", tags=["receipts"])
+async def upload_receipt_stream(
+    file:         Annotated[UploadFile, File(description="Receipt PDF or image")],
+    receipt_type: str           = Query(default="purchase", enum=["purchase", "sale"]),
+    db:           Optional[str] = Query(default=None, description="DB file path"),
+):
+    """Upload a receipt and stream back Server-Sent Events with progress and result.
+
+    Event types emitted:
+    - ``progress`` — one line of text from the processing pipeline.
+    - ``result``   — JSON payload identical to the non-streaming upload endpoint.
+    - ``error``    — string error message.
+    """
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type '{file.content_type}'.",
+        )
+    if not _LIB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="finanzamt library not installed.")
+
+    from finanzamt import progress as _progress
+
+    layout  = _resolve_layout(db)
+    db_path = layout.db_path
+    suffix  = Path(file.filename or "receipt").suffix or ".pdf"
+
+    file_bytes = await file.read()
+
+    loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    def _run() -> None:
+        import tempfile as _tf
+        with _tf.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(file_bytes)
+            tmp_path = Path(tmp.name)
+        try:
+            _progress.set_callback(
+                lambda msg: loop.call_soon_threadsafe(queue.put_nowait, msg)
+            )
+            agent  = FinanceAgent(db_path=db_path)
+            result = agent.process_receipt(tmp_path, receipt_type=receipt_type)
+        except Exception as exc:
+            _progress.clear_callback()
+            tmp_path.unlink(missing_ok=True)
+            loop.call_soon_threadsafe(queue.put_nowait, f"__error__:{exc}")
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+            return
+        else:
+            _progress.clear_callback()
+            tmp_path.unlink(missing_ok=True)
+
+        if not result.success:
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                f"__error__:Extraction failed: {result.error_message}",
+            )
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+            return
+
+        response = _receipt_to_response(result.data, db_path)
+        response["duplicate"] = result.duplicate
+        if result.duplicate:
+            response["message"] = "A receipt with identical content already exists."
+        loop.call_soon_threadsafe(
+            queue.put_nowait,
+            f"__result__:{json.dumps(response)}",
+        )
+        loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    loop.run_in_executor(None, _run)
+
+    async def _event_stream():
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            if item.startswith("__result__:"):
+                payload = item[len("__result__:"):]
+                yield f"event: result\ndata: {payload}\n\n"
+                break
+            if item.startswith("__error__:"):
+                payload = item[len("__error__:"):]
+                yield f"event: error\ndata: {json.dumps(payload)}\n\n"
+                break
+            yield f"event: progress\ndata: {json.dumps(item)}\n\n"
+
+    return StreamingResponse(
+        _event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
 
 @app.post("/receipts/upload", status_code=status.HTTP_201_CREATED, tags=["receipts"])
 async def upload_receipt(
