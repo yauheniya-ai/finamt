@@ -1,5 +1,7 @@
 # finanzamt
 
+<p align="center">
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/finanzamt?color=blue&label=PyPI)](https://pypi.org/project/finanzamt/)
@@ -8,9 +10,10 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finanzamt)](https://github.com/yauheniya-ai/finanzamt/commits/main)
 [![Downloads](https://pepy.tech/badge/finanzamt)](https://pepy.tech/project/finanzamt)
 
-<div align="center">
+
 [English](https://raw.githubusercontent.com/yauheniya-ai/finanzamt/main/README.md) • Deutsch
-</div>
+
+</p>
 
 Eine Python-Bibliothek zur strukturierten Extraktion von Daten aus Belegen und Rechnungen sowie zur Erstellung wesentlicher deutscher Umsatzsteuervoranmeldungen.
 
