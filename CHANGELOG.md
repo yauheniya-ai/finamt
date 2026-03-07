@@ -1,10 +1,15 @@
 # Changelog
 
 
+## Version 0.5.1 (2026-03-07)
+
+Refactor full codebase to use the new name 
+
 ## Version 0.5.0 (2026-03-07)
 
 Name change to finamt
-- pip install finamt
+- PyPI release under new name
+- Enable `pip install finamt`
 
 ## Version 0.4.6 (2026-03-06)
 
