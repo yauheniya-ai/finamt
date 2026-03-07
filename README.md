@@ -8,7 +8,9 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finanzamt)](https://github.com/yauheniya-ai/finanzamt/commits/main)
 [![Downloads](https://pepy.tech/badge/finanzamt)](https://pepy.tech/project/finanzamt)
 
+<div align="center">
 English • [German](https://raw.githubusercontent.com/yauheniya-ai/finanzamt/main/readme/README_de.md)
+</div>
 
 A Python library for extracting structured data from receipts and invoices and preparing essential German VAT statements.
 

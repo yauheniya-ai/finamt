@@ -8,7 +8,9 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finanzamt)](https://github.com/yauheniya-ai/finanzamt/commits/main)
 [![Downloads](https://pepy.tech/badge/finanzamt)](https://pepy.tech/project/finanzamt)
 
+<div align="center">
 [English](https://raw.githubusercontent.com/yauheniya-ai/finanzamt/main/README.md) • Deutsch
+</div>
 
 Eine Python-Bibliothek zur strukturierten Extraktion von Daten aus Belegen und Rechnungen sowie zur Erstellung wesentlicher deutscher Umsatzsteuervoranmeldungen.
 
