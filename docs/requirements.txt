@@ -1,0 +1,6 @@
+# Pinned requirements for building the finanzamt documentation.
+# Install with: pip install -r docs/requirements.txt
+
+sphinx>=5.0
+sphinx-rtd-theme>=1.0
+myst-parser>=0.18
