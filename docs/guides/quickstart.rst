@@ -53,7 +53,7 @@ Start the local web interface:
 
 .. code-block:: bash
 
-   finanzamt ui
+   finanzamt --ui
 
 Then open ``http://localhost:8000`` in your browser.  The UI lets you upload
 receipts, review and edit extracted data, manage counterparties, and export

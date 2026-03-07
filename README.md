@@ -9,6 +9,8 @@
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/yauheniya-ai/finanzamt/actions/workflows/tests.yml)
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finanzamt)](https://github.com/yauheniya-ai/finanzamt/commits/main)
 [![Downloads](https://pepy.tech/badge/finanzamt)](https://pepy.tech/project/finanzamt)
+[![Documentation Status](https://readthedocs.org/projects/finanzamt/badge/?version=latest)](https://readthedocs.org/projects/finanzamt/)
+
 
 <img src="https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg" width="16" height="16"> English • <img src="https://api.iconify.design/noto-v1:flag-for-flag-germany.svg" width="16" height="16"> [German](https://github.com/yauheniya-ai/finanzamt/blob/main/readme/README_de.md)
 
