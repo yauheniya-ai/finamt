@@ -51,6 +51,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+    "sphinx>=5.0",
+    "sphinx-rtd-theme>=1.0",
+    "myst-parser>=0.18",
+]
 dev = [
     "twine",
     "pytest>=7.0",
@@ -60,9 +65,7 @@ dev = [
     "flake8>=5.0",
     "mypy>=0.991",
     "pre-commit>=2.20.0",
-    "sphinx>=5.0",
-    "sphinx-rtd-theme>=1.0",
-    "myst-parser>=0.18",
+    "finamt[docs]",
 ]
 
 [project.urls]

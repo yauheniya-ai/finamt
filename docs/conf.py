@@ -3,6 +3,7 @@
 
 import os
 import sys
+from importlib.metadata import version, PackageNotFoundError
 
 # Make the package importable without installing it
 sys.path.insert(0, os.path.abspath("../src"))
@@ -11,7 +12,24 @@ sys.path.insert(0, os.path.abspath("../src"))
 project = "finamt"
 copyright = "2026, Yauheniya Varabyova"
 author = "Yauheniya Varabyova"
-release = "0.4.6"
+try:
+    release = version("finamt")
+except PackageNotFoundError:
+    release = "unknown"
+
+# -- Autodoc mock imports ----------------------------------------------------
+# Heavy ML/binary packages that cannot be installed on ReadTheDocs build agents
+# (no cp314 wheels, CUDA deps, etc.). Mocking lets autodoc import finamt modules
+# and extract docstrings without executing the actual library code.
+autodoc_mock_imports = [
+    "paddle",
+    "paddleocr",
+    "paddlepaddle",
+    "pytesseract",
+    "fitz",          # PyMuPDF
+    "PIL",            # Pillow (usually available, but kept for safety)
+    "numpy",
+]
 
 # -- General configuration ---------------------------------------------------
 extensions = [
