@@ -30,4 +30,7 @@ jobs:
         filename: coverage.json
         label: coverage
         message: ${{ steps.coverage.outputs.coverage }}%
-        color: yellow
+        valColorRange: ${{ steps.coverage.outputs.coverage }}
+        minColorRange: 0
+        maxColorRange: 100
+        colorRange: red, red, orange, yellow, brightgreen

@@ -6,103 +6,515 @@ In-process tests for FinamtCLI with FinanceAgent fully mocked.
 
 from __future__ import annotations
 
+import json
 import sys
+from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from finamt.cli import FinamtCLI
+from finamt.cli import FinamtCLI, _build_parser, main
 
 
-class TestFinamtCLI:
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    def test_print_version(self, capsys):
-        cli = FinamtCLI()
-        cli.print_version()
-        out = capsys.readouterr().out
-        assert "finamt version" in out
+def _success_result(mocker, *, cp_name="Test GmbH", amount=119, vat=19,
+                    category="software", items=None, receipt_type="purchase",
+                    receipt_date=None, vat_pct=19, proc_time=1.0):
+    r = mocker.Mock()
+    r.success   = True
+    r.duplicate = False
+    r.data.receipt_type.__str__ = lambda self: receipt_type
+    r.data.counterparty.name    = cp_name
+    r.data.total_amount         = Decimal(str(amount))
+    r.data.vat_amount           = Decimal(str(vat))
+    r.data.vat_percentage       = vat_pct
+    r.data.category             = category
+    r.data.items                = items or []
+    r.data.receipt_date         = receipt_date
+    r.processing_time           = proc_time
+    r.data.to_json.return_value = '{"vendor": "Test GmbH"}'
+    r.to_dict.return_value      = {"success": True}
+    return r
 
-    def test_process_receipt_success(self, mocker, tmp_path):
-        cli = FinamtCLI()
 
-        mock_agent_cls = mocker.patch("finamt.cli.FinanceAgent")
-        mock_instance  = mock_agent_cls.return_value
+def _fail_result(mocker):
+    r = mocker.Mock()
+    r.success       = False
+    r.duplicate     = False
+    r.error_message = "OCR failed"
+    r.to_dict.return_value = {"success": False}
+    return r
 
-        mock_result = mocker.Mock()
-        mock_result.success   = True
-        mock_result.duplicate = False
-        mock_result.data.receipt_type.__str__ = lambda self: "purchase"
-        mock_result.data.counterparty.name    = "Test GmbH"
-        mock_result.data.total_amount         = 119
-        mock_result.data.to_json.return_value = '{"vendor": "Test GmbH"}'
-        mock_instance.process_receipt.return_value = mock_result
 
-        input_dir = tmp_path
-        (input_dir / "test.pdf").write_text("dummy", encoding="utf-8")
+def _dup_result(mocker, cp_name="Test GmbH"):
+    r = mocker.Mock()
+    r.success     = True
+    r.duplicate   = True
+    r.existing_id = "abc123xyz"
+    r.data.counterparty.name = cp_name
+    r.to_dict.return_value = {"duplicate": True}
+    return r
 
-        rc = cli.process_receipt("test", input_dir)
+
+# ---------------------------------------------------------------------------
+# print_version
+# ---------------------------------------------------------------------------
+
+class TestPrintVersion:
+    def test_version_printed(self, capsys):
+        FinamtCLI().print_version()
+        assert "finamt version" in capsys.readouterr().out
+
+    def test_version_fallback_when_package_missing(self, mocker, capsys):
+        mocker.patch("finamt.cli.version", side_effect=Exception("not installed"))
+        FinamtCLI().print_version()
+        assert "unknown" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# process_receipt
+# ---------------------------------------------------------------------------
+
+class TestProcessReceipt:
+    def test_success(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        assert FinamtCLI().process_receipt("r", tmp_path) == 0
+
+    def test_success_with_verbose(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        FinamtCLI().process_receipt("r", tmp_path, verbose=True)
+        assert "Processing" in capsys.readouterr().out
+
+    def test_success_writes_json_to_output_dir(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        out_dir = tmp_path / "out"
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        rc = FinamtCLI().process_receipt("r", tmp_path, output_dir=out_dir)
         assert rc == 0
-        mock_instance.process_receipt.assert_called_once()
+        assert (out_dir / "r_extracted.json").exists()
 
-    def test_process_receipt_duplicate(self, mocker, tmp_path):
-        cli = FinamtCLI()
+    def test_missing_file_returns_1(self, tmp_path):
+        assert FinamtCLI().process_receipt("ghost", tmp_path) == 1
 
-        mock_agent_cls = mocker.patch("finamt.cli.FinanceAgent")
-        mock_instance  = mock_agent_cls.return_value
+    def test_failure_returns_1(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _fail_result(mocker)
+        assert FinamtCLI().process_receipt("r", tmp_path) == 1
+        assert "failed" in capsys.readouterr().err.lower()
 
-        mock_result = mocker.Mock()
-        mock_result.success     = True
-        mock_result.duplicate   = True
-        mock_result.existing_id = "abc123"
-        mock_result.data.counterparty.name = "Test GmbH"
-        mock_instance.process_receipt.return_value = mock_result
+    def test_duplicate_returns_0(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _dup_result(mocker)
+        assert FinamtCLI().process_receipt("r", tmp_path) == 0
+        assert "Duplicate" in capsys.readouterr().out
 
-        input_dir = tmp_path
-        (input_dir / "test.pdf").write_text("dummy", encoding="utf-8")
+    def test_no_db_flag(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        FinamtCLI().process_receipt("r", tmp_path, no_db=True)
+        mock_cls.assert_called_once_with(db_path=None)
 
-        rc = cli.process_receipt("test", input_dir)
-        assert rc == 0   # duplicate is not a failure
+    def test_explicit_db_path(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        db = tmp_path / "custom.db"
+        FinamtCLI().process_receipt("r", tmp_path, db_path=db)
+        mock_cls.assert_called_once_with(db_path=db)
 
-    def test_process_receipt_missing_file(self, tmp_path):
-        cli = FinamtCLI()
-        rc = cli.process_receipt("nonexistent", tmp_path)
-        assert rc == 1
+    def test_sale_type(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_instance = mocker.patch("finamt.cli.FinanceAgent").return_value
+        mock_instance.process_receipt.return_value = _success_result(mocker, receipt_type="sale")
+        FinamtCLI().process_receipt("r", tmp_path, receipt_type="sale")
+        mock_instance.process_receipt.assert_called_once_with(
+            tmp_path / "r.pdf", receipt_type="sale"
+        )
 
-    def test_batch_process_mock(self, mocker, tmp_path, capsys):
-        cli = FinamtCLI()
 
-        mock_agent_cls = mocker.patch("finamt.cli.FinanceAgent")
-        mock_instance  = mock_agent_cls.return_value
+# ---------------------------------------------------------------------------
+# batch_process
+# ---------------------------------------------------------------------------
 
-        mock_result = mocker.Mock()
-        mock_result.success      = True
-        mock_result.duplicate    = False
-        mock_result.data.total_amount   = 10
-        mock_result.data.vat_amount     = 2
-        mock_result.data.category       = "food"
-        mock_result.data.items          = []
-        mock_result.data.receipt_date   = None
-        mock_result.data.receipt_type.__str__ = lambda self: "purchase"
-        mock_result.data.counterparty.name    = "Vendor GmbH"
-        mock_result.data.vat_percentage       = 19
-        mock_result.processing_time           = 1.5
-        mock_result.to_dict.return_value      = {"success": True}
-        mock_instance.process_receipt.return_value = mock_result
-
-        input_dir = tmp_path
-        (input_dir / "a.pdf").write_text("dummy", encoding="utf-8")
-        (input_dir / "b.pdf").write_text("dummy", encoding="utf-8")
-
-        rc = cli.batch_process(input_dir)
+class TestBatchProcess:
+    def test_success_two_pdfs(self, mocker, tmp_path, capsys):
+        for name in ("a.pdf", "b.pdf"):
+            (tmp_path / name).write_text("x")
+        res = _success_result(mocker, receipt_date=datetime(2024, 3, 15))
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = res
+        rc = FinamtCLI().batch_process(tmp_path)
         out = capsys.readouterr().out
-
         assert rc == 0
         assert "BATCH PROCESSING REPORT" in out
-        assert "Vendor GmbH" in out
 
-    def test_batch_process_no_pdfs(self, tmp_path):
-        cli = FinamtCLI()
-        rc = cli.batch_process(tmp_path)
+    def test_no_pdfs_returns_1(self, tmp_path):
+        assert FinamtCLI().batch_process(tmp_path) == 1
+
+    def test_failure_counted_in_report(self, mocker, tmp_path, capsys):
+        (tmp_path / "bad.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _fail_result(mocker)
+        rc = FinamtCLI().batch_process(tmp_path)
         assert rc == 1
+        assert "✗" in capsys.readouterr().out
+
+    def test_duplicate_in_batch(self, mocker, tmp_path, capsys):
+        (tmp_path / "dup.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _dup_result(mocker)
+        rc = FinamtCLI().batch_process(tmp_path)
+        assert rc == 0
+        assert "duplicate" in capsys.readouterr().out.lower()
+
+    def test_writes_json_output(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        out_dir = tmp_path / "out"
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        FinamtCLI().batch_process(tmp_path, output_dir=out_dir)
+        assert (out_dir / "r_extracted.json").exists()
+
+    def test_verbose_mode(self, mocker, tmp_path, capsys):
+        (tmp_path / "v.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        FinamtCLI().batch_process(tmp_path, verbose=True)
+        assert "Processing" in capsys.readouterr().out
+
+    def test_no_db_flag(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        FinamtCLI().batch_process(tmp_path, no_db=True)
+        mock_cls.assert_called_once_with(db_path=None)
+
+    def test_report_has_category_breakdown(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker, category="software", amount=100, vat=19)
+        FinamtCLI().batch_process(tmp_path)
+        assert "software" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# ingest_receipts
+# ---------------------------------------------------------------------------
+
+class TestIngestReceipts:
+    def test_no_pdfs(self, tmp_path, capsys):
+        count = FinamtCLI().ingest_receipts(tmp_path)
+        assert count == 0
+        assert "No PDF" in capsys.readouterr().out
+
+    def test_success_increments_saved(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        count = FinamtCLI().ingest_receipts(tmp_path)
+        assert count == 1
+        assert "saved" in capsys.readouterr().out
+
+    def test_duplicate_increments_dupes(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _dup_result(mocker)
+        count = FinamtCLI().ingest_receipts(tmp_path)
+        assert count == 0
+        out = capsys.readouterr().out
+        assert "duplicate" in out.lower()
+
+    def test_failure_not_counted(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _fail_result(mocker)
+        count = FinamtCLI().ingest_receipts(tmp_path)
+        assert count == 0
+
+    def test_verbose_ok(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker, receipt_date=datetime(2024, 1, 1))
+        FinamtCLI().ingest_receipts(tmp_path, verbose=True)
+        assert "OK" in capsys.readouterr().out
+
+    def test_verbose_duplicate(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _dup_result(mocker)
+        FinamtCLI().ingest_receipts(tmp_path, verbose=True)
+        assert "DUPLICATE" in capsys.readouterr().out
+
+    def test_verbose_failed(self, mocker, tmp_path, capsys):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _fail_result(mocker)
+        FinamtCLI().ingest_receipts(tmp_path, verbose=True)
+        assert "FAILED" in capsys.readouterr().out
+
+    def test_explicit_db_path(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        db = tmp_path / "custom.db"
+        FinamtCLI().ingest_receipts(tmp_path, db_path=db)
+        mock_cls.assert_called_once_with(db_path=db)
+
+
+# ---------------------------------------------------------------------------
+# _quarter_bounds
+# ---------------------------------------------------------------------------
+
+class TestQuarterBounds:
+    @pytest.mark.parametrize("q,start,end", [
+        (1, (2024, 1, 1),  (2024, 3, 31)),
+        (2, (2024, 4, 1),  (2024, 6, 30)),
+        (3, (2024, 7, 1),  (2024, 9, 30)),
+        (4, (2024, 10, 1), (2024, 12, 31)),
+    ])
+    def test_quarter_bounds(self, q, start, end):
+        from datetime import date
+        s, e = FinamtCLI._quarter_bounds(q, 2024)
+        assert s == date(*start)
+        assert e == date(*end)
+
+
+# ---------------------------------------------------------------------------
+# run_ustva
+# ---------------------------------------------------------------------------
+
+class TestRunUstva:
+    def _mock_report(self, mocker):
+        report = mocker.Mock()
+        report.summary.return_value = "UStVA Q1 2024 summary"
+        return report
+
+    def test_no_receipts_returns_1(self, mocker, tmp_path, capsys):
+        mocker.patch("finamt.cli.get_repository").__enter__ = mocker.Mock(
+            return_value=mocker.Mock(find_by_period=mocker.Mock(return_value=[]))
+        )
+        # Patch via context manager protocol
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(find_by_period=MagicMock(return_value=[]))
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        rc = FinamtCLI().run_ustva(quarter=1, year=2024, db_path=tmp_path / "finamt.db")
+        assert rc == 1
+        assert "No receipts" in capsys.readouterr().out
+
+    def test_generates_report(self, mocker, tmp_path, capsys):
+        mock_receipt = mocker.Mock()
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(
+            find_by_period=MagicMock(return_value=[mock_receipt])
+        )
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        mocker.patch("finamt.cli.generate_ustva", return_value=self._mock_report(mocker))
+
+        rc = FinamtCLI().run_ustva(quarter=1, year=2024)
+        assert rc == 0
+        assert "UStVA" in capsys.readouterr().out
+
+    def test_saves_to_explicit_output(self, mocker, tmp_path, capsys):
+        mock_receipt = mocker.Mock()
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(
+            find_by_period=MagicMock(return_value=[mock_receipt])
+        )
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        report = self._mock_report(mocker)
+        mocker.patch("finamt.cli.generate_ustva", return_value=report)
+
+        out_file = tmp_path / "report.json"
+        FinamtCLI().run_ustva(quarter=2, year=2024, output=out_file)
+        report.to_json.assert_called_once_with(out_file)
+
+    def test_saves_to_output_dir(self, mocker, tmp_path, capsys):
+        mock_receipt = mocker.Mock()
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(
+            find_by_period=MagicMock(return_value=[mock_receipt])
+        )
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        report = self._mock_report(mocker)
+        mocker.patch("finamt.cli.generate_ustva", return_value=report)
+
+        out_dir = tmp_path / "reports"
+        FinamtCLI().run_ustva(quarter=3, year=2024, output_dir=out_dir)
+        assert out_dir.is_dir()
+        report.to_json.assert_called_once_with(out_dir / "ustva_q3_2024.json")
+
+
+# ---------------------------------------------------------------------------
+# _build_parser
+# ---------------------------------------------------------------------------
+
+class TestBuildParser:
+    def test_defaults(self):
+        parser = _build_parser()
+        args = parser.parse_args([])
+        assert args.version is False
+        assert args.batch is False
+        assert args.ustva is False
+        assert args.ui is False
+        assert args.type == "purchase"
+        assert args.quarter == 1
+
+    def test_version_flag(self):
+        args = _build_parser().parse_args(["--version"])
+        assert args.version is True
+
+    def test_file_and_input_dir(self):
+        args = _build_parser().parse_args(["--file", "r1", "--input-dir", "/tmp"])
+        assert args.file == "r1"
+        assert args.input_dir == "/tmp"
+
+    def test_batch_flag(self):
+        args = _build_parser().parse_args(["--batch", "--input-dir", "/tmp"])
+        assert args.batch is True
+
+    def test_type_sale(self):
+        args = _build_parser().parse_args(["--type", "sale"])
+        assert args.type == "sale"
+
+    def test_ustva_flag(self):
+        args = _build_parser().parse_args(["--ustva", "--quarter", "2", "--year", "2023"])
+        assert args.ustva is True
+        assert args.quarter == 2
+        assert args.year == 2023
+
+    def test_ui_flag(self):
+        args = _build_parser().parse_args(["--ui", "--no-browser", "--port", "9000"])
+        assert args.ui is True
+        assert args.no_browser is True
+        assert args.port == 9000
+
+    def test_db_flag(self, tmp_path):
+        db = str(tmp_path / "custom.db")
+        args = _build_parser().parse_args(["--db", db])
+        assert args.db == db
+
+
+# ---------------------------------------------------------------------------
+# main() dispatch
+# ---------------------------------------------------------------------------
+
+class TestMain:
+    def _run(self, argv, mocker):
+        mocker.patch("sys.argv", ["finamt"] + argv)
+        return main()
+
+    def test_version_flag_exits_0(self, mocker, capsys):
+        mocker.patch("sys.argv", ["finamt", "--version"])
+        rc = main()
+        assert rc == 0
+        assert "finamt version" in capsys.readouterr().out
+
+    def test_no_args_prints_help_exits_0(self, mocker, capsys):
+        mocker.patch("sys.argv", ["finamt"])
+        rc = main()
+        assert rc == 0
+
+    def test_single_receipt_dispatch(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        mocker.patch("sys.argv", [
+            "finamt", "--file", "r", "--input-dir", str(tmp_path)
+        ])
+        rc = main()
+        assert rc == 0
+
+    def test_batch_dispatch(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        mocker.patch("sys.argv", [
+            "finamt", "--batch", "--input-dir", str(tmp_path)
+        ])
+        rc = main()
+        assert rc == 0
+
+    def test_ustva_dispatch_no_receipts(self, mocker, tmp_path):
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(find_by_period=MagicMock(return_value=[]))
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        mocker.patch("sys.argv", ["finamt", "--ustva", "--quarter", "1", "--year", "2024"])
+        rc = main()
+        assert rc == 1
+
+    def test_ustva_dispatch_with_ingest(self, mocker, tmp_path, capsys):
+        """--ustva --input-dir triggers ingest then UStVA."""
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(find_by_period=MagicMock(return_value=[]))
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        mocker.patch("finamt.cli.FinanceAgent")
+        mocker.patch("sys.argv", [
+            "finamt", "--ustva", "--input-dir", str(tmp_path),
+            "--quarter", "1", "--year", "2024"
+        ])
+        rc = main()
+        assert rc == 1   # no receipts in DB → 1
+
+    def test_verbose_enables_logging(self, mocker, capsys):
+        mocker.patch("sys.argv", ["finamt", "--verbose", "--version"])
+        import logging
+        with patch("logging.basicConfig") as mock_log:
+            main()
+            mock_log.assert_called_once()
+
+    def test_ui_dispatch(self, mocker):
+        mock_launch = mocker.patch("finamt.ui.server.launch")
+        mocker.patch("sys.argv", ["finamt", "--ui", "--no-browser"])
+        rc = main()
+        assert rc == 0
+        mock_launch.assert_called_once()
+
+    def test_ui_dispatch_with_port_and_log_level(self, mocker):
+        mock_launch = mocker.patch("finamt.ui.server.launch")
+        mocker.patch("sys.argv", [
+            "finamt", "--ui", "--port", "9000", "--log-level", "debug", "--no-browser"
+        ])
+        main()
+        call_kwargs = mock_launch.call_args
+        assert call_kwargs.kwargs.get("port") == 9000 or call_kwargs.args[1] == 9000
+
+    def test_no_db_flag_passed_through(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        mocker.patch("sys.argv", [
+            "finamt", "--file", "r", "--input-dir", str(tmp_path), "--no-db"
+        ])
+        main()
+        mock_cls.assert_called_once_with(db_path=None)
+
+    def test_db_flag_passed_through(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        db = str(tmp_path / "custom.db")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
+        mocker.patch("sys.argv", [
+            "finamt", "--file", "r", "--input-dir", str(tmp_path), "--db", db
+        ])
+        main()
+        mock_cls.assert_called_once_with(db_path=Path(db))

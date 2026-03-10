@@ -199,13 +199,27 @@ class TestSaveGet:
 
 class TestCounterpartyDedup:
     def test_same_vat_id_reuses_counterparty(self, repo):
-        import sqlite3
+        """Same VAT ID → second receipt reuses existing counterparty row, no error."""
         cp = _make_counterparty("Vendor A")
         r1 = _make_receipt(counterparty=cp)
         r2 = _make_receipt(counterparty=cp)
         repo.save(r1)
-        with pytest.raises(sqlite3.IntegrityError):
-            repo.save(r2)
+        repo.save(r2)  # must NOT raise — counterparty is reused
+        f1 = repo.get(r1.id)
+        f2 = repo.get(r2.id)
+        assert f1.counterparty.id == f2.counterparty.id
+
+    def test_same_name_no_vat_id_reuses_counterparty(self, repo):
+        """Same name + no VAT ID → deduplicated on name."""
+        cp1 = Counterparty(name="Shared Corp")
+        cp2 = Counterparty(name="Shared Corp")
+        r1 = _make_receipt(counterparty=cp1)
+        r2 = _make_receipt(counterparty=cp2)
+        repo.save(r1)
+        repo.save(r2)
+        f1 = repo.get(r1.id)
+        f2 = repo.get(r2.id)
+        assert f1.counterparty.id == f2.counterparty.id
 
     def test_different_vat_id_creates_new_counterparty(self, repo):
         cp1 = Counterparty(name="A", vat_id="DE111111111")
@@ -404,3 +418,221 @@ class TestPersistence:
         with SQLiteRepository(db_path=db_path) as repo2:
             all_receipts = list(repo2.list_all())
         assert len(all_receipts) == 1
+
+
+# ---------------------------------------------------------------------------
+# update (receipt partial update)
+# ---------------------------------------------------------------------------
+
+class TestUpdate:
+    def test_update_receipt_amount(self, repo):
+        r = _make_receipt(total_amount="100.00")
+        repo.save(r)
+        result = repo.update(r.id, {"total_amount": "200.00"})
+        assert result is True
+        found = repo.get(r.id)
+        assert found.total_amount == Decimal("200.00")
+
+    def test_update_nonexistent_returns_false(self, repo):
+        result = repo.update("a" * 64, {"total_amount": "1.00"})
+        assert result is False
+
+    def test_update_counterparty_name(self, repo):
+        r = _make_receipt(counterparty=_make_counterparty("Old Name"))
+        repo.save(r)
+        repo.update(r.id, {"counterparty_name": "New Name"})
+        found = repo.get(r.id)
+        assert found.counterparty.name == "New Name"
+
+    def test_update_counterparty_address(self, repo):
+        r = _make_receipt()
+        repo.save(r)
+        repo.update(r.id, {"address": {"city": "Hamburg", "postcode": "20095"}})
+        found = repo.get(r.id)
+        assert found.counterparty.address.city == "Hamburg"
+        assert found.counterparty.address.postcode == "20095"
+
+    def test_update_vat_splits(self, repo):
+        r = _make_receipt()
+        repo.save(r)
+        splits = [{"vat_rate": 19, "vat_amount": 9.50, "net_amount": 50.0}]
+        repo.update(r.id, {"vat_splits": splits})
+        found = repo.get(r.id)
+        assert len(found.vat_splits) == 1
+        assert found.vat_splits[0]["vat_rate"] == 19.0
+
+    def test_update_items_replaces(self, repo):
+        r = _make_receipt(items=[_make_item(description="Old Item")])
+        repo.save(r)
+        new_items = [{"description": "New Item", "total_price": "10.00",
+                      "vat_rate": "19", "vat_amount": None, "unit_price": None,
+                      "quantity": None, "category": "software"}]
+        repo.update(r.id, {"items": new_items})
+        found = repo.get(r.id)
+        assert len(found.items) == 1
+        assert found.items[0].description == "New Item"
+
+    def test_update_creates_counterparty_when_none(self, repo):
+        """If receipt has no counterparty, update with cp fields creates one."""
+        r = _make_receipt(counterparty=None)
+        r.counterparty = None
+        # Save without going through counterparty resolution
+        repo.save(r)
+        repo.update(r.id, {"counterparty_name": "New Corp", "vat_id": "DE999888777"})
+        found = repo.get(r.id)
+        assert found.counterparty is not None
+        assert found.counterparty.name == "New Corp"
+
+    def test_update_counterparty_verified_flag(self, repo):
+        r = _make_receipt()
+        repo.save(r)
+        cp_id = repo.get(r.id).counterparty.id
+        repo.update(r.id, {"counterparty_verified": True})
+        cps = repo.list_verified_counterparties()
+        assert any(c["id"] == cp_id for c in cps)
+
+
+# ---------------------------------------------------------------------------
+# Counterparty management methods
+# ---------------------------------------------------------------------------
+
+class TestCounterpartyManagement:
+    def test_list_all_counterparties_empty(self, repo):
+        assert repo.list_all_counterparties() == []
+
+    def test_list_all_counterparties_after_save(self, repo):
+        for name in ("Alpha", "Beta", "Gamma"):
+            repo.save(_make_receipt(counterparty=_make_counterparty(name)))
+        cps = repo.list_all_counterparties()
+        assert len(cps) == 3
+        assert all("id" in cp and "name" in cp and "address" in cp for cp in cps)
+
+    def test_update_counterparty_name(self, repo):
+        r = _make_receipt(counterparty=_make_counterparty("Original"))
+        repo.save(r)
+        cp_id = repo.get(r.id).counterparty.id
+        ok = repo.update_counterparty(cp_id, {"name": "Updated"})
+        assert ok is True
+        cps = repo.list_all_counterparties()
+        assert any(cp["name"] == "Updated" for cp in cps)
+
+    def test_update_counterparty_ignores_unknown_fields(self, repo):
+        r = _make_receipt(counterparty=_make_counterparty("Safe"))
+        repo.save(r)
+        cp_id = repo.get(r.id).counterparty.id
+        # disallowed field — should be ignored, method returns False (no allowed fields)
+        result = repo.update_counterparty(cp_id, {"unknown_field": "value"})
+        assert result is False
+
+    def test_update_counterparty_nonexistent_returns_false(self, repo):
+        result = repo.update_counterparty("nonexistent-id", {"name": "X"})
+        assert result is False
+
+    def test_delete_counterparty(self, repo):
+        r = _make_receipt(counterparty=_make_counterparty("ToDelete"))
+        repo.save(r)
+        cp_id = repo.get(r.id).counterparty.id
+        ok = repo.delete_counterparty(cp_id)
+        assert ok is True
+        cps = repo.list_all_counterparties()
+        assert all(cp["id"] != cp_id for cp in cps)
+
+    def test_delete_counterparty_nonexistent_returns_false(self, repo):
+        assert repo.delete_counterparty("does-not-exist") is False
+
+    def test_set_counterparty_verified(self, repo):
+        r = _make_receipt(counterparty=_make_counterparty("Verifiable"))
+        repo.save(r)
+        cp_id = repo.get(r.id).counterparty.id
+        repo.set_counterparty_verified(cp_id, True)
+        verified = repo.list_verified_counterparties()
+        assert any(cp["id"] == cp_id for cp in verified)
+
+    def test_set_counterparty_unverified(self, repo):
+        r = _make_receipt(counterparty=_make_counterparty("WasVerified"))
+        repo.save(r)
+        cp_id = repo.get(r.id).counterparty.id
+        repo.set_counterparty_verified(cp_id, True)
+        repo.set_counterparty_verified(cp_id, False)
+        verified = repo.list_verified_counterparties()
+        assert all(cp["id"] != cp_id for cp in verified)
+
+    def test_list_verified_counterparties_empty(self, repo):
+        repo.save(_make_receipt(counterparty=_make_counterparty("Unverified")))
+        assert repo.list_verified_counterparties() == []
+
+    def test_all_counterparty_fields_returned(self, repo):
+        cp = Counterparty(
+            name="Full Corp",
+            vat_id="DE123456789",
+            tax_number="123/456/78901",
+            address=Address(
+                street_and_number="Main St 42",
+                postcode="10115",
+                city="Berlin",
+                state="Berlin",
+                country="Germany",
+            ),
+        )
+        repo.save(_make_receipt(counterparty=cp))
+        result = repo.list_all_counterparties()[0]
+        assert result["vat_id"] == "DE123456789"
+        assert result["tax_number"] == "123/456/78901"
+        assert result["address"]["street_and_number"] == "Main St 42"
+        assert result["address"]["city"] == "Berlin"
+
+
+# ---------------------------------------------------------------------------
+# Startup deduplication sweep
+# ---------------------------------------------------------------------------
+
+class TestStartupDedup:
+    def test_dedup_runs_on_reopen(self, tmp_path):
+        """When duplicate counterparties exist on disk, re-opening merges them."""
+        import sqlite3 as _sqlite3
+        import uuid
+        from datetime import datetime, timezone
+
+        db_path = tmp_path / "dedup.db"
+
+        # Bootstrap a DB with the correct schema via the repo
+        r = _make_receipt(counterparty=_make_counterparty("DupCorp"))
+        with SQLiteRepository(db_path=db_path) as repo:
+            repo.save(r)
+
+        # Manually inject a second row with the same name/vat_id
+        conn = _sqlite3.connect(db_path)
+        conn.row_factory = _sqlite3.Row
+        existing = conn.execute("SELECT vat_id FROM counterparties LIMIT 1").fetchone()
+        vat_id = existing["vat_id"] if existing else "DE999000999"
+        conn.execute(
+            "INSERT INTO counterparties (id, name, vat_id, created_at, verified) "
+            "VALUES (?, 'DupCorp', ?, ?, 0)",
+            (str(uuid.uuid4()), vat_id, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        conn.close()
+
+        # Re-open — dedup sweep runs automatically
+        with SQLiteRepository(db_path=db_path) as repo2:
+            cps = repo2.list_all_counterparties()
+        # Should have collapsed to exactly one counterparty
+        assert len(cps) == 1
+
+
+# ---------------------------------------------------------------------------
+# VAT splits round-trip
+# ---------------------------------------------------------------------------
+
+class TestVatSplits:
+    def test_vat_splits_saved_and_restored(self, repo):
+        r = _make_receipt()
+        r.vat_splits = [
+            {"position": 1, "vat_rate": 19.0, "vat_amount": 19.0, "net_amount": 100.0},
+            {"position": 2, "vat_rate": 7.0,  "vat_amount":  7.0, "net_amount": 100.0},
+        ]
+        repo.save(r)
+        found = repo.get(r.id)
+        assert len(found.vat_splits) == 2
+        rates = {s["vat_rate"] for s in found.vat_splits}
+        assert rates == {19.0, 7.0}

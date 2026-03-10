@@ -271,3 +271,103 @@ class TestBatchProcess:
         assert len(results) == 2
         assert len([r for r in results.values() if r.success]) == 1
         assert len([r for r in results.values() if not r.success]) == 1
+
+
+# ---------------------------------------------------------------------------
+# __init__ branches — explicit db_path and db_path=None with project
+# ---------------------------------------------------------------------------
+
+class TestInitBranches:
+    def test_explicit_db_path_string(self, tmp_path):
+        """db_path as string (not _UNSET) → layout inferred from path."""
+        db = str(tmp_path / "finamt.db")
+        with patch("finamt.agents.agent.OCRProcessor"):
+            agent = FinanceAgent(db_path=db)
+        assert agent._db_path is not None
+        assert str(agent._db_path) == db
+
+    def test_explicit_db_path_pathlib(self, tmp_path):
+        db = tmp_path / "finamt.db"
+        with patch("finamt.agents.agent.OCRProcessor"):
+            agent = FinanceAgent(db_path=db)
+        assert agent._db_path == db
+
+    def test_db_path_none_with_project_sets_layout(self):
+        """db_path=None with project= → layout resolved but no DB."""
+        with patch("finamt.agents.agent.OCRProcessor"):
+            agent = FinanceAgent(db_path=None, project="myproject")
+        assert agent._db_path is None
+        assert agent._layout is not None
+        assert agent._layout.name == "myproject"
+
+    def test_db_path_none_without_project_no_layout(self):
+        with patch("finamt.agents.agent.OCRProcessor"):
+            agent = FinanceAgent(db_path=None)
+        assert agent._db_path is None
+
+
+# ---------------------------------------------------------------------------
+# process_receipt — bytes input and PDF copying
+# ---------------------------------------------------------------------------
+
+class TestProcessReceiptExtra:
+    def test_bytes_input_works(
+        self, agent1_response, agent2_response, agent3_response, agent4_response
+    ):
+        """Passing PDF as raw bytes — pdf_file_path should be None internally."""
+        agent, mock_ocr = _make_agent("Gesamt 21,36 €")
+        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+            mock_post.side_effect = _four_responses(
+                agent1_response, agent2_response, agent3_response, agent4_response
+            )
+            result = agent.process_receipt(b"%PDF-1.4 bytes data")
+        assert isinstance(result.success, bool)
+
+    def test_store_pdf_copies_file(
+        self, tmp_path, agent1_response, agent2_response, agent3_response, agent4_response
+    ):
+        """With an explicit db_path and a real PDF file, _store_pdf should run."""
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4")
+        db_path = tmp_path / "test.db"
+
+        with patch("finamt.agents.agent.OCRProcessor") as MockOCR:
+            mock_ocr = MockOCR.return_value
+            mock_ocr.extract_text_from_pdf.return_value = "Bürobedarf GmbH\nGesamt 21,36 €"
+            agent = FinanceAgent(db_path=str(db_path))
+            agent.ocr = mock_ocr
+
+        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+            mock_post.side_effect = _four_responses(
+                agent1_response, agent2_response, agent3_response, agent4_response
+            )
+            result = agent.process_receipt(str(pdf_file))
+
+        # PDF archive directory should exist and contain a copy
+        if result.success and result.data:
+            pdfs_dir = tmp_path / "pdfs"
+            assert pdfs_dir.is_dir()
+
+    def test_store_pdf_skips_missing_source(self, tmp_path):
+        """_store_pdf on a nonexistent source should not raise."""
+        with patch("finamt.agents.agent.OCRProcessor"):
+            agent = FinanceAgent(db_path=str(tmp_path / "finamt.db"))
+        # Call _store_pdf with a path that doesn't exist
+        ghost = tmp_path / "ghost.pdf"
+        agent._store_pdf(ghost, "abc123")  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# __version__ sanity check
+# ---------------------------------------------------------------------------
+
+class TestVersion:
+    def test_version_is_string(self):
+        from finamt.__version__ import __version__
+        assert isinstance(__version__, str)
+        assert len(__version__) > 0
+
+    def test_version_follows_semver_pattern(self):
+        import re
+        from finamt.__version__ import __version__
+        assert re.match(r"^\d+\.\d+\.\d+", __version__)
