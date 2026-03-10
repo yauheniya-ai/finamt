@@ -1,9 +1,19 @@
 # Changelog
 
+## Version 0.5.2 (2026-03-10)
+
+Dependency cleanup and Python version cap
+- **Version bounds added** — `paddleocr>=3.0.0`, `paddlepaddle>=3.0.0`, `pydantic>=2.0.0`, and `pydantic-settings>=2.0.0` now carry explicit minimum versions, preventing silent installation of incompatible older releases
+- **Python 3.14 blocked** — `requires-python` is capped at `<3.14` because `paddlepaddle` ships no `cp314` wheels yet; users on Python ≥ 3.14 now get a clear resolver error instead of a runtime crash
+- **UI dependencies promoted** — `fastapi`, `uvicorn[standard]`, and `python-multipart` moved from the optional `[ui]` extra into core dependencies so the web interface works out of the box with a plain `pip install finamt`
+
 
 ## Version 0.5.1 (2026-03-07)
 
-Refactor full codebase to use the new name 
+Full codebase rename from `finanzamt` to `finamt`
+- **Package imports updated** — all internal `from finanzamt import …` and `import finanzamt` references replaced with `finamt` throughout source, tests, and examples
+- **CLI entry point renamed** — the console script is now `finamt` instead of `finanzamt`; old invocations must be updated after upgrading
+- **Config and env-var prefix** — `FINANZAMT_` environment variable prefix changed to `FINAMT_` across all `BaseSettings` fields and documentation
 
 ## Version 0.5.0 (2026-03-07)
 
