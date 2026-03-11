@@ -17,8 +17,6 @@
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 
-
-
 <img src="https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg" width="16" height="16"> English | <img src="https://api.iconify.design/noto-v1:flag-for-flag-germany.svg" width="16" height="16"> [German](https://github.com/yauheniya-ai/finamt/blob/main/readme/README_de.md)
 
 </div>
@@ -37,6 +35,7 @@ A Python library for extracting structured data from receipts and invoices and p
 ## Tech Stack
 
 - <img src="https://api.iconify.design/devicon:python.svg" width="16" height="16"> Python — package language
+- <img src="https://api.iconify.design/devicon:pypi.svg" width="16" height="16"> PyPI — distributed as an installable Python package
 - <img src="https://api.iconify.design/devicon:fastapi.svg" width="16" height="16"> FastAPI — backend for the web UI
 - <img src="https://api.iconify.design/devicon:react.svg" width="16" height="16"> React — interactive frontend
 - <img src="https://api.iconify.design/simple-icons:paddlepaddle.svg" width="16" height="16"> PaddleOCR — OCR for scanned PDFs 
@@ -44,6 +43,7 @@ A Python library for extracting structured data from receipts and invoices and p
 - <img src="https://api.iconify.design/devicon:ollama.svg" width="16" height="16"> Ollama — local LLMs for structured extraction of information from receipts and invoices
 - <img src="https://api.iconify.design/hugeicons:qwen.svg" width="16" height="16"> Qwen – laptop-compatible LLMs with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
 - <img src="https://api.iconify.design/devicon:sqlite.svg" width="16" height="16"> SQLite – local database for original receipts and extracted data
+- <img src="https://api.iconify.design/devicon:clickhouse.svg" width="16" height="16"> Click — CLI commands (`serve`, `add`, `list`, `get`, `delete`, `projects`)
 
 ## Installation
 
