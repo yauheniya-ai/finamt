@@ -15,6 +15,8 @@
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finamt)](https://github.com/yauheniya-ai/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
+[![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
+
 
 
 <img src="https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg" width="16" height="16"> English | <img src="https://api.iconify.design/noto-v1:flag-for-flag-germany.svg" width="16" height="16"> [German](https://github.com/yauheniya-ai/finamt/blob/main/readme/README_de.md)
