@@ -591,7 +591,7 @@ def delete_counterparty(cp_id: str, db: Optional[str] = Query(default=None)):
 @app.patch("/counterparties/{cp_id}", tags=["counterparties"])
 def update_counterparty(
     cp_id: str,
-    body: dict,
+    body: dict = Body(...),
     db: Optional[str] = Query(default=None),
 ):
     """Update name, tax_number, vat_id, verified, and address fields of a counterparty."""
@@ -612,7 +612,7 @@ def update_counterparty(
 @app.patch("/counterparties/{cp_id}/verify", tags=["counterparties"])
 def set_counterparty_verified(
     cp_id: str,
-    body: dict,
+    body: dict = Body(...),
     db: Optional[str] = Query(default=None),
 ):
     """Set verified=true/false on a counterparty."""
