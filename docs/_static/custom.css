@@ -1,0 +1,90 @@
+/* ── Brand tokens ── */
+:root {
+  --color-brand-primary:    #ef4444; /* red-500   */
+  --color-brand-secondary:  #d97706; /* amber-600 */
+}
+
+/* ── Sidebar background ── */
+.wy-nav-side,
+.wy-side-nav-search {
+  background: #111111;
+}
+
+/* ── Sidebar search box accent ── */
+.wy-side-nav-search input[type=text] {
+  border-color: var(--color-brand-secondary);
+}
+
+/* ── Sidebar search bar top strip ── */
+.wy-side-nav-search {
+  background: #000000;
+}
+
+/* ── Active / hovered menu item ── */
+.wy-menu-vertical a:hover,
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.on a {
+  background: var(--color-brand-secondary);
+  color: #ffffff;
+}
+
+.wy-menu-vertical li.current {
+  background: #1a1a1a;
+}
+
+/* ── Heading anchors & inline links ── */
+a,
+a:visited {
+  color: var(--color-brand-primary);
+}
+
+a:hover {
+  color: var(--color-brand-secondary);
+}
+
+/* ── Top navigation bar ── */
+.wy-nav-top {
+  background: #000000;
+}
+
+/* ── "Edit on GitHub" and version pill ── */
+.rst-versions {
+  background: #111111;
+  border-top: 1px solid var(--color-brand-secondary);
+}
+
+.rst-versions .rst-current-version {
+  background: var(--color-brand-primary);
+  color: #ffffff;
+}
+
+/* ── Admonition (note/warning) headers ── */
+.rst-content .note .admonition-title {
+  background: var(--color-brand-secondary);
+}
+
+.rst-content .warning .admonition-title {
+  background: var(--color-brand-primary);
+}
+
+/* ── Code block header ── */
+.highlight {
+  border-left: 3px solid var(--color-brand-secondary);
+}
+
+/* ── H1 / H2 underline accents ── */
+.rst-content h1,
+.rst-content h2 {
+  border-bottom: 2px solid var(--color-brand-secondary);
+  padding-bottom: 4px;
+}
+
+/* ── Buttons (e.g. "Next / Previous") ── */
+.btn-neutral {
+  background: var(--color-brand-primary) !important;
+  color: #ffffff !important;
+}
+
+.btn-neutral:hover {
+  background: var(--color-brand-secondary) !important;
+}
