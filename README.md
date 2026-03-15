@@ -9,7 +9,7 @@
 <div align="center">
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/finamt)](https://pypistats.org/packages/finamt)
 [![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
@@ -34,16 +34,27 @@ A Python library for extracting structured data from receipts and invoices and p
 
 ## Tech Stack
 
+**Backend**
 - <img src="https://api.iconify.design/devicon:python.svg" width="16" height="16"> Python — package language
-- <img src="https://api.iconify.design/devicon:pypi.svg" width="16" height="16"> PyPI — distributed as an installable Python package
 - <img src="https://api.iconify.design/devicon:fastapi.svg" width="16" height="16"> FastAPI — backend for the web UI
-- <img src="https://api.iconify.design/devicon:react.svg" width="16" height="16"> React — interactive frontend
 - <img src="https://api.iconify.design/simple-icons:paddlepaddle.svg" width="16" height="16"> PaddleOCR — OCR for scanned PDFs 
 - <img src="https://api.iconify.design/devicon:google.svg" width="16" height="16"> Tesseract — OCR for scanned PDFs and images when PaddleOCR fails or times out
 - <img src="https://api.iconify.design/devicon:ollama.svg" width="16" height="16"> Ollama — local LLMs for structured extraction of information from receipts and invoices
 - <img src="https://api.iconify.design/hugeicons:qwen.svg" width="16" height="16"> Qwen – laptop-compatible LLMs with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
 - <img src="https://api.iconify.design/devicon:sqlite.svg" width="16" height="16"> SQLite – local database for original receipts and extracted data
+
+**Frontend**
+- <img src="https://api.iconify.design/devicon:react.svg" width="16" height="16"> React — interactive frontend
+- <img src="https://api.iconify.design/devicon:vitejs.svg" width="16" height="16"> Vite — fast dev server and production bundler
+- <img src="https://api.iconify.design/devicon:tailwindcss.svg" width="16" height="16"> Tailwind CSS — utility-first styling
+- <img src="https://api.iconify.design/devicon:typescript.svg" width="16" height="16"> TypeScript — type-safe component and API code
+
+
+**CLI**
 - <img src="https://api.iconify.design/devicon:clickhouse.svg" width="16" height="16"> Click — CLI commands (`serve`, `add`, `list`, `get`, `delete`, `projects`)
+
+**Packaging**
+- <img src="https://api.iconify.design/devicon:pypi.svg" width="16" height="16"> PyPI — distributed as an installable Python package
 
 ## Installation
 
