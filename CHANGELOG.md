@@ -1,6 +1,19 @@
 # Changelog
 
-## Version 0.5.6 (2026-03-15)
+## Version 0.6.0 (2026-03-15)
+
+Multi-currency support — extraction, storage, and live EUR conversion in the UI
+- **`currency` field extracted by Agent 3** — the amounts agent now returns an ISO 4217 currency code alongside totals and VAT; the prompt instructs the model to emit a 2–4 character uppercase code (e.g. `EUR`, `USD`, `GBP`); defaults to `EUR` when absent or invalid
+- **Pipeline validation** — `_validate_agent3` enforces the regex `^[A-Z]{2,4}$`; any non-matching value is silently replaced with `EUR` so downstream code always receives a clean code
+- **`ReceiptData.currency`** — new `str` field (default `"EUR"`) added to the dataclass and to `to_dict()`
+- **Database migration** — `currency TEXT DEFAULT 'EUR'` column added to the `receipts` table via the existing idempotent `ALTER TABLE` loop; all pre-existing rows automatically receive `EUR`; INSERT, SELECT, and `update()` all handle the new column; `update()` validates the value with the same regex before writing
+- **`Receipt` type extended** — frontend `Receipt` TypeScript type gains `currency: string`; the draft state, `startEditing()` initialiser, and the PATCH save payload all include currency
+- **Currency row in preview panel** — a dedicated row is shown in the Amounts section between the total and the VAT fields; in view mode it displays the ISO code; in edit mode it provides an uppercase-forced text input (max 4 chars)
+- **Live EUR conversion widget** — when the receipt currency is not `EUR`, a `CurrencyConverter` component fetches the current rate from `https://api.frankfurter.app/latest?from=<CUR>&to=EUR`, displays the rate date, and provides a manual rate-override input; the rate is reported back to the parent via callback
+- **All amounts recalculated** — total, VAT amount, and net amount in the Amounts section are displayed through a `cvt()` helper: if a live (or overridden) rate is available the converted EUR figure is shown; otherwise the original amount is displayed in the receipt's own currency; the widget and all three fields update instantly when the rate changes or the user types a custom rate
+- **Dynamic currency symbol in line items** — item rows use a `currSymbol()` helper that resolves `$` for USD, `£` for GBP, `€` for EUR, and the three-letter ISO code for anything else via `Intl.NumberFormat` with `currencyDisplay: "narrowSymbol"`; original item amounts are shown in the receipt currency unchanged; edit-mode column headers (`MwSt. {{sym}}`, `Gesamt {{sym}}`) use i18n interpolation so they update automatically
+
+
 
 Supplier drill-down in dashboard category charts
 - **Per-supplier breakdown** — each category bar in the expense and revenue charts can now be expanded to reveal a ranked list of individual suppliers and their totals for the active period (e.g. Software → Adobe €499 · Microsoft €499)

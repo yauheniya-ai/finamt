@@ -92,6 +92,7 @@ class SQLiteRepository:
             ("counterparties",     "street_and_number", "TEXT"),
             ("counterparties",     "state",       "TEXT"),
             ("receipt_vat_splits", "net_amount",  "TEXT"),
+            ("receipts",           "currency",    "TEXT DEFAULT 'EUR'"),
         ]:
             try:
                 self._conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {typedef}")
@@ -364,14 +365,15 @@ class SQLiteRepository:
                 """INSERT INTO receipts
                    (id, counterparty_id, receipt_type, receipt_number,
                     receipt_date, total_amount, vat_percentage, vat_amount,
-                    category, created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    currency, category, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     receipt.id, cp_id, str(receipt.receipt_type),
                     receipt.receipt_number, date_str,
                     str(receipt.total_amount)   if receipt.total_amount   is not None else None,
                     str(receipt.vat_percentage) if receipt.vat_percentage is not None else None,
                     str(receipt.vat_amount)     if receipt.vat_amount     is not None else None,
+                    getattr(receipt, "currency", "EUR") or "EUR",
                     str(receipt.category),
                     self._now(),
                 ),
@@ -470,7 +472,7 @@ class SQLiteRepository:
         """
         RECEIPT_MUTABLE = {
             "receipt_type", "receipt_number", "receipt_date",
-            "total_amount", "vat_percentage", "vat_amount", "category",
+            "total_amount", "vat_percentage", "vat_amount", "currency", "category",
         }
         CP_SCALAR = {
             "counterparty_name": "name",
@@ -488,6 +490,9 @@ class SQLiteRepository:
         for field in ("total_amount", "vat_percentage", "vat_amount"):
             if field in receipt_updates and receipt_updates[field] is not None:
                 receipt_updates[field] = str(receipt_updates[field])
+        if "currency" in receipt_updates:
+            raw_cur = str(receipt_updates["currency"]).strip().upper()
+            receipt_updates["currency"] = raw_cur if (2 <= len(raw_cur) <= 4 and raw_cur.isalpha()) else "EUR"
 
         # Apply receipt-level updates
         if receipt_updates:
@@ -797,6 +802,7 @@ class SQLiteRepository:
         receipt.total_amount   = self._dec(row["total_amount"])
         receipt.vat_percentage = self._dec(row["vat_percentage"])
         receipt.vat_amount     = self._dec(row["vat_amount"])
+        receipt.currency       = row["currency"] if "currency" in row.keys() and row["currency"] else "EUR"
         receipt.category       = ReceiptCategory(row["category"] or "other")
         receipt.items          = items
         return receipt

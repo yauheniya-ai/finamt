@@ -116,6 +116,11 @@ def _validate_agent3(raw: Optional[dict]) -> dict:
         # Sanity: vat_amount must be less than total if total known
         if total is None or vat_amt < total:
             result["vat_amount"] = vat_amt
+
+    # Currency — accept only plausible ISO 4217 codes (2–4 uppercase letters)
+    raw_cur = str(raw.get("currency") or "").strip().upper()
+    result["currency"] = raw_cur if (2 <= len(raw_cur) <= 4 and raw_cur.isalpha()) else "EUR"
+
     return result
 
 
@@ -199,6 +204,7 @@ def _build_receipt_data(
         total_amount=   parse_decimal(amounts.get("total_amount")),
         vat_percentage= parse_decimal(amounts.get("vat_percentage")),
         vat_amount=     parse_decimal(amounts.get("vat_amount")),
+        currency=       amounts.get("currency", "EUR"),
         category=       meta.get("category", ReceiptCategory("other")),
         items=          receipt_items,
     )
@@ -255,7 +261,7 @@ def run_pipeline(
         prompt=        build_agent3_prompt(raw_text),
         cfg=           agent_cfg,
         agent_name=    "agent3",
-        expected_keys= ["total_amount", "vat_percentage", "vat_amount"],
+        expected_keys= ["total_amount", "vat_percentage", "vat_amount", "currency"],
         debug_dir=     debug_dir,
     )
     amounts = _validate_agent3(raw3)

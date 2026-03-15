@@ -57,12 +57,13 @@ Return only JSON:"""
 AGENT3_TEMPLATE = """\
 Extract the financial amounts from the receipt text below.
 Return only this JSON, no other text:
-{{"total_amount": null, "vat_percentage": null, "vat_amount": null}}
+{{"total_amount": null, "vat_percentage": null, "vat_amount": null, "currency": null}}
 
-Rules: all values are numbers, not strings. \
+Rules: all numeric values are numbers, not strings. \
 German number format "1.234,56" means 1234.56. \
 vat_percentage is the rate e.g. 19.0 for 19%%. \
-vat_amount is the absolute tax amount in currency, not the rate.
+vat_amount is the absolute tax amount, not the rate. \
+currency is the ISO 4217 code e.g. EUR, USD, GBP.
 
 TEXT:
 {text}

@@ -241,6 +241,7 @@ class ReceiptData:
     total_amount:     Optional[Decimal] = None
     vat_percentage:   Optional[Decimal] = None
     vat_amount:       Optional[Decimal] = None
+    currency:         str = "EUR"
     category:         ReceiptCategory = field(default_factory=ReceiptCategory.other)
     items:            List[ReceiptItem] = field(default_factory=list)
     vat_splits:       List[dict] = field(default_factory=list)
@@ -306,6 +307,7 @@ class ReceiptData:
             "vat_percentage": float(self.vat_percentage) if self.vat_percentage is not None else None,
             "vat_amount":     float(self.vat_amount)     if self.vat_amount     is not None else None,
             "net_amount":     float(self.net_amount)     if self.net_amount     is not None else None,
+            "currency":       self.currency,
             "category":       str(self.category),
             "items":          [item.to_dict() for item in self.items],
             "vat_splits":     getattr(self, "vat_splits", []),
