@@ -1,90 +1,169 @@
 /* ── Brand tokens ── */
 :root {
-  --color-brand-primary:    #ef4444; /* red-500   */
-  --color-brand-secondary:  #d97706; /* amber-600 */
+  --red:   #ef4444; /* red-500   — accents on white bg  */
+  --amber: #fbbf24; /* amber-400 — used only on dark bg */
+  --black: #111111;
+  --white: #ffffff;
 }
 
-/* ── Sidebar background ── */
-.wy-nav-side,
-.wy-side-nav-search {
-  background: #111111;
+/* ════════════════════════════════
+   SIDEBAR — amber-400 bg, black text
+   ════════════════════════════════ */
+.wy-nav-side {
+  background: var(--amber);
 }
 
-/* ── Sidebar search box accent ── */
-.wy-side-nav-search input[type=text] {
-  border-color: var(--color-brand-secondary);
-}
-
-/* ── Sidebar search bar top strip ── */
 .wy-side-nav-search {
   background: #000000;
 }
 
-/* ── Active / hovered menu item ── */
-.wy-menu-vertical a:hover,
+/* Project title in search area */
+.wy-side-nav-search > a,
+.wy-side-nav-search > a:hover {
+  color: var(--amber);
+}
+
+/* Search input */
+.wy-side-nav-search input[type=text] {
+  background: #ffffff;
+  color: #000000;
+  border: 2px solid var(--amber);
+  border-radius: 4px;
+}
+
+/* All sidebar nav text — black on amber */
+.wy-menu-vertical a,
+.wy-menu-vertical li span {
+  color: #000000 !important;
+}
+
+/* Section headers (GETTING STARTED, API REFERENCE, etc.) */
+.wy-menu-vertical p,
+.wy-menu-vertical p.caption {
+  color: #000000 !important;
+  font-weight: 700;
+}
+
+/* Hover state — black bg, amber text */
+.wy-menu-vertical a:hover {
+  background: #000000 !important;
+  color: var(--amber) !important;
+}
+
+/* Active / current page — red bg, white text */
 .wy-menu-vertical li.current > a,
 .wy-menu-vertical li.on a {
-  background: var(--color-brand-secondary);
-  color: #ffffff;
+  background: var(--red) !important;
+  color: var(--white) !important;
 }
 
 .wy-menu-vertical li.current {
-  background: #1a1a1a;
+  background: rgba(0, 0, 0, 0.12);
 }
 
-/* ── Heading anchors & inline links ── */
+/* Toctree expand/collapse icons */
+.wy-menu-vertical li button,
+.wy-menu-vertical li .toctree-expand {
+  color: #000000 !important;
+}
+
+/* ════════════════════════════════
+   TOP NAV BAR — black bg
+   ════════════════════════════════ */
+.wy-nav-top {
+  background: #000000;
+  color: var(--amber);
+}
+
+.wy-nav-top a {
+  color: var(--amber) !important;
+}
+
+/* ════════════════════════════════
+   MAIN CONTENT — white bg
+   Links and accents use red-500
+   ════════════════════════════════ */
 a,
 a:visited {
-  color: var(--color-brand-primary);
+  color: var(--red) !important;
 }
 
 a:hover {
-  color: var(--color-brand-secondary);
+  color: #b91c1c !important; /* red-700 for hover — still readable on white */
 }
 
-/* ── Top navigation bar ── */
-.wy-nav-top {
-  background: #000000;
+/* Headings underline */
+.rst-content h1 {
+  border-bottom: 2px solid var(--red);
+  padding-bottom: 6px;
 }
 
-/* ── "Edit on GitHub" and version pill ── */
-.rst-versions {
-  background: #111111;
-  border-top: 1px solid var(--color-brand-secondary);
-}
-
-.rst-versions .rst-current-version {
-  background: var(--color-brand-primary);
-  color: #ffffff;
-}
-
-/* ── Admonition (note/warning) headers ── */
-.rst-content .note .admonition-title {
-  background: var(--color-brand-secondary);
-}
-
-.rst-content .warning .admonition-title {
-  background: var(--color-brand-primary);
-}
-
-/* ── Code block header ── */
-.highlight {
-  border-left: 3px solid var(--color-brand-secondary);
-}
-
-/* ── H1 / H2 underline accents ── */
-.rst-content h1,
 .rst-content h2 {
-  border-bottom: 2px solid var(--color-brand-secondary);
+  border-bottom: 1px solid #fca5a5; /* red-300, subtle */
   padding-bottom: 4px;
 }
 
-/* ── Buttons (e.g. "Next / Previous") ── */
-.btn-neutral {
-  background: var(--color-brand-primary) !important;
-  color: #ffffff !important;
+/* Code blocks — left border accent */
+.highlight {
+  border-left: 3px solid var(--red);
+}
+
+/* Inline code */
+.rst-content code,
+.rst-content tt {
+  color: var(--red);
+  border: 1px solid #fca5a5;
+  background: #fff7f7;
+}
+
+/* ════════════════════════════════
+   ADMONITIONS
+   ════════════════════════════════ */
+.rst-content .note .admonition-title {
+  background: #000000;
+  color: var(--amber);
+}
+
+.rst-content .warning .admonition-title {
+  background: var(--red);
+  color: var(--white);
+}
+
+/* ════════════════════════════════
+   BUTTONS — black bg, amber text
+   ════════════════════════════════ */
+.btn-neutral,
+.btn-neutral:visited {
+  background: #000000 !important;
+  color: var(--amber) !important;
+  border: 1px solid var(--amber) !important;
 }
 
 .btn-neutral:hover {
-  background: var(--color-brand-secondary) !important;
+  background: var(--red) !important;
+  color: var(--white) !important;
+  border-color: var(--red) !important;
+}
+
+/* ════════════════════════════════
+   VERSION / RTD FOOTER STRIP
+   ════════════════════════════════ */
+.rst-versions {
+  background: #000000;
+  border-top: 2px solid var(--amber);
+}
+
+.rst-versions .rst-current-version {
+  background: #000000;
+  color: var(--amber);
+}
+
+.rst-versions a,
+.rst-versions span {
+  color: var(--amber) !important;
+}
+
+.rst-versions .rst-current-version:hover {
+  background: var(--red);
+  color: var(--white);
 }
