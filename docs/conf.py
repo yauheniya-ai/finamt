@@ -90,7 +90,7 @@ html_theme_options = {
     "navigation_depth": 4,
     "titles_only": False,
     "logo_only": True,
-    "display_version": True,
+    "display_version": False,
     "prev_next_buttons_location": "bottom",
     "collapse_navigation": False,
     "sticky_navigation": True,

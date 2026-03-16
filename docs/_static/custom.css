@@ -49,9 +49,11 @@
   font-weight: 700;
 }
 
-.wy-menu-vertical a:hover {
+.wy-menu-vertical a:hover,
+.wy-menu-vertical li.current ul li a:hover {
   background: var(--red) !important;
   color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 .wy-menu-vertical li.current > a,
@@ -59,6 +61,7 @@
   background: var(--red) !important;
   color: #ffffff !important;
   font-weight: 600;
+  text-decoration: none !important;
 }
 
 .wy-menu-vertical li.current > a .toctree-expand,
@@ -70,11 +73,7 @@
 .wy-menu-vertical li.current ul li a:visited {
   background: var(--amber) !important;
   color: #000000 !important;
-}
-
-.wy-menu-vertical li.current ul li a:hover {
-  background: var(--red) !important;
-  color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 /* ── Top nav bar ── */
@@ -85,50 +84,45 @@
 
 .wy-nav-top a {
   color: #000000 !important;
+  text-decoration: none !important;
 }
 
 .wy-nav-top i {
   color: #000000;
 }
 
-/* ── All links — black, no underline ── */
-a:not(.btn),
-a:not(.btn):visited,
-.rst-content a:not(.btn),
-.rst-content a:not(.btn):visited,
-.wy-breadcrumbs a:not(.btn),
-.wy-breadcrumbs a:not(.btn):visited,
-.footer a:not(.btn),
-.footer a:not(.btn):visited,
+/* ── All links — black, no underline, no hover effect ── */
+a,
+a:visited,
+a:hover,
+.rst-content a,
+.rst-content a:visited,
+.rst-content a:hover,
+.wy-breadcrumbs a,
+.wy-breadcrumbs a:visited,
+.wy-breadcrumbs a:hover,
+.footer a,
+.footer a:visited,
+.footer a:hover,
 .rst-content .reference.external,
+.rst-content .reference.external:hover,
 .rst-content .reference.internal,
+.rst-content .reference.internal:hover,
 .rst-content dl dt a,
-.rst-content .toctree-wrapper a {
+.rst-content dl dt a:hover,
+.rst-content .toctree-wrapper a,
+.rst-content .toctree-wrapper a:hover {
   color: #000000 !important;
   text-decoration: none !important;
 }
 
-/* ── Hover — black text, amber underline ── */
-a:not(.btn):hover,
-.rst-content a:not(.btn):hover,
-.wy-breadcrumbs a:not(.btn):hover,
-.footer a:not(.btn):hover,
-.rst-content .reference.external:hover,
-.rst-content .reference.internal:hover,
-.rst-content dl dt a:hover,
-.rst-content .toctree-wrapper a:hover {
-  color: #000000 !important;
-  text-decoration: underline !important;
-  text-decoration-color: var(--amber) !important;
-  text-underline-offset: 3px !important;
-  text-decoration-thickness: 2px !important;
-}
-
-/* ── Buttons — always white on red, no underline ── */
+/* ── Buttons — white text on red, no underline ── */
 .btn-neutral,
 .btn-neutral:visited,
+.btn-neutral:hover,
 a.btn-neutral,
-a.btn-neutral:visited {
+a.btn-neutral:visited,
+a.btn-neutral:hover {
   background: var(--red) !important;
   color: #ffffff !important;
   border: none !important;
@@ -139,8 +133,6 @@ a.btn-neutral:visited {
 .btn-neutral:hover,
 a.btn-neutral:hover {
   background: var(--red-h) !important;
-  color: #ffffff !important;
-  text-decoration: none !important;
 }
 
 /* ── Headings ── */
@@ -177,6 +169,7 @@ a.btn-neutral:hover {
 .rst-versions span {
   color: var(--amber) !important;
   background: #000000 !important;
+  text-decoration: none !important;
 }
 
 .rst-versions .rst-current-version:hover {
