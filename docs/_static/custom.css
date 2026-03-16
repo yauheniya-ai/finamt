@@ -4,9 +4,9 @@
   --amber: #fbbf24;
 }
 
-/* ── Top search bar ── */
+/* ── Top search bar — black bg for dark logo ── */
 .wy-side-nav-search {
-  background: #ffffff;
+  background: #000000;
 }
 
 .wy-side-nav-search > a img.logo {
@@ -14,8 +14,10 @@
 }
 
 .wy-side-nav-search input[type=text] {
-  border: 1px solid #000000;
+  border: 1px solid var(--amber);
   border-radius: 4px;
+  background: #ffffff;
+  color: #000000;
 }
 
 /* ── Sidebar ── */
@@ -85,17 +87,41 @@
   color: #000000 !important;
 }
 
-/* hamburger icon on mobile */
 .wy-nav-top i {
   color: #000000;
 }
 
-/* ── Main content links ── */
+/* ── All links — black, no underline ── */
 a,
 a:visited,
-a:hover {
+.rst-content a,
+.rst-content a:visited,
+.wy-breadcrumbs a,
+.wy-breadcrumbs a:visited,
+.footer a,
+.footer a:visited,
+.rst-content .reference.external,
+.rst-content .reference.internal,
+.rst-content dl dt a,
+.rst-content .toctree-wrapper a {
   color: #000000 !important;
   text-decoration: none !important;
+}
+
+/* ── Hover — black text, amber underline ── */
+a:hover,
+.rst-content a:hover,
+.wy-breadcrumbs a:hover,
+.footer a:hover,
+.rst-content .reference.external:hover,
+.rst-content .reference.internal:hover,
+.rst-content dl dt a:hover,
+.rst-content .toctree-wrapper a:hover {
+  color: #000000 !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--amber) !important;
+  text-underline-offset: 3px !important;
+  text-decoration-thickness: 2px !important;
 }
 
 /* ── Headings ── */
@@ -123,16 +149,18 @@ a:hover {
 
 /* ── Buttons ── */
 .btn-neutral,
-.btn-neutral:visited,
-.btn-neutral:hover {
+.btn-neutral:visited {
   background: var(--red) !important;
   color: #ffffff !important;
   border: none !important;
   box-shadow: none !important;
+  text-decoration: none !important;
 }
 
 .btn-neutral:hover {
   background: var(--red-h) !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 /* ── RTD version strip ── */
