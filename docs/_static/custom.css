@@ -92,14 +92,14 @@
 }
 
 /* ── All links — black, no underline ── */
-a,
-a:visited,
-.rst-content a,
-.rst-content a:visited,
-.wy-breadcrumbs a,
-.wy-breadcrumbs a:visited,
-.footer a,
-.footer a:visited,
+a:not(.btn),
+a:not(.btn):visited,
+.rst-content a:not(.btn),
+.rst-content a:not(.btn):visited,
+.wy-breadcrumbs a:not(.btn),
+.wy-breadcrumbs a:not(.btn):visited,
+.footer a:not(.btn),
+.footer a:not(.btn):visited,
 .rst-content .reference.external,
 .rst-content .reference.internal,
 .rst-content dl dt a,
@@ -109,10 +109,10 @@ a:visited,
 }
 
 /* ── Hover — black text, amber underline ── */
-a:hover,
-.rst-content a:hover,
-.wy-breadcrumbs a:hover,
-.footer a:hover,
+a:not(.btn):hover,
+.rst-content a:not(.btn):hover,
+.wy-breadcrumbs a:not(.btn):hover,
+.footer a:not(.btn):hover,
 .rst-content .reference.external:hover,
 .rst-content .reference.internal:hover,
 .rst-content dl dt a:hover,
@@ -122,6 +122,25 @@ a:hover,
   text-decoration-color: var(--amber) !important;
   text-underline-offset: 3px !important;
   text-decoration-thickness: 2px !important;
+}
+
+/* ── Buttons — always white on red, no underline ── */
+.btn-neutral,
+.btn-neutral:visited,
+a.btn-neutral,
+a.btn-neutral:visited {
+  background: var(--red) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
+}
+
+.btn-neutral:hover,
+a.btn-neutral:hover {
+  background: var(--red-h) !important;
+  color: #ffffff !important;
+  text-decoration: none !important;
 }
 
 /* ── Headings ── */
@@ -145,22 +164,6 @@ a:hover,
   color: var(--red);
   border: 1px solid #fca5a5;
   background: #fff7f7;
-}
-
-/* ── Buttons ── */
-.btn-neutral,
-.btn-neutral:visited {
-  background: var(--red) !important;
-  color: #ffffff !important;
-  border: none !important;
-  box-shadow: none !important;
-  text-decoration: none !important;
-}
-
-.btn-neutral:hover {
-  background: var(--red-h) !important;
-  color: #ffffff !important;
-  text-decoration: none !important;
 }
 
 /* ── RTD version strip ── */
