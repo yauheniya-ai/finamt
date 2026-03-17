@@ -43,8 +43,6 @@ Return only this JSON, no other text:
 Rules: name = actual business/person name, \
 vat_id = USt-IdNr. e.g. DE123456789, \
 tax_number = Steuernummer e.g. 123/456/78901, \
-address_supplement = secondary address line e.g. building name or campus (null if none). \
-
 
 TEXT:
 {text}
