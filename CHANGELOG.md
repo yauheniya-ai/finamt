@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.7.1 (2026-03-17)
+
+Rebuild frontend static assets
+- **Frontend bundle updated** — static UI assets were not rebuilt before the 0.7.0 PyPI release; this patch includes the correct production build reflecting all 0.7.0 UI changes (`address_supplement` field, Adresszusatz inputs, updated address display)
+
 ## Version 0.7.0 (2026-03-17)
 
 Address supplement field — captures secondary address lines (building name, campus, suite) separately from street and number
