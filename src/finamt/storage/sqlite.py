@@ -229,51 +229,56 @@ class SQLiteRepository:
         """
         Return an existing counterparty matching by VAT-ID (preferred) or by
         name (fallback). Only inserts a new row when no match is found.
+        The SELECT + INSERT is performed under the write lock to prevent
+        duplicate rows from concurrent uploads.
         """
-        row = None
-        if cp.vat_id and cp.vat_id.strip():
-            row = self._conn.execute(
-                "SELECT * FROM counterparties WHERE LOWER(vat_id) = LOWER(?)"
-                " ORDER BY created_at ASC LIMIT 1",
-                (cp.vat_id.strip(),),
-            ).fetchone()
-        if row is None and cp.name and cp.name.strip():
-            row = self._conn.execute(
-                "SELECT * FROM counterparties"
-                " WHERE LOWER(name) = LOWER(?) AND (vat_id IS NULL OR vat_id = '')"
-                " ORDER BY created_at ASC LIMIT 1",
-                (cp.name.strip(),),
-            ).fetchone()
-        if row is not None:
-            return self._row_to_counterparty(row)
-        # No existing match — insert
-        self._exec(
-            """INSERT INTO counterparties
-               (id, name, street_and_number, address_supplement, postcode, city, state, country,
-                tax_number, vat_id, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                cp.id, cp.name,
-                cp.address.street_and_number, cp.address.address_supplement,
-                cp.address.postcode, cp.address.city,
-                cp.address.state, cp.address.country,
-                cp.tax_number, cp.vat_id, self._now(),
-            ),
-        )
+        with self._lock:
+            row = None
+            if cp.vat_id and cp.vat_id.strip():
+                row = self._conn.execute(
+                    "SELECT * FROM counterparties WHERE LOWER(vat_id) = LOWER(?)"
+                    " ORDER BY created_at ASC LIMIT 1",
+                    (cp.vat_id.strip(),),
+                ).fetchone()
+            if row is None and cp.name and cp.name.strip():
+                row = self._conn.execute(
+                    "SELECT * FROM counterparties"
+                    " WHERE LOWER(name) = LOWER(?) AND (vat_id IS NULL OR vat_id = '')"
+                    " ORDER BY created_at ASC LIMIT 1",
+                    (cp.name.strip(),),
+                ).fetchone()
+            if row is not None:
+                return self._row_to_counterparty(row)
+            # No existing match — insert
+            self._conn.execute(
+                """INSERT INTO counterparties
+                   (id, name, street_and_number, address_supplement, postcode, city, state, country,
+                    tax_number, vat_id, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    cp.id, cp.name,
+                    cp.address.street_and_number, cp.address.address_supplement,
+                    cp.address.postcode, cp.address.city,
+                    cp.address.state, cp.address.country,
+                    cp.tax_number, cp.vat_id, self._now(),
+                ),
+            )
+            self._conn.commit()
         return cp
 
     def _deduplicate_counterparties(self) -> None:
         """
         One-time deduplication: for each group of counterparties that share
-        the same VAT-ID (if present) or same name, keep the oldest row and
-        repoint all receipt references to it, then delete the extras.
+        the same VAT-ID (if present) or same name, keep the best row
+        (verified preferred, then oldest) and repoint all receipt references
+        to it, then delete only UNVERIFIED extras.
+        Verified rows are never deleted — they represent user-confirmed data.
         Called automatically on every DB open — safe to run repeatedly.
         """
         # Collect all groups with more than one member
         groups = self._conn.execute(
             """
-            SELECT COALESCE(NULLIF(TRIM(vat_id), ''), LOWER(TRIM(name))) AS key,
-                   MIN(created_at) AS keep_at
+            SELECT COALESCE(NULLIF(TRIM(vat_id), ''), LOWER(TRIM(name))) AS key
             FROM counterparties
             GROUP BY key
             HAVING COUNT(*) > 1
@@ -283,21 +288,21 @@ class SQLiteRepository:
             return
         with self._lock:
             for grp in groups:
-                key, keep_at = grp["key"], grp["keep_at"]
-                # Canonical = oldest row in the group
+                key = grp["key"]
+                # Canonical = verified row (if any), else oldest unverified row
                 canonical = self._conn.execute(
                     """
                     SELECT id FROM counterparties
                     WHERE COALESCE(NULLIF(TRIM(vat_id), ''), LOWER(TRIM(name))) = ?
-                      AND created_at = ?
+                    ORDER BY verified DESC, created_at ASC
                     LIMIT 1
                     """,
-                    (key, keep_at),
+                    (key,),
                 ).fetchone()
                 if canonical is None:
                     continue
                 canonical_id = canonical["id"]
-                # Reroute receipts
+                # Reroute receipts from UNVERIFIED duplicates to canonical
                 self._conn.execute(
                     """
                     UPDATE receipts SET counterparty_id = ?
@@ -305,16 +310,18 @@ class SQLiteRepository:
                         SELECT id FROM counterparties
                         WHERE COALESCE(NULLIF(TRIM(vat_id), ''), LOWER(TRIM(name))) = ?
                           AND id != ?
+                          AND verified = 0
                     )
                     """,
                     (canonical_id, key, canonical_id),
                 )
-                # Delete duplicates
+                # Delete only UNVERIFIED duplicates — never touch verified rows
                 self._conn.execute(
                     """
                     DELETE FROM counterparties
                     WHERE COALESCE(NULLIF(TRIM(vat_id), ''), LOWER(TRIM(name))) = ?
                       AND id != ?
+                      AND verified = 0
                     """,
                     (key, canonical_id),
                 )
@@ -512,10 +519,18 @@ class SQLiteRepository:
         cp_id = cp_row["counterparty_id"] if cp_row else None
 
         # Collect all counterparty field changes
+        # vat_id and tax_number may be explicitly cleared (set to null/empty),
+        # so include them whenever the key is present — even if the value is None.
+        # name is only updated when a non-empty value is supplied.
         cp_updates: dict = {}
         for field_in, col in CP_SCALAR.items():
-            if field_in in fields and fields[field_in] is not None:
-                cp_updates[col] = fields[field_in]
+            if field_in not in fields:
+                continue
+            val = fields[field_in]
+            if col == "name" and not val:   # never clear the supplier name
+                continue
+            # Normalise empty string → None so SQLite stores NULL
+            cp_updates[col] = val if val else None
         addr = fields.get("address", {})
         if isinstance(addr, dict):
             for k in ADDR_FIELDS:
@@ -524,7 +539,44 @@ class SQLiteRepository:
 
         if cp_updates:
             if cp_id:
-                # Update existing counterparty row
+                # If the counterparty is shared with other receipts, clone it
+                # so that only THIS receipt is affected by the edit.
+                other_refs = self._conn.execute(
+                    "SELECT COUNT(*) FROM receipts WHERE counterparty_id = ? AND id != ?",
+                    (cp_id, receipt_id),
+                ).fetchone()[0]
+                if other_refs > 0:
+                    import uuid as _uuid_cp
+                    old_row = self._conn.execute(
+                        "SELECT * FROM counterparties WHERE id = ?", (cp_id,)
+                    ).fetchone()
+                    clone_id = str(_uuid_cp.uuid4())
+                    self._exec(
+                        """INSERT INTO counterparties
+                           (id, name, street_and_number, address_supplement, postcode, city, state,
+                            country, tax_number, vat_id, verified, created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            clone_id,
+                            old_row["name"],
+                            old_row["street_and_number"],
+                            old_row["address_supplement"],
+                            old_row["postcode"],
+                            old_row["city"],
+                            old_row["state"],
+                            old_row["country"],
+                            old_row["tax_number"],
+                            old_row["vat_id"],
+                            0,  # clone starts unverified
+                            self._now(),
+                        ),
+                    )
+                    self._exec(
+                        "UPDATE receipts SET counterparty_id = ? WHERE id = ?",
+                        (clone_id, receipt_id),
+                    )
+                    cp_id = clone_id
+                # Update this receipt's (possibly cloned) counterparty row
                 set_clause = ", ".join(f"{col} = ?" for col in cp_updates)
                 params = tuple(cp_updates.values()) + (cp_id,)
                 self._exec(
@@ -678,7 +730,12 @@ class SQLiteRepository:
         ]
 
     def update_counterparty(self, cp_id: str, fields: dict) -> bool:
-        """Update editable fields of a counterparty. Returns True if a row was updated."""
+        """Update editable fields of a counterparty. Returns True if a row was updated.
+
+        Any user edit automatically marks the row as verified=1 (unless the caller
+        explicitly sets verified=False) so that the deduplication routine never
+        silently discards a manually corrected counterparty.
+        """
         allowed = {
             "name", "tax_number", "vat_id", "verified",
             "street_and_number", "address_supplement", "postcode", "city", "state", "country",
@@ -686,6 +743,9 @@ class SQLiteRepository:
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return False
+        # Auto-verify on user edit unless the caller explicitly sets verified=False
+        if "verified" not in updates:
+            updates["verified"] = 1
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [cp_id]
         cur = self._exec(

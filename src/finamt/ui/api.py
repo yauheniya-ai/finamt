@@ -606,7 +606,11 @@ def update_counterparty(
     with _repo(db_path) as repo:
         if not repo.update_counterparty(cp_id, flat):
             raise HTTPException(status_code=404, detail="Counterparty not found.")
-    return {"ok": True}
+        # Re-fetch and return the saved row so the frontend doesn't rely on
+        # stale local state (especially for cleared fields like vat_id).
+        rows = repo.list_all_counterparties()
+    updated = next((r for r in rows if r["id"] == cp_id), None)
+    return updated if updated is not None else {"ok": True}
 
 
 @app.patch("/counterparties/{cp_id}/verify", tags=["counterparties"])
