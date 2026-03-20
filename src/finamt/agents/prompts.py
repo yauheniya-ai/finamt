@@ -8,10 +8,10 @@ Pattern: instruction → schema → text → output reminder (sandwich).
 from __future__ import annotations
 
 RECEIPT_CATEGORIES = [
-    "services", "consulting", "products", "licensing",
-    "material", "equipment", "internet", "telecommunication",
-    "software", "education", "travel", "utilities",
-    "insurance", "taxes", "other",
+    "services", "products", "material", "equipment", "software",
+    "licensing", "telecommunication", "travel", "car", "education",
+    "utilities", "insurance", "financial", "office", "marketing",
+    "donations", "other",
 ]
 
 _CATS = "|".join(RECEIPT_CATEGORIES)

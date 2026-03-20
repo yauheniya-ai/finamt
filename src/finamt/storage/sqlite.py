@@ -94,6 +94,7 @@ class SQLiteRepository:
             ("counterparties",     "state",                "TEXT"),
             ("receipt_vat_splits", "net_amount",           "TEXT"),
             ("receipts",           "currency",             "TEXT DEFAULT 'EUR'"),
+            ("receipts",           "subcategory",           "TEXT"),
         ]:
             try:
                 self._conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {typedef}")
@@ -157,6 +158,7 @@ class SQLiteRepository:
                 vat_percentage   TEXT,
                 vat_amount       TEXT,
                 category         TEXT,
+                subcategory      TEXT,
                 created_at       TEXT NOT NULL
             );
 
@@ -335,8 +337,8 @@ class SQLiteRepository:
                 """INSERT INTO receipts
                    (id, counterparty_id, receipt_type, receipt_number,
                     receipt_date, total_amount, vat_percentage, vat_amount,
-                    currency, category, created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                    currency, category, subcategory, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     receipt.id, cp_id, str(receipt.receipt_type),
                     receipt.receipt_number, date_str,
@@ -345,6 +347,7 @@ class SQLiteRepository:
                     str(receipt.vat_amount)     if receipt.vat_amount     is not None else None,
                     getattr(receipt, "currency", "EUR") or "EUR",
                     str(receipt.category),
+                    getattr(receipt, "subcategory", None),
                     self._now(),
                 ),
             )
@@ -444,6 +447,7 @@ class SQLiteRepository:
         RECEIPT_MUTABLE = {
             "receipt_type", "receipt_number", "receipt_date",
             "total_amount", "vat_percentage", "vat_amount", "currency", "category",
+            "subcategory",
         }
         CP_SCALAR = {
             "counterparty_name": "name",
@@ -806,5 +810,6 @@ class SQLiteRepository:
         receipt.vat_amount     = self._dec(row["vat_amount"])
         receipt.currency       = row["currency"] if "currency" in row.keys() and row["currency"] else "EUR"
         receipt.category       = ReceiptCategory(row["category"] or "other")
+        receipt.subcategory    = row["subcategory"] if "subcategory" in row.keys() else None
         receipt.items          = items
         return receipt

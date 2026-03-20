@@ -1,5 +1,17 @@
 # Changelog
 
+
+## Version 0.8.0 (2026-03-20)
+
+Subcategories, category list overhaul, and type-independent category assignment
+- **`subcategory` field** — new optional `TEXT` column added to the `receipts` table; existing rows are unaffected (column added via the idempotent `ALTER TABLE` migration loop, defaulting to `NULL`); stored and returned in `ReceiptData.to_dict()` and the API response
+- **Category list revised** — `RECEIPT_CATEGORIES` updated to match the frontend: removed `consulting`, `internet`, and `taxes` as top-level categories (values previously assigned to these are normalised to `"other"` on load); added `car`, `financial`, `office`, `marketing`, and `donations`
+- **Type-independent categories** — `REVENUE_CATS` constant removed; any category can now appear under either the Revenue or Expenses section of the sidebar depending on receipt type; the sidebar renders a single ordered category list for each section instead of splitting into revenue-only and expense-only subsets
+- **Subcategory selector** — editing a receipt in the preview panel now shows a second dropdown below the category picker populated with predefined subcategories for the selected category (e.g. Software → Subscriptions, Pay as you go, Hosting, Domains …); changing the category resets the subcategory; changing the subcategory does not affect the category
+- **Custom subcategories** — a `+` button next to the subcategory dropdown opens an inline text input; any custom value entered is added to the dropdown for that category and persisted in `localStorage` so it survives page reloads; custom entries are preserved when switching back to the same category
+- **Subcategory in read mode** — the receipt detail panel shows the subcategory row only when a value is set, keeping the view uncluttered for receipts without one
+- **Full translations** — all predefined subcategory keys are translated in both EN and DE locale files (e.g. `pay_as_you_go` → "Pay as you go" / "Nutzungsbasiert"); new top-level category labels also added (car/Fahrzeug, financial/Finanzen, office/Büro, marketing/Marketing, donations/Spenden)
+
 ## Version 0.7.5 (2026-03-20)
 
 Dashboard collapsible sections and build-time version injection
@@ -13,8 +25,6 @@ Rebuild frontend static assets
 - **Sidebar: supplier groups start collapsed** — supplier sub-rows under each category now load closed; click to expand; previously they loaded open which was noisy with many receipts
 - **Sidebar: supplier-grouped receipt list** — receipts are grouped by supplier within each category; supplier row shows count (left) and total (right); individual receipts show as a single line with date, truncated receipt number, and amount
 - **Sidebar: size hierarchy corrected** — section total > category total > supplier total > per-receipt amount
-
-
 
 ## Version 0.7.3 (2026-03-17)
 
@@ -61,8 +71,6 @@ Multi-currency support — extraction, storage, and live EUR conversion in the U
 - **Live EUR conversion widget** — when the receipt currency is not `EUR`, a `CurrencyConverter` component fetches the current rate from `https://api.frankfurter.app/latest?from=<CUR>&to=EUR`, displays the rate date, and provides a manual rate-override input; the rate is reported back to the parent via callback
 - **All amounts recalculated** — total, VAT amount, and net amount in the Amounts section are displayed through a `cvt()` helper: if a live (or overridden) rate is available the converted EUR figure is shown; otherwise the original amount is displayed in the receipt's own currency; the widget and all three fields update instantly when the rate changes or the user types a custom rate
 - **Dynamic currency symbol in line items** — item rows use a `currSymbol()` helper that resolves `$` for USD, `£` for GBP, `€` for EUR, and the three-letter ISO code for anything else via `Intl.NumberFormat` with `currencyDisplay: "narrowSymbol"`; original item amounts are shown in the receipt currency unchanged; edit-mode column headers (`MwSt. {{sym}}`, `Gesamt {{sym}}`) use i18n interpolation so they update automatically
-
-
 
 Supplier drill-down in dashboard category charts
 - **Per-supplier breakdown** — each category bar in the expense and revenue charts can now be expanded to reveal a ranked list of individual suppliers and their totals for the active period (e.g. Software → Adobe €499 · Microsoft €499)
@@ -244,8 +252,8 @@ Refactor config and models, unify prompt categories, fix OCR and utils, and upda
 ## Version 0.1.3 (2026-02-21)
 
 Major refactor: package renamed and structure updated
-- Renamed package from 'ai-finance-agent' to 'finanzamt'.
-- Updated project structure to src/finanzamt for imports and packaging.
+- Renamed package from `ai-finance-agent` to `finanzamt`.
+- Updated project structure to `src/finanzamt` for imports and packaging.
 
 ## Version 0.1.2 (2025-07-10)
 
