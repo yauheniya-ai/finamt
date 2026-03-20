@@ -23,7 +23,7 @@ _CATS = "|".join(RECEIPT_CATEGORIES)
 AGENT1_TEMPLATE = """\
 Extract receipt number, date, and category from the text below.
 Return only this JSON, no other text:
-{{"receipt_number": null, "receipt_date": "YYYY-MM-DD or null", "category": "{cats}"}}
+{{"receipt_number": null, "receipt_date": "YYYY-MM-DD", "category": "{cats}"}}
 
 TEXT:
 {text}
