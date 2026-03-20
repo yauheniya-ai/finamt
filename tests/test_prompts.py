@@ -24,10 +24,10 @@ class TestReceiptCategories:
 
     def test_contains_expected_categories(self):
         expected = {
-            "services", "consulting", "products", "licensing",
-            "material", "equipment", "internet", "telecommunication",
-            "software", "education", "travel", "utilities",
-            "insurance", "taxes", "other",
+            "services", "products", "material", "equipment", "software",
+            "licensing", "telecommunication", "travel", "car", "education",
+            "utilities", "insurance", "financial", "office", "marketing",
+            "donations", "other",
         }
         assert expected == set(RECEIPT_CATEGORIES)
 
