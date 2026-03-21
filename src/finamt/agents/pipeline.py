@@ -216,12 +216,13 @@ def _build_receipt_data(
 # ---------------------------------------------------------------------------
 
 def run_pipeline(
-    raw_text:     str,
-    pdf_path:     Optional[Union[str, Path]],   # kept for API compat, not used
-    receipt_type: str,
-    cfg:          Optional[AgentsConfig] = None,
-    receipt_id:   Optional[str] = None,
-    debug_root:   Optional[Path] = _DEFAULT_DEBUG_ROOT,
+    raw_text:      str,
+    pdf_path:      Optional[Union[str, Path]],   # kept for API compat, not used
+    receipt_type:  str,
+    cfg:           Optional[AgentsConfig] = None,
+    receipt_id:    Optional[str] = None,
+    debug_root:    Optional[Path] = _DEFAULT_DEBUG_ROOT,
+    taxpayer_info: Optional[dict] = None,
 ) -> ReceiptData:
     if cfg is None:
         cfg = AgentsConfig()
@@ -247,7 +248,7 @@ def run_pipeline(
     # ── Agent 2: counterparty ──────────────────────────────────────────────
     _progress.emit(f"  {_ts()} → Agent 2: counterparty")
     raw2 = call_llm(
-        prompt=        build_agent2_prompt(raw_text, receipt_type),
+        prompt=        build_agent2_prompt(raw_text, receipt_type, taxpayer_info),
         cfg=           agent_cfg,
         agent_name=    "agent2",
         expected_keys= ["name", "vat_id", "tax_number", "street_and_number",

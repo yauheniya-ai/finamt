@@ -6,6 +6,7 @@ Pattern: instruction → schema → text → output reminder (sandwich).
 """
 
 from __future__ import annotations
+from typing import Optional
 
 RECEIPT_CATEGORIES = [
     "services", "products", "material", "equipment", "software",
@@ -43,7 +44,7 @@ Return only this JSON, no other text:
 Rules: name = actual business/person name, \
 vat_id = USt-IdNr. e.g. DE123456789, \
 tax_number = Steuernummer e.g. 123/456/78901, \
-
+{exclusion}
 TEXT:
 {text}
 
@@ -104,12 +105,27 @@ def build_agent1_prompt(text: str) -> str:
     return AGENT1_TEMPLATE.format(cats=_CATS, text=_truncate(text))
 
 
-def build_agent2_prompt(text: str, receipt_type: str) -> str:
+def build_agent2_prompt(text: str, receipt_type: str, taxpayer_info: Optional[dict] = None) -> str:
     if receipt_type == "purchase":
         party = "vendor/supplier"
     else:
-        party = "client/customer (look for 'An:', 'Bill to:', 'Kunde:', 'Rechnungsempfaenger:')"
-    return AGENT2_TEMPLATE.format(party=party, text=_truncate(text))
+        party = "client/customer"
+
+    exclusion = ""
+    if taxpayer_info:
+        parts: list[str] = []
+        if taxpayer_info.get("name"):       parts.append(f"Name: {taxpayer_info['name']}")
+        if taxpayer_info.get("vat_id"):     parts.append(f"VAT ID: {taxpayer_info['vat_id']}")
+        if taxpayer_info.get("tax_number"): parts.append(f"Tax Number: {taxpayer_info['tax_number']}")
+        if taxpayer_info.get("address"):    parts.append(f"Address: {taxpayer_info['address']}")
+        if parts:
+            exclusion = (
+                f"IMPORTANT: The following belong to the TAXPAYER/DOCUMENT ISSUER "
+                f"— do NOT extract these as the {party}: "
+                + "; ".join(parts)
+            )
+
+    return AGENT2_TEMPLATE.format(party=party, exclusion=exclusion, text=_truncate(text))
 
 
 def build_agent3_prompt(text: str) -> str:

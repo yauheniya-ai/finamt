@@ -331,9 +331,13 @@ def list_databases(active_db: Optional[str] = Query(default=None)):
 
 @app.post("/receipts/upload/stream", tags=["receipts"])
 async def upload_receipt_stream(
-    file:         Annotated[UploadFile, File(description="Receipt PDF or image")],
-    receipt_type: str           = Query(default="purchase", enum=["purchase", "sale"]),
-    db:           Optional[str] = Query(default=None, description="DB file path"),
+    file:                Annotated[UploadFile, File(description="Receipt PDF or image")],
+    receipt_type:        str           = Query(default="purchase", enum=["purchase", "sale"]),
+    db:                  Optional[str] = Query(default=None, description="DB file path"),
+    taxpayer_name:       Optional[str] = Query(default=None, description="Taxpayer's own name"),
+    taxpayer_vat_id:     Optional[str] = Query(default=None, description="Taxpayer's own VAT ID"),
+    taxpayer_tax_number: Optional[str] = Query(default=None, description="Taxpayer's own tax number"),
+    taxpayer_address:    Optional[str] = Query(default=None, description="Taxpayer's own address"),
 ):
     """Upload a receipt and stream back Server-Sent Events with progress and result.
 
@@ -361,6 +365,15 @@ async def upload_receipt_stream(
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
+    _taxpayer_info: Optional[dict] = None
+    if any([taxpayer_name, taxpayer_vat_id, taxpayer_tax_number, taxpayer_address]):
+        _taxpayer_info = {
+            "name":       taxpayer_name       or "",
+            "vat_id":     taxpayer_vat_id     or "",
+            "tax_number": taxpayer_tax_number or "",
+            "address":    taxpayer_address    or "",
+        }
+
     def _run() -> None:
         import tempfile as _tf
         with _tf.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
@@ -371,7 +384,7 @@ async def upload_receipt_stream(
                 lambda msg: loop.call_soon_threadsafe(queue.put_nowait, msg)
             )
             agent  = FinanceAgent(db_path=db_path)
-            result = agent.process_receipt(tmp_path, receipt_type=receipt_type)
+            result = agent.process_receipt(tmp_path, receipt_type=receipt_type, taxpayer_info=_taxpayer_info)
         except Exception as exc:
             _progress.clear_callback()
             tmp_path.unlink(missing_ok=True)

@@ -86,15 +86,19 @@ class FinanceAgent:
 
     def process_receipt(
         self,
-        pdf_path:     Union[str, Path, bytes],
-        receipt_type: str = "purchase",
+        pdf_path:      Union[str, Path, bytes],
+        receipt_type:  str = "purchase",
+        taxpayer_info: Optional[dict] = None,
     ) -> ExtractionResult:
         """
         Process a receipt or invoice PDF through the full pipeline.
 
         Args:
-            pdf_path:     Filesystem path or raw PDF bytes.
-            receipt_type: "purchase" (default) or "sale".
+            pdf_path:      Filesystem path or raw PDF bytes.
+            receipt_type:  "purchase" (default) or "sale".
+            taxpayer_info: Optional dict with taxpayer's own data so Agent 2
+                           does not confuse the taxpayer with the counterparty.
+                           Keys: name, vat_id, tax_number, address.
 
         Returns ExtractionResult — always populated, success flag indicates
         whether the result passed validation and was saved.
@@ -141,6 +145,7 @@ class FinanceAgent:
                 cfg=self.agents_cfg,
                 receipt_id=content_id,
                 debug_root=self._layout.debug_dir if self._layout else None,
+                taxpayer_info=taxpayer_info,
             )
 
             # 8 — Validate --------------------------------------------------

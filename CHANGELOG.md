@@ -1,6 +1,17 @@
 # Changelog
 
-## Version 0.9.2 (2026-03-21)
+## Version 0.10.0 (2026-03-21)
+
+Taxpayer profile — prevent Agent 2 from confusing the document owner with the counterparty
+- **`TaxpayerProfile` type** — new structured profile with `name`, `vat_id`, `tax_number`, `street`, `postcode`, `city`, `state`, and `country` fields; stored per project in `localStorage` under the key `finamt_taxpayer:<db_path>` so each project has independent data and switching databases immediately loads the correct profile
+- **Agent 2 prompt injection** — `build_agent2_prompt()` accepts an optional `taxpayer_info` dict; when provided, an `IMPORTANT:` exclusion clause is appended to the prompt instructing the model not to extract the taxpayer's own name, VAT ID, tax number, or address as the counterparty; fixes mis-extraction on self-issued invoices where both parties' data appear on the document
+- **Pipeline and agent threading** — `taxpayer_info` is passed from `FinanceAgent.process_receipt()` → `run_pipeline()` → `build_agent2_prompt()`; all intermediary signatures updated with the optional parameter, preserving full backward compatibility
+- **API: upload stream endpoint updated** — `POST /receipts/upload/stream` accepts four new optional query parameters: `taxpayer_name`, `taxpayer_vat_id`, `taxpayer_tax_number`, `taxpayer_address`; the address is composited from the structured fields before being forwarded to the pipeline
+- **UI: taxpayer data entry** — a `TaxpayerModal` (exported from `Sidebar.tsx`) provides input fields for all profile fields; address section uses a dedicated layout with a full-width street row, a postcode + city row, and a state + country row; the modal is owned by `App.tsx` and opened from two call sites
+- **UI: sidebar prompt** — when no taxpayer is set, a short hint with a "Set up my taxpayer data" link appears below the upload button; the block is hidden once data is saved to avoid duplication
+- **UI: dashboard header display** — when a taxpayer profile is set, the dashboard header shows `NAME (VATID • TAXNUMBER)` right-aligned on the same line as "Overview", with the formatted address and an inline "Edit" button on the line below
+
+
 
 Subcategory expansion and batch upload
 - **Additional subcategories** — `CATEGORY_SUBCATEGORIES` extended with predefined entries for all previously empty categories: `products` (physical_goods, digital_goods, merchandise, samples), `material` (consumables, raw_materials, packaging, low_value_asset), `equipment` (computer, machinery, furniture, tools, low_value_asset), `marketing` (advertising, print_media, trade_fairs, sponsorship), `donations` (charitable, political, church, membership_fees), `other` (sundry, membership_fees); `services` gains `notary`; `travel` gains `per_diem`
