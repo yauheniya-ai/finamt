@@ -11,7 +11,7 @@ Taxpayer profile — prevent Agent 2 from confusing the document owner with the 
 - **UI: sidebar prompt** — when no taxpayer is set, a short hint with a "Set up my taxpayer data" link appears below the upload button; the block is hidden once data is saved to avoid duplication
 - **UI: dashboard header display** — when a taxpayer profile is set, the dashboard header shows `NAME (VATID • TAXNUMBER)` right-aligned on the same line as "Overview", with the formatted address and an inline "Edit" button on the line below
 
-
+## Version 0.9.2 (2026-03-21)
 
 Subcategory expansion and batch upload
 - **Additional subcategories** — `CATEGORY_SUBCATEGORIES` extended with predefined entries for all previously empty categories: `products` (physical_goods, digital_goods, merchandise, samples), `material` (consumables, raw_materials, packaging, low_value_asset), `equipment` (computer, machinery, furniture, tools, low_value_asset), `marketing` (advertising, print_media, trade_fairs, sponsorship), `donations` (charitable, political, church, membership_fees), `other` (sundry, membership_fees); `services` gains `notary`; `travel` gains `per_diem`
