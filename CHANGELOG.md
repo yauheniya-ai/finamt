@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.10.1 (2026-03-21)
+
+Batch upload live sidebar updates
+- **Sidebar updates per receipt** — during a batch upload the sidebar list now refreshes after each individual receipt completes rather than waiting for the entire batch to finish; each result is prepended to the list immediately when its SSE `result` event arrives, so receipts appear one by one as processing progresses; the final full re-fetch at the end of the batch still runs to ensure the list is fully in sync with the server
+
 ## Version 0.10.0 (2026-03-21)
 
 Taxpayer profile — prevent Agent 2 from confusing the document owner with the counterparty
