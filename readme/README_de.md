@@ -204,7 +204,7 @@ class FinanceAgent:
     def __init__(
         self,
         config:     Config | None = None,
-        db_path:    str | Path | None = "~/.finamt/finamt.db",
+        db_path:    str | Path | None = "~/.finamt/default/finamt.db",
         agents_cfg: AgentsConfig | None = None,
     ) -> None: ...
 
@@ -249,6 +249,7 @@ class ReceiptData:
     receipt_number:   str | None
     receipt_date:     datetime | None
     total_amount:     Decimal | None
+    currency:         str | "EUR"
     vat_percentage:   Decimal | None       # z. B. Decimal("19.0")
     vat_amount:       Decimal | None
     net_amount:       Decimal | None       # berechnet: Gesamt minus MwSt.

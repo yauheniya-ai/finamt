@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.11.1 (2026-03-23)
+
+Verified-tick revert
+
+- **Verified-tick revert** — the amber `◎ VERIFIED` read-only badge introduced in 0.11.0 is removed; `isVerified` in `PreviewPanel` reverts to `localVerified !== null ? localVerified : cpVerifiedFromReceipt`, restoring natural inheritance of the DB-stored `verified` state; the 0.11.0 workaround was only needed because of VAT-ID-based counterparty merging, which is now fixed at the backend, so the checkbox once again reflects the actual DB value on load
+
 ## Version 0.11.0 (2026-03-23)
 
 Data-integrity fixes, validation-as-warnings, and taxpayer-info cleanup
