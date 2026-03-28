@@ -3,7 +3,7 @@ finamt.ui.server
 ~~~~~~~~~~~~~~~~~~~
 Uvicorn launcher for the finamt web UI.
 
-Called by the CLI via ``finamt ui`` or directly::
+Called by the CLI via ``finamt --ui`` or directly::
 
     python -m finamt.ui.server
     python -m finamt.ui.server --port 8080 --no-browser

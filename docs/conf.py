@@ -40,6 +40,7 @@ extensions = [
     "sphinx.ext.viewcode",      # Add links to highlighted source code
     "sphinx.ext.intersphinx",   # Link to other projects' docs
     "myst_parser",              # Parse Markdown (.md) files
+    "sphinx_copybutton",        # Add copy buttons to code blocks
 ]
 
 # File suffixes Sphinx will process
