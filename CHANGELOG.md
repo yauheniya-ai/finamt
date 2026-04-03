@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.12.2 (2026-04-03)
+
+Rebuild UI and reupload
+
 ## Version 0.12.1 (2026-04-03)
 
 Taxpayer profile persisted in project database instead of browser localStorage
