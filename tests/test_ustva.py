@@ -125,8 +125,8 @@ class TestGenerateUstva:
 
     def test_total_input_vat_sums_purchases(self):
         receipts = [
-            _receipt(vat_amount="19.00", vat_percentage="19"),
-            _receipt(vat_amount="7.00",  vat_percentage="7"),
+            _receipt(total_amount="119.00", vat_amount="19.00", vat_percentage="19"),
+            _receipt(total_amount="107.00", vat_amount="7.00",  vat_percentage="7"),
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert report.total_input_vat == Decimal("26.00")
@@ -346,9 +346,11 @@ class TestExport:
 
 class TestRounding:
     def test_vat_amounts_rounded_to_two_decimal_places(self):
+        # Formula: NETTO = 10.00 / 1.19 = 8.4034... → 8.40; VAT = 10.00 − 8.40 = 1.60
+        # The stored vat_amount is ignored when vat_percentage is present.
         receipts = [_receipt(total_amount="10.00", vat_amount="1.905", vat_percentage="19")]
         report = generate_ustva(receipts, Q1_START, Q1_END)
-        assert report.lines["19"].purchase_vat == Decimal("1.91")
+        assert report.lines["19"].purchase_vat == Decimal("1.60")
 
     def test_decimal_normalisation(self):
         """Decimal('19.0').normalize() == '19' — both map to the same bucket."""

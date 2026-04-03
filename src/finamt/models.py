@@ -378,6 +378,12 @@ class ReceiptData:
 
     @property
     def net_amount(self) -> Optional[Decimal]:
+        # Correct gross-to-net: NETTO = BRUTTO ÷ (1 + MwSt./100)
+        # This is the only correct formula when total_amount is a gross (VAT-inclusive) figure.
+        if self.total_amount is not None and self.vat_percentage is not None:
+            rate = self.vat_percentage / Decimal("100")
+            return _r2(self.total_amount / (Decimal("1") + rate))
+        # Fallback: if only the stored vat_amount is available, subtract directly
         if self.total_amount is not None and self.vat_amount is not None:
             return self.total_amount - self.vat_amount
         return None
@@ -427,12 +433,12 @@ class ReceiptData:
 
         Returns an empty list when amounts are not yet available.
         """
-        if self.total_amount is None or self.vat_amount is None:
+        if self.total_amount is None or self.net_amount is None:
             return []
 
         gross = _r2(self.total_amount)
-        vat   = _r2(self.vat_amount)
-        net   = _r2(gross - vat)
+        net   = _r2(self.net_amount)
+        vat   = _r2(gross - net)   # derived from gross−net, consistent with net_amount formula
         p     = Decimal(str(self.private_use_share))
         rid   = self.id
 
@@ -472,9 +478,10 @@ class ReceiptData:
     @property
     def business_vat(self) -> Optional[Decimal]:
         """Reclaimable / remittable VAT for the business portion only."""
-        if self.vat_amount is None:
+        if self.total_amount is None or self.net_amount is None:
             return None
-        return _r2(self.vat_amount * (Decimal("1") - Decimal(str(self.private_use_share))))
+        vat = _r2(self.total_amount - self.net_amount)  # consistent with net_amount formula
+        return _r2(vat * (Decimal("1") - Decimal(str(self.private_use_share))))
 
     # ------------------------------------------------------------------
     # Validation

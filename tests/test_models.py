@@ -81,9 +81,15 @@ class TestReceiptItem:
 
 
 class TestReceiptData:
-    def test_net_amount_computed(self, sample_receipt):
-        expected = sample_receipt.total_amount - sample_receipt.vat_amount
-        assert sample_receipt.net_amount == expected
+    def test_net_amount_computed_from_rate(self, sample_receipt):
+        # Correct gross-to-net: NETTO = BRUTTO ÷ (1 + MwSt./100)
+        # sample_receipt: total=25.90, vat_pct=19 → 25.90 / 1.19 = 21.7647... → 21.76
+        assert sample_receipt.net_amount == Decimal("21.76")
+
+    def test_net_amount_fallback_to_stored_vat(self):
+        # When vat_percentage is absent, fall back to total − stored vat_amount
+        r = ReceiptData(total_amount=Decimal("25.90"), vat_amount=Decimal("4.13"))
+        assert r.net_amount == Decimal("21.77")  # 25.90 − 4.13
 
     def test_net_amount_none_when_total_missing(self):
         r = ReceiptData(vat_amount=Decimal("1.00"))

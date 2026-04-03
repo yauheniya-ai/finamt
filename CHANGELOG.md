@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 0.12.3 (2026-04-03)
+
+### Bug fixes
+
+- **Frontend: German decimal separator accepted in amount fields** — entering values with a comma as the decimal separator (e.g. `195,66`) previously caused silent truncation to the integer part (`195.00`) because JavaScript's native `parseFloat` stops at the first non-numeric character. A `parseDecimal` helper is now used throughout `PreviewPanel.tsx` that normalises the comma to a dot before parsing (`195,66 → 195.66`). Affected fields: GESAMT, MWST. %, MWST. Betrag, all item amounts (total price, VAT rate, VAT amount), all VAT-split fields, and the currency-converter custom-rate input.
+
+- **Frontend / Backend: VAT and net amount calculated correctly from gross price** — previously NETTO was derived as `BRUTTO − stored_vat_amount`, which produced wrong results whenever the LLM extracted a slightly inconsistent VAT figure. The formula is now `NETTO = BRUTTO ÷ (1 + MwSt.%/100)` — the only algebraically correct decomposition of a gross (VAT-inclusive) price. For example: 575,66 € gross @ 19 % → 483,75 € net → 91,91 € VAT (instead of the previously displayed 80,95 €). Changes applied in `models.py` (`net_amount` property, `generate_postings`, `business_vat`) and in the `PreviewPanel.tsx` display and private-use preview calculation.
+
 ## Version 0.12.2 (2026-04-03)
 
 Rebuild UI and reupload
