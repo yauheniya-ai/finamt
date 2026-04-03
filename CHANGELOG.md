@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.12.6 (2026-04-03)
+
+### Bug fixes
+
+- **Frontend: NETTO shown incorrectly when VAT splits are present** — the net amount field in the Amounts section always displayed `receipt.net_amount` from the DB, even when the receipt had VAT splits. With splits (e.g. 19 % → 12,50 € net and 0 % → 15,79 € net) the correct NETTO is the sum of the split net amounts (28,29 €), not the stored scalar. The field now sums `net_amount` across all `vat_splits` in view mode, and sums the live draft fields in edit mode when split-VAT is active; falls back to `receipt.net_amount` when no splits exist.
+
+- **Frontend: search field added to "Select from verified" counterparty picker** — the verified-counterparty dropdown previously required scrolling through the full alphabetical list to find an entry. A search input (auto-focused on open) is now shown at the top of the dropdown; it filters by name, VAT ID, and tax number as you type. Selecting an entry or closing the dropdown resets the search. A "No results" message is shown when the query matches nothing.
+
+- **Backend: counterparty edits no longer silently set `verified = 1`** — any save that touched counterparty fields (name, address, VAT ID, tax number) automatically forced `verified = 1` in `update_receipt_fields()` and `update_counterparty()` in `sqlite.py`, meaning every routine edit implicitly verified the counterparty without any user action. Both paths now leave the `verified` flag untouched unless it is explicitly included in the request payload. The verified flag is only written when the user ticks the checkbox or selects an entry from the verified-counterparty picker. The orphan-cleanup routine relies on receipt references (not the flag) and is unaffected.
+
 ## Version 0.12.5 (2026-04-03)
 
 ### Bug fixes

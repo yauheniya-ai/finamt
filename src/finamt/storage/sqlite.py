@@ -680,11 +680,11 @@ class SQLiteRepository:
                 # Edit the counterparty row directly.  All receipts sharing this
                 # counterparty will reflect the change — which is the desired
                 # behaviour (if OpenAI was mis-labelled everywhere, fix it once).
-                # Mark verified=1 so the orphan-cleanup routine never removes it
-                # while it is still referenced.
-                merged_updates = {**cp_updates, "verified": 1}
-                set_clause = ", ".join(f"{col} = ?" for col in merged_updates)
-                params = tuple(merged_updates.values()) + (cp_id,)
+                # Note: verified is NOT touched here — it must only be set by an
+                # explicit user action (checkbox / select-from-verified).  The
+                # orphan-cleanup routine uses receipt references, not this flag.
+                set_clause = ", ".join(f"{col} = ?" for col in cp_updates)
+                params = tuple(cp_updates.values()) + (cp_id,)
                 self._exec(
                     f"UPDATE counterparties SET {set_clause} WHERE id = ?", params
                 )
@@ -835,8 +835,8 @@ class SQLiteRepository:
     def update_counterparty(self, cp_id: str, fields: dict) -> bool:
         """Update editable fields of a counterparty. Returns True if a row was updated.
 
-        Any edit automatically marks the row verified=1 so orphan-cleanup never
-        removes a counterparty the user is actively managing.
+        The verified flag is only changed when explicitly included in *fields*;
+        ordinary field edits (name, address, VAT-ID, …) must not touch it.
         """
         allowed = {
             "name", "tax_number", "vat_id", "verified",
@@ -845,7 +845,6 @@ class SQLiteRepository:
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return False
-        updates["verified"] = 1  # editing always marks as verified
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [cp_id]
         cur = self._exec(
