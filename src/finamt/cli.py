@@ -13,19 +13,22 @@ Usage examples
     finamt --version
 
     # Single receipt
-    finamt --file receipt1 --input-dir receipts/
+    finamt process receipt1 --input-dir receipts/
 
     # Batch
-    finamt --batch --input-dir receipts/ --output-dir results/
+    finamt batch --input-dir receipts/ --output-dir results/
 
     # Scan receipts into local DB, then generate Q1 UStVA report
-    finamt --ustva --input-dir receipts/ --quarter 1 --year 2024
+    finamt ustva --input-dir receipts/ --quarter 1 --year 2024
 
     # Generate report from already-stored receipts
-    finamt --ustva --quarter 1 --year 2024 --output ustva_q1.json
+    finamt ustva --quarter 1 --year 2024 --output ustva_q1.json
 
     # Use a custom DB path
-    finamt --ustva --input-dir receipts/ --db /tmp/mydb.db
+    finamt ustva --input-dir receipts/ --db /tmp/mydb.db
+
+    # Start the web UI
+    finamt serve --port 8000
 """
 
 from __future__ import annotations
@@ -37,7 +40,6 @@ try:
 except ImportError:
     pass
 
-import argparse
 import json
 import logging
 import sys
@@ -46,6 +48,12 @@ from datetime import date
 from decimal import Decimal
 from importlib.metadata import version
 from pathlib import Path
+from typing import Optional
+
+import typer
+from rich import print as rprint
+from rich.console import Console
+from typing_extensions import Annotated
 
 from finamt import FinanceAgent
 from finamt.storage.sqlite import DEFAULT_DB_PATH
@@ -321,189 +329,193 @@ class FinamtCLI:
         return 0
 
 
+
 # ---------------------------------------------------------------------------
-# Argument parser
+# Typer app
 # ---------------------------------------------------------------------------
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="finamt: process German receipts and prepare tax returns.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
+console = Console()
 
-    parser.add_argument(
-        "--version", action="store_true",
-        help="Show package version and exit.",
-    )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Enable verbose output.",
-    )
+_ASCII_BANNER = """
+[bold yellow]____________                         _____ 
+___  __/__(_)____________ _______ _____  /_
+__  /_ __  /__  __ \\  __ `/_  __ `__ \\  __/
+_  __/ _  / _  / / / /_/ /_  / / / / / /_  
+/_/    /_/  /_/ /_/\\__,_/ /_/ /_/ /_/\\__/[/bold yellow]  
+"""
 
-    # -- Receipt processing -----------------------------------------------
-    receipt_group = parser.add_argument_group("Receipt processing")
-    receipt_group.add_argument(
-        "--file", default=None, metavar="STEM",
-        help="Receipt filename without the .pdf extension.",
-    )
-    receipt_group.add_argument(
-        "--input-dir", default=None, metavar="DIR",
-        help="Directory containing the receipt PDF(s).",
-    )
-    receipt_group.add_argument(
-        "--output-dir", default=None, metavar="DIR",
-        help="Where to write the extracted JSON file(s).",
-    )
-    receipt_group.add_argument(
-        "--batch", action="store_true",
-        help="Batch process all PDFs in --input-dir.",
-    )
-    receipt_group.add_argument(
-        "--type", default="purchase", choices=["purchase", "sale"],
-        help="purchase = Eingangsrechnung (you paid); sale = Ausgangsrechnung (client paid you).",
-    )
-    receipt_group.add_argument(
-        "--no-db", action="store_true",
-        help="Disable DB persistence (extraction + JSON only).",
-    )
+app = typer.Typer(
+    name="finamt",
+    help="finamt: process German receipts and prepare tax returns.",
+    rich_markup_mode="rich",
+    add_completion=False,
+)
 
-    # -- Tax return -------------------------------------------------------
-    tax_group = parser.add_argument_group("UStVA tax return")
-    tax_group.add_argument(
-        "--ustva", action="store_true",
-        help="Generate a UStVA (VAT pre-return) report.",
-    )
-    tax_group.add_argument(
-        "--quarter", type=int, default=1, choices=[1, 2, 3, 4],
-        help="Fiscal quarter for the UStVA report.",
-    )
-    tax_group.add_argument(
-        "--year", type=int, default=date.today().year,
-        help="Fiscal year for the UStVA report.",
-    )
-    tax_group.add_argument(
-        "--output", default=None, metavar="FILE",
-        help=(
-            "Write UStVA JSON report to this explicit file path. "
-            "If omitted and --output-dir is set, the file is named "
-            "automatically, e.g. ustva_q1_2024.json."
+ReceiptType = typer.Option("--type", help="purchase = Eingangsrechnung; sale = Ausgangsrechnung.")
+QuarterOpt  = typer.Option("--quarter", help="Fiscal quarter (1–4).", show_default=True)
+YearOpt     = typer.Option("--year", help="Fiscal year.", show_default=True)
+DbOpt       = typer.Option("--db", help="SQLite DB path (default: ~/.finamt/finamt.db).", show_default=False)
+VerboseOpt  = typer.Option("--verbose", "-v", help="Enable verbose output.")
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        try:
+            ver = version("finamt")
+        except Exception:
+            ver = "unknown"
+        rprint(f"finamt version [bold green]{ver}[/bold green]")
+        raise typer.Exit()
+
+
+@app.callback(invoke_without_command=True)
+def callback(
+    ctx: typer.Context,
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show package version and exit.",
         ),
-    )
-    tax_group.add_argument(
-        "--db", default=None, metavar="FILE",
-        help="SQLite database path (default: ~/.finamt/finamt.db).",
-    )
+    ] = False,
+) -> None:
+    """finamt: process German receipts and prepare German tax returns."""
+    if ctx.invoked_subcommand is None:
+        rprint(_ASCII_BANNER)
+        rprint(ctx.get_help())
+        raise typer.Exit()
 
-    # -- Web UI -----------------------------------------------------------
-    ui_group = parser.add_argument_group("Web UI")
-    ui_group.add_argument(
-        "--ui", action="store_true",
-        help="Start the web UI server (requires: pip install finamt[ui]).",
-    )
-    ui_group.add_argument(
-        "--host", default="127.0.0.1", metavar="HOST",
-        help="UI server bind address.",
-    )
-    ui_group.add_argument(
-        "--port", default=8000, type=int, metavar="PORT",
-        help="UI server port.",
-    )
-    ui_group.add_argument(
-        "--no-browser", action="store_true",
-        help="Do not open the browser when starting the UI.",
-    )
-    ui_group.add_argument(
-        "--reload", action="store_true",
-        help="Enable hot-reload (development mode).",
-    )
-    ui_group.add_argument(
-        "--log-level",
-        default="warning",
-        choices=["debug", "info", "warning", "error"],
-        metavar="LEVEL",
-        help="Log level for the UI server (debug, info, warning, error). Default: warning.",
-    )
 
-    return parser
+# ---------------------------------------------------------------------------
+# process sub-command
+# ---------------------------------------------------------------------------
+
+@app.command("process")
+def cmd_process(
+    file: Annotated[str, typer.Argument(help="Receipt filename without the .pdf extension.")],
+    input_dir: Annotated[Path, typer.Option("--input-dir", help="Directory containing the receipt PDF.")],
+    output_dir: Annotated[Optional[Path], typer.Option("--output-dir", help="Write extracted JSON here.")] = None,
+    verbose: Annotated[bool, VerboseOpt] = False,
+    receipt_type: Annotated[str, ReceiptType] = "purchase",
+    db: Annotated[Optional[Path], DbOpt] = None,
+    no_db: Annotated[bool, typer.Option("--no-db", help="Disable DB persistence.")] = False,
+) -> None:
+    """Process a single receipt PDF and extract its data."""
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(name)s %(message)s")
+
+    rc = FinamtCLI().process_receipt(
+        file_stem=file,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        verbose=verbose,
+        receipt_type=receipt_type,
+        db_path=db,
+        no_db=no_db,
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+# ---------------------------------------------------------------------------
+# batch sub-command
+# ---------------------------------------------------------------------------
+
+@app.command("batch")
+def cmd_batch(
+    input_dir: Annotated[Path, typer.Option("--input-dir", help="Directory containing receipt PDFs.")],
+    output_dir: Annotated[Optional[Path], typer.Option("--output-dir", help="Write extracted JSONs here.")] = None,
+    verbose: Annotated[bool, VerboseOpt] = False,
+    receipt_type: Annotated[str, ReceiptType] = "purchase",
+    db: Annotated[Optional[Path], DbOpt] = None,
+    no_db: Annotated[bool, typer.Option("--no-db", help="Disable DB persistence.")] = False,
+) -> None:
+    """Batch-process all PDFs in a directory."""
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(name)s %(message)s")
+
+    rc = FinamtCLI().batch_process(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        verbose=verbose,
+        receipt_type=receipt_type,
+        db_path=db,
+        no_db=no_db,
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+# ---------------------------------------------------------------------------
+# ustva sub-command
+# ---------------------------------------------------------------------------
+
+@app.command("ustva")
+def cmd_ustva(
+    quarter: Annotated[int, QuarterOpt] = 1,
+    year: Annotated[int, YearOpt] = date.today().year,
+    input_dir: Annotated[Optional[Path], typer.Option("--input-dir", help="Scan & ingest PDFs before reporting.")] = None,
+    output: Annotated[Optional[Path], typer.Option("--output", help="Write JSON report to this path.")] = None,
+    output_dir: Annotated[Optional[Path], typer.Option("--output-dir", help="Auto-named JSON written here.")] = None,
+    verbose: Annotated[bool, VerboseOpt] = False,
+    receipt_type: Annotated[str, ReceiptType] = "purchase",
+    db: Annotated[Optional[Path], DbOpt] = None,
+) -> None:
+    """Generate a UStVA (VAT pre-return) report for a fiscal quarter."""
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(levelname)-8s %(name)s %(message)s")
+
+    cli = FinamtCLI()
+    if input_dir:
+        cli.ingest_receipts(
+            input_dir=input_dir,
+            db_path=db,
+            verbose=verbose,
+            receipt_type=receipt_type,
+        )
+    rc = cli.run_ustva(
+        quarter=quarter,
+        year=year,
+        db_path=db,
+        output=output,
+        output_dir=output_dir,
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+# ---------------------------------------------------------------------------
+# serve sub-command
+# ---------------------------------------------------------------------------
+
+@app.command("serve")
+def cmd_serve(
+    host: Annotated[str, typer.Option("--host", help="Bind address.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="Port number.")] = 8000,
+    no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open the browser.")] = False,
+    reload: Annotated[bool, typer.Option("--reload", help="Enable hot-reload (dev mode).")] = False,
+    log_level: Annotated[str, typer.Option("--log-level", help="Uvicorn log level.")] = "warning",
+) -> None:
+    """Start the finamt web UI server."""
+    from finamt.ui.server import launch
+    launch(
+        host=host,
+        port=port,
+        reload=reload,
+        open_browser=not no_browser,
+        log_level=log_level,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
-def main() -> int:
-    parser = _build_parser()
-    args   = parser.parse_args()
-    cli    = FinamtCLI()
-
-    if args.verbose:
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(levelname)-8s %(name)s — %(message)s",
-        )
-
-    if args.version:
-        cli.print_version()
-        return 0
-
-    db_path = Path(args.db) if args.db else None
-    no_db   = getattr(args, "no_db", False)
-
-    # -- UStVA flow -------------------------------------------------------
-    if args.ustva:
-        if args.input_dir:
-            cli.ingest_receipts(
-                input_dir=Path(args.input_dir),
-                db_path=db_path,
-                verbose=args.verbose,
-                receipt_type=args.type,
-            )
-        return cli.run_ustva(
-            quarter=args.quarter,
-            year=args.year,
-            db_path=db_path,
-            output=Path(args.output) if args.output else None,
-            output_dir=Path(args.output_dir) if args.output_dir else None,
-        )
-
-    # -- Batch processing -------------------------------------------------
-    if args.batch and args.input_dir:
-        return cli.batch_process(
-            input_dir=args.input_dir,
-            output_dir=args.output_dir,
-            verbose=args.verbose,
-            receipt_type=args.type,
-            db_path=db_path,
-            no_db=no_db,
-        )
-
-    # -- Single receipt ---------------------------------------------------
-    if args.file and args.input_dir:
-        return cli.process_receipt(
-            file_stem=args.file,
-            input_dir=args.input_dir,
-            output_dir=args.output_dir,
-            verbose=args.verbose,
-            receipt_type=args.type,
-            db_path=db_path,
-            no_db=no_db,
-        )
-
-    # -- Web UI ----------------------------------------------------------
-    if args.ui:
-        from finamt.ui.server import launch
-        launch(
-            host=args.host,
-            port=args.port,
-            reload=args.reload,
-            open_browser=not args.no_browser,
-            log_level=args.log_level,
-        )
-        return 0
-
-    parser.print_help()
-    return 0
+def main() -> None:
+    app()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

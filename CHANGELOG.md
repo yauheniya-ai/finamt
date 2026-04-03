@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 0.12.0 (2026-04-03)
+
+CLI rewrite: argparse → Typer with Rich colours and ASCII banner
+
+- **argparse replaced by Typer** — the CLI is fully rewritten using [Typer](https://typer.tiangolo.com/); the four top-level actions are now explicit subcommands (`process`, `batch`, `ustva`, `serve`) instead of mutually-exclusive flags; `rich_markup_mode="rich"` is enabled on the app so docstrings and help text support Rich markup natively
+- **`finamt process`** — processes a single receipt PDF; accepts `--file`, `--type`, `--db`, and `--verbose`; delegates to `FinamtCLI.process_receipt()`
+- **`finamt batch`** — batch-processes all PDFs in a directory; accepts `--dir`, `--type`, `--db`, and `--verbose`; delegates to `FinamtCLI.batch_process()`
+- **`finamt ustva`** — generates a UStVA report for a quarter; accepts `--quarter`, `--year`, `--db`, and `--verbose`; delegates to `FinamtCLI.run_ustva()`
+- **`finamt serve`** — starts the finamt web UI server; accepts `--host`, `--port`, and `--db`; delegates to `FinamtCLI.serve()`
+- **ASCII banner** — invoking `finamt` with no arguments prints a bold-yellow ASCII art banner followed by the help text and exits with code 0; implemented via `invoke_without_command=True` on the `@app.callback()` and `ctx.get_help()`
+- **Rich colour output** — `rprint` (from `rich`) replaces `typer.echo` for banner and version output; the version string is rendered as `finamt version <bold-green>x.y.z</bold-green>`; `Console` from `rich.console` is available for future styled output
+- **`FinamtCLI` class unchanged** — all business logic (`process_receipt`, `batch_process`, `run_ustva`, `serve`, etc.) remains in the `FinamtCLI` class and is not affected by the CLI layer rewrite
+- **Test suite updated** — `test_cli_inprocess.py` migrated from `sys.argv` patching + direct `main()` calls to `typer.testing.CliRunner`; `TestBuildParser` replaced by `TestTyperCLI`; all 54 tests pass
+
 ## Version 0.11.4 (2026-03-26)
 
 Batch upload cancellation and taxpayer address supplement

@@ -14,10 +14,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from typer.testing import CliRunner
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from finamt.cli import FinamtCLI, _build_parser, main
+from finamt.cli import FinamtCLI, app
+
+runner = CliRunner()
 
 
 # ---------------------------------------------------------------------------
@@ -363,138 +366,132 @@ class TestRunUstva:
 
 
 # ---------------------------------------------------------------------------
-# _build_parser
+# Typer CLI integration (replaces TestBuildParser)
 # ---------------------------------------------------------------------------
 
-class TestBuildParser:
-    def test_defaults(self):
-        parser = _build_parser()
-        args = parser.parse_args([])
-        assert args.version is False
-        assert args.batch is False
-        assert args.ustva is False
-        assert args.ui is False
-        assert args.type == "purchase"
-        assert args.quarter == 1
+class TestTyperCLI:
+    def test_no_args_shows_help(self):
+        result = runner.invoke(app, [])
+        assert result.exit_code == 0
+        assert "Usage" in result.output
 
     def test_version_flag(self):
-        args = _build_parser().parse_args(["--version"])
-        assert args.version is True
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+        assert "finamt version" in result.output
 
-    def test_file_and_input_dir(self):
-        args = _build_parser().parse_args(["--file", "r1", "--input-dir", "/tmp"])
-        assert args.file == "r1"
-        assert args.input_dir == "/tmp"
+    def test_process_with_file_and_input_dir(self, mocker, tmp_path):
+        (tmp_path / "r1.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        result = runner.invoke(app, ["process", "r1", "--input-dir", str(tmp_path)])
+        assert result.exit_code == 0
 
-    def test_batch_flag(self):
-        args = _build_parser().parse_args(["--batch", "--input-dir", "/tmp"])
-        assert args.batch is True
+    def test_batch_with_input_dir(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
+        result = runner.invoke(app, ["batch", "--input-dir", str(tmp_path)])
+        assert result.exit_code == 0
 
-    def test_type_sale(self):
-        args = _build_parser().parse_args(["--type", "sale"])
-        assert args.type == "sale"
+    def test_type_sale(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker, receipt_type="sale")
+        result = runner.invoke(app, ["process", "r", "--input-dir", str(tmp_path), "--type", "sale"])
+        assert result.exit_code == 0
 
-    def test_ustva_flag(self):
-        args = _build_parser().parse_args(["--ustva", "--quarter", "2", "--year", "2023"])
-        assert args.ustva is True
-        assert args.quarter == 2
-        assert args.year == 2023
+    def test_ustva_quarter_and_year(self, mocker):
+        cm = MagicMock()
+        cm.__enter__.return_value = MagicMock(find_by_period=MagicMock(return_value=[]))
+        cm.__exit__.return_value = False
+        mocker.patch("finamt.cli.get_repository", return_value=cm)
+        result = runner.invoke(app, ["ustva", "--quarter", "2", "--year", "2023"])
+        assert result.exit_code == 1  # no receipts → non-zero
 
-    def test_ui_flag(self):
-        args = _build_parser().parse_args(["--ui", "--no-browser", "--port", "9000"])
-        assert args.ui is True
-        assert args.no_browser is True
-        assert args.port == 9000
+    def test_serve_args(self, mocker):
+        mock_launch = mocker.patch("finamt.ui.server.launch")
+        result = runner.invoke(app, ["serve", "--no-browser", "--port", "9000"])
+        assert result.exit_code == 0
+        mock_launch.assert_called_once()
 
-    def test_db_flag(self, tmp_path):
+    def test_db_option(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mock_cls = mocker.patch("finamt.cli.FinanceAgent")
+        mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
         db = str(tmp_path / "custom.db")
-        args = _build_parser().parse_args(["--db", db])
-        assert args.db == db
+        result = runner.invoke(app, ["batch", "--input-dir", str(tmp_path), "--db", db])
+        assert result.exit_code == 0
 
 
 # ---------------------------------------------------------------------------
-# main() dispatch
+# main() / app dispatch (via Typer CliRunner)
 # ---------------------------------------------------------------------------
 
 class TestMain:
-    def _run(self, argv, mocker):
-        mocker.patch("sys.argv", ["finamt"] + argv)
-        return main()
+    def test_version_flag_exits_0(self, mocker):
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+        assert "finamt version" in result.output
 
-    def test_version_flag_exits_0(self, mocker, capsys):
-        mocker.patch("sys.argv", ["finamt", "--version"])
-        rc = main()
-        assert rc == 0
-        assert "finamt version" in capsys.readouterr().out
-
-    def test_no_args_prints_help_exits_0(self, mocker, capsys):
-        mocker.patch("sys.argv", ["finamt"])
-        rc = main()
-        assert rc == 0
+    def test_no_args_shows_help_exits_0(self):
+        result = runner.invoke(app, [])
+        assert result.exit_code == 0
+        assert "Usage" in result.output
 
     def test_single_receipt_dispatch(self, mocker, tmp_path):
         (tmp_path / "r.pdf").write_text("x")
         mock_cls = mocker.patch("finamt.cli.FinanceAgent")
         mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
-        mocker.patch("sys.argv", [
-            "finamt", "--file", "r", "--input-dir", str(tmp_path)
-        ])
-        rc = main()
-        assert rc == 0
+        result = runner.invoke(app, ["process", "r", "--input-dir", str(tmp_path)])
+        assert result.exit_code == 0
 
     def test_batch_dispatch(self, mocker, tmp_path):
         (tmp_path / "r.pdf").write_text("x")
         mock_cls = mocker.patch("finamt.cli.FinanceAgent")
         mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
-        mocker.patch("sys.argv", [
-            "finamt", "--batch", "--input-dir", str(tmp_path)
-        ])
-        rc = main()
-        assert rc == 0
+        result = runner.invoke(app, ["batch", "--input-dir", str(tmp_path)])
+        assert result.exit_code == 0
 
-    def test_ustva_dispatch_no_receipts(self, mocker, tmp_path):
+    def test_ustva_dispatch_no_receipts(self, mocker):
         cm = MagicMock()
         cm.__enter__.return_value = MagicMock(find_by_period=MagicMock(return_value=[]))
         cm.__exit__.return_value = False
         mocker.patch("finamt.cli.get_repository", return_value=cm)
-        mocker.patch("sys.argv", ["finamt", "--ustva", "--quarter", "1", "--year", "2024"])
-        rc = main()
-        assert rc == 1
+        result = runner.invoke(app, ["ustva", "--quarter", "1", "--year", "2024"])
+        assert result.exit_code == 1
 
-    def test_ustva_dispatch_with_ingest(self, mocker, tmp_path, capsys):
-        """--ustva --input-dir triggers ingest then UStVA."""
+    def test_ustva_dispatch_with_ingest(self, mocker, tmp_path):
+        """finamt ustva --input-dir triggers ingest then UStVA."""
         cm = MagicMock()
         cm.__enter__.return_value = MagicMock(find_by_period=MagicMock(return_value=[]))
         cm.__exit__.return_value = False
         mocker.patch("finamt.cli.get_repository", return_value=cm)
         mocker.patch("finamt.cli.FinanceAgent")
-        mocker.patch("sys.argv", [
-            "finamt", "--ustva", "--input-dir", str(tmp_path),
-            "--quarter", "1", "--year", "2024"
+        result = runner.invoke(app, [
+            "ustva", "--input-dir", str(tmp_path), "--quarter", "1", "--year", "2024"
         ])
-        rc = main()
-        assert rc == 1   # no receipts in DB → 1
+        assert result.exit_code == 1  # no receipts in DB → 1
 
-    def test_verbose_enables_logging(self, mocker, capsys):
-        mocker.patch("sys.argv", ["finamt", "--verbose", "--version"])
+    def test_verbose_enables_logging(self, mocker, tmp_path):
+        (tmp_path / "r.pdf").write_text("x")
+        mocker.patch("finamt.cli.FinanceAgent").return_value.process_receipt.return_value = \
+            _success_result(mocker)
         import logging
         with patch("logging.basicConfig") as mock_log:
-            main()
+            runner.invoke(app, ["process", "r", "--input-dir", str(tmp_path), "--verbose"])
             mock_log.assert_called_once()
 
-    def test_ui_dispatch(self, mocker):
+    def test_serve_dispatch(self, mocker):
         mock_launch = mocker.patch("finamt.ui.server.launch")
-        mocker.patch("sys.argv", ["finamt", "--ui", "--no-browser"])
-        rc = main()
-        assert rc == 0
+        result = runner.invoke(app, ["serve", "--no-browser"])
+        assert result.exit_code == 0
         mock_launch.assert_called_once()
 
-    def test_ui_dispatch_with_port_and_log_level(self, mocker):
+    def test_serve_dispatch_with_port_and_log_level(self, mocker):
         mock_launch = mocker.patch("finamt.ui.server.launch")
-        mocker.patch("sys.argv", [
-            "finamt", "--ui", "--port", "9000", "--log-level", "debug", "--no-browser"
-        ])
-        main()
+        result = runner.invoke(app, ["serve", "--port", "9000", "--log-level", "debug", "--no-browser"])
+        assert result.exit_code == 0
         call_kwargs = mock_launch.call_args
         assert call_kwargs.kwargs.get("port") == 9000 or call_kwargs.args[1] == 9000
 
@@ -502,10 +499,7 @@ class TestMain:
         (tmp_path / "r.pdf").write_text("x")
         mock_cls = mocker.patch("finamt.cli.FinanceAgent")
         mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
-        mocker.patch("sys.argv", [
-            "finamt", "--file", "r", "--input-dir", str(tmp_path), "--no-db"
-        ])
-        main()
+        runner.invoke(app, ["process", "r", "--input-dir", str(tmp_path), "--no-db"])
         mock_cls.assert_called_once_with(db_path=None)
 
     def test_db_flag_passed_through(self, mocker, tmp_path):
@@ -513,8 +507,5 @@ class TestMain:
         db = str(tmp_path / "custom.db")
         mock_cls = mocker.patch("finamt.cli.FinanceAgent")
         mock_cls.return_value.process_receipt.return_value = _success_result(mocker)
-        mocker.patch("sys.argv", [
-            "finamt", "--file", "r", "--input-dir", str(tmp_path), "--db", db
-        ])
-        main()
+        runner.invoke(app, ["process", "r", "--input-dir", str(tmp_path), "--db", db])
         mock_cls.assert_called_once_with(db_path=Path(db))
