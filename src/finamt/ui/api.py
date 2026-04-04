@@ -18,6 +18,7 @@ GET    /databases                  — legacy alias for /projects
 GET    /taxpayer                   — read taxpayer profile for a project
 PUT    /taxpayer                   — save taxpayer profile for a project
 DELETE /taxpayer                   — clear taxpayer profile for a project
+POST   /receipts                   — create a manual receipt entry (no file)
 POST   /receipts/upload
 GET    /receipts
 GET    /receipts/{id}
@@ -46,6 +47,7 @@ from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile, statu
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
 # finamt integration
@@ -390,6 +392,83 @@ def delete_taxpayer(db: Optional[str] = Query(default=None)):
 # ---------------------------------------------------------------------------
 # Receipts
 # ---------------------------------------------------------------------------
+
+
+class ManualReceiptBody(BaseModel):
+    """Payload for the manual receipt entry endpoint."""
+    date:           Optional[str]   = None   # ISO-8601 date string
+    vendor:         Optional[str]   = None
+    receipt_type:   str             = "purchase"  # "purchase" | "sale"
+    category:       str             = "other"
+    net_amount:     float           = 0.0
+    vat_percentage: float           = 0.0
+    description:    Optional[str]   = None
+    currency:       str             = "EUR"
+
+
+@app.post("/receipts", status_code=status.HTTP_201_CREATED, tags=["receipts"])
+def create_manual_receipt(
+    body: ManualReceiptBody,
+    db:   Optional[str] = Query(default=None),
+):
+    """Create a receipt record from manually entered data (no file required)."""
+    from finamt.models import ReceiptData, ReceiptType, ReceiptCategory, Counterparty  # type: ignore[import]
+    from datetime import datetime as _dt
+    from decimal import Decimal as _D
+    import uuid as _uuid
+
+    # Build a unique raw_text so the SHA-256 id is always distinct
+    unique_seed = _uuid.uuid4().hex
+    raw_text = (
+        f"MANUAL:{body.receipt_type}:{body.date or ''}:"
+        f"{body.net_amount}:{body.vendor or ''}:{unique_seed}"
+    )
+    if body.description:
+        raw_text += f":{body.description}"
+
+    net   = _D(str(body.net_amount))
+    vat   = _D(str(body.vat_percentage))
+    total = (net * (1 + vat / _D("100"))).quantize(_D("0.01"))
+    vat_amount = (total - net).quantize(_D("0.01"))
+
+    counterparty = Counterparty(name=body.vendor) if body.vendor else None
+
+    receipt_date = None
+    if body.date:
+        try:
+            receipt_date = _dt.fromisoformat(body.date)
+        except ValueError:
+            pass
+
+    try:
+        rtype = ReceiptType(body.receipt_type)
+    except ValueError:
+        rtype = ReceiptType.purchase
+
+    try:
+        rcat = ReceiptCategory(body.category)
+    except ValueError:
+        rcat = ReceiptCategory.other
+
+    receipt = ReceiptData(
+        raw_text=raw_text,
+        receipt_type=rtype,
+        counterparty=counterparty,
+        receipt_date=receipt_date,
+        total_amount=total if total else None,
+        vat_percentage=vat if vat else None,
+        vat_amount=vat_amount if vat else None,
+        category=rcat,
+        currency=body.currency,
+    )
+
+    db_path = _resolve_layout(db).db_path
+    with _repo(db_path) as repo:
+        repo.save(receipt)
+        receipt = repo.get(receipt.id)  # re-fetch to normalise any DB defaults
+
+    return _receipt_to_response(receipt, db_path)
+
 
 @app.post("/receipts/upload/stream", tags=["receipts"])
 async def upload_receipt_stream(
