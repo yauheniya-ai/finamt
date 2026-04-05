@@ -12,7 +12,7 @@ RECEIPT_CATEGORIES = [
     "services", "products", "material", "equipment", "software",
     "licensing", "telecommunication", "travel", "car", "education",
     "utilities", "insurance", "financial", "office", "marketing",
-    "donations", "other",
+    "donations", "tax_settlement", "capital_movement", "other",
 ]
 
 _CATS = "|".join(RECEIPT_CATEGORIES)

@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.13.2 (2026-04-05)
+
+### New features
+
+- **Frontend: Cashflow-only categories** — two new receipt categories (`tax_settlement`, `capital_movement`) represent balance-sheet cash movements that are not part of profit-and-loss (e.g. tax refunds from Finanzamt, owner capital contributions). A `CASHFLOW_ONLY_CATS` constant (exported from `constants/index.ts`) drives all exclusion logic across the app:
+  - **Category dropdowns** — the category picker in `PreviewPanel` and the `ManualEntryModal` in the sidebar now render a visual separator ("Nur Cashflow" / "Cashflow only") above the two cashflow entries via a `flatMap` divider logic over `CATEGORY_META`.
+  - **Sidebar cashflow section** — receipts belonging to cashflow categories are shown in a dedicated collapsible "Cashflow" section below the revenue and expense lists. Each cashflow category renders both its sale and purchase sub-groups. A signed total (income positive, expense negative) is displayed in the section header.
+  - **Dashboard P&L exclusion** — stat cards, bar charts, and all tax panels (Jahresabschluss / GuV, Gewerbesteuererklärung, Körperschaftsteuererklärung) filter out cashflow receipts. VAT totals and the Umsatzsteuer panels continue to operate on all receipts including cashflow ones.
+  - **i18n** — new keys `cashflow_section` ("Cashflow") and `cashflow_only_label` ("Nur Cashflow" / "Cashflow only") added to both `de.json` and `en.json`.
+
 ## Version 0.13.1 (2026-04-05)
 
 ### New features
