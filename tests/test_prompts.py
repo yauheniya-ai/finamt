@@ -27,7 +27,7 @@ class TestReceiptCategories:
             "services", "products", "material", "equipment", "software",
             "licensing", "telecommunication", "travel", "car", "education",
             "utilities", "insurance", "financial", "office", "marketing",
-            "donations", "other",
+            "donations", "tax_settlement", "capital_movement", "other",
         }
         assert expected == set(RECEIPT_CATEGORIES)
 

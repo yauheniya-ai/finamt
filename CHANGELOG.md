@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.14.0 (2026-04-05)
+
+### New features
+
+- **Frontend: subcategory and notes in Manual Entry modal** — the "Eintrag erstellen" modal now includes a subcategory dropdown (populated from `CATEGORY_SUBCATEGORIES`, resets when category changes) and a free-text notes field. Both values are sent to `POST /receipts` and persisted in the database. Notes are shown in view mode in the Preview Panel and editable in edit mode alongside the existing subcategory selector.
+
+### Bug fixes / improvements
+
+- **Frontend + Backend: cashflow-only receipts reflected in Bilanz** — `tax_settlement` and `capital_movement` receipts were correctly excluded from the GuV but were also silently dropped from `Kassenbestand`, making tax refunds and capital movements invisible in the balance sheet. A dedicated `cashflowNetCurrent` accumulator now tracks these receipts for the reporting year. The amount is added to `Kassenbestand` (Aktiva) and displayed as a separate **"B. Steuererstattungen/-zahlungen (netto)"** line on the Passiva side, keeping the balance sheet balanced without distorting profit-and-loss. Prior-year cashflow-only amounts are carried into the opening-cash carry-forward as before. The same fix is applied to the Python `bilanz.py` backend (`generate_jahresabschluss`), which previously had no cashflow-only exclusion at all. New i18n key `jab_steuerpositionen` added to both locales.
+
 ## Version 0.13.2 (2026-04-05)
 
 ### New features
