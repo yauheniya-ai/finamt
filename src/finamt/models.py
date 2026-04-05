@@ -348,6 +348,7 @@ class ReceiptData:
     currency:         str = "EUR"
     category:         ReceiptCategory = field(default_factory=ReceiptCategory.other)
     subcategory:      Optional[str] = None
+    description:      str = ""                # free-text notes / memo
     items:            List[ReceiptItem] = field(default_factory=list)
     vat_splits:       List[dict] = field(default_factory=list)
     # Populated by validate(); empty = clean, non-empty = user-visible warnings.
@@ -540,6 +541,7 @@ class ReceiptData:
             "currency":         self.currency,
             "category":         str(self.category),
             "subcategory":      self.subcategory,
+            "description":      self.description or None,
             "items":            [item.to_dict() for item in self.items],
             "vat_splits":       getattr(self, "vat_splits", []),
             "validation_warnings": getattr(self, "validation_warnings", []),

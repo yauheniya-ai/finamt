@@ -97,6 +97,7 @@ class SQLiteRepository:
             ("receipt_vat_splits", "net_amount",           "TEXT"),
             ("receipts",           "currency",             "TEXT DEFAULT 'EUR'"),
             ("receipts",           "subcategory",          "TEXT"),
+            ("receipts",           "description",          "TEXT"),
             ("receipts",           "private_use_share",    "TEXT DEFAULT '0'"),
             ("receipts",           "validation_warnings",  "TEXT"),
         ]:
@@ -385,9 +386,9 @@ class SQLiteRepository:
                 """INSERT INTO receipts
                    (id, counterparty_id, receipt_type, receipt_number,
                     receipt_date, total_amount, vat_percentage, vat_amount,
-                    currency, category, subcategory, private_use_share,
-                    validation_warnings, created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    currency, category, subcategory, description,
+                    private_use_share, validation_warnings, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     receipt.id, cp_id, str(receipt.receipt_type),
                     receipt.receipt_number, date_str,
@@ -397,6 +398,7 @@ class SQLiteRepository:
                     getattr(receipt, "currency", "EUR") or "EUR",
                     str(receipt.category),
                     getattr(receipt, "subcategory", None),
+                    getattr(receipt, "description", None) or None,
                     str(getattr(receipt, "private_use_share", "0") or "0"),
                     json.dumps(getattr(receipt, "validation_warnings", []) or []),
                     self._now(),
@@ -593,7 +595,7 @@ class SQLiteRepository:
         RECEIPT_MUTABLE = {
             "receipt_type", "receipt_number", "receipt_date",
             "total_amount", "vat_percentage", "vat_amount", "currency", "category",
-            "subcategory", "private_use_share", "validation_warnings",
+            "subcategory", "description", "private_use_share", "validation_warnings",
         }
         # Financial fields whose change should trigger posting regeneration
         _POSTING_SENSITIVE = {
@@ -1004,6 +1006,7 @@ class SQLiteRepository:
         receipt.currency          = row["currency"] if "currency" in row.keys() and row["currency"] else "EUR"
         receipt.category          = ReceiptCategory(row["category"] or "other")
         receipt.subcategory       = row["subcategory"] if "subcategory" in row.keys() else None
+        receipt.description       = row["description"] if "description" in row.keys() and row["description"] else ""
         receipt.items             = items
         # private_use_share — default to 0 for receipts created before this column existed
         _pus = row["private_use_share"] if "private_use_share" in row.keys() else None

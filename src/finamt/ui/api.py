@@ -400,6 +400,7 @@ class ManualReceiptBody(BaseModel):
     vendor:         Optional[str]   = None
     receipt_type:   str             = "purchase"  # "purchase" | "sale"
     category:       str             = "other"
+    subcategory:    Optional[str]   = None
     net_amount:     float           = 0.0
     vat_percentage: float           = 0.0
     description:    Optional[str]   = None
@@ -461,6 +462,8 @@ def create_manual_receipt(
         category=rcat,
         currency=body.currency,
     )
+    receipt.subcategory = body.subcategory or None
+    receipt.description = body.description or ""
 
     db_path = _resolve_layout(db).db_path
     with _repo(db_path) as repo:
