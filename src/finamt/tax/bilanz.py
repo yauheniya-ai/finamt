@@ -125,6 +125,11 @@ class Bilanz:
     nicht_eingeforderte_einlagen: Decimal = _ZERO  # Konto 2901 deduction
     rückstellungen:             Decimal = _ZERO   # not auto-derived
     verbindlichkeiten:          Decimal = _ZERO   # approx. from outstanding purchases
+    # Net cash from tax_settlement / capital_movement receipts for the reporting year.
+    # Positive = net refund / inflow (e.g. VAT refund from Finanzamt).
+    # Shown as a separate Passiva line to keep the balance sheet balanced while
+    # keeping these flows OUT of the GuV.
+    steuerpositionen:           Decimal = _ZERO
 
     @property
     def summe_aktiva(self) -> Decimal:
@@ -153,6 +158,7 @@ class Bilanz:
             self.summe_eigenkapital
             + self.rückstellungen
             + self.verbindlichkeiten
+            + self.steuerpositionen
         )
 
     @property
@@ -179,8 +185,7 @@ class Bilanz:
                 "gewinnvortrag":                 str(self.gewinnvortrag),
                 "summe_eigenkapital":            str(self.summe_eigenkapital),
                 "rückstellungen":                str(self.rückstellungen),
-                "verbindlichkeiten":             str(self.verbindlichkeiten),
-                "summe_passiva":                 str(self.summe_passiva),
+                "verbindlichkeiten":             str(self.verbindlichkeiten),                "steuerpositionen":             str(self.steuerpositionen),                "summe_passiva":                 str(self.summe_passiva),
             },
             "bilanz_ausgeglichen": self.bilanz_ausgeglichen,
         }
@@ -318,6 +323,8 @@ class Jahresabschluss:
             row("   = Summe Eigenkapital",                 b.summe_eigenkapital, indent=3),
             row("B. Rückstellungen",               b.rückstellungen),
             row("C. Verbindlichkeiten",            b.verbindlichkeiten),
+        ] + ([row("D. Steuererstattungen/-zahlungen", b.steuerpositionen)]
+              if b.steuerpositionen else []) + [
             "  " + "─" * (W - 2),
             row("SUMME PASSIVA",                   b.summe_passiva),
             "",
@@ -345,6 +352,9 @@ class Jahresabschluss:
 
 _MATERIAL_CATS  = {"material", "equipment"}
 _INCOME_CATS    = {"services", "consulting", "products", "licensing"}
+# Categories that represent cash flows only (no P&L impact).
+# These must NOT appear in the GuV; their cash effect IS tracked separately.
+_CASHFLOW_ONLY  = {"tax_settlement", "capital_movement"}
 
 
 def generate_jahresabschluss(
@@ -394,6 +404,7 @@ def generate_jahresabschluss(
     """
     guv   = GuV(year=year)
     skipped = 0
+    cashflow_net: Decimal = _ZERO  # net cash from tax_settlement/capital_movement in reporting year
 
     period_start = date(year, 1, 1)
     period_end   = date(year, 12, 31)
@@ -412,6 +423,11 @@ def generate_jahresabschluss(
 
         cat = str(r.category) if r.category else "other"
         net = _r(r.business_net if r.business_net is not None else r.net_amount)
+
+        # Cashflow-only: skip from GuV, track cash impact separately
+        if cat in _CASHFLOW_ONLY:
+            cashflow_net += net if not r.is_purchase else -net
+            continue
 
         if r.is_purchase:
             if cat in _MATERIAL_CATS:
@@ -443,16 +459,14 @@ def generate_jahresabschluss(
     #     Einlage is already embedded in that figure and must NOT be added again.
     opening = eingezahltes_kapital if kassen_eröffnungsbestand is None else kassen_eröffnungsbestand
 
-    # Cash approximation (cash-basis):
-    #   opening + revenues received − expenses paid
-    # Note: vortrag_gewinnverlust is an equity position, not a cash movement — it
-    # must NOT be added to the cash balance here.
+    # kassenbestand: P&L-derived cash + cashflow-only net (refunds/payments)
     kassenbestand = _r(
         opening
         + guv.umsatzerlöse
         + guv.sonstige_betriebserlöse
         - guv.materialaufwand
         - guv.sonstige_betriebsausgaben
+        + cashflow_net
     )
 
     # § 272 Abs. 1 HGB — outstanding contributions (Ausstehende Einlagen):
@@ -470,6 +484,7 @@ def generate_jahresabschluss(
         jahresergebnis               = guv.jahresergebnis,
         gewinnvortrag                = vortrag_gewinnverlust,
         rückstellungen               = rückstellungen,
+        steuerpositionen             = cashflow_net,
     )
 
     return Jahresabschluss(bilanz=bilanz, guv=guv, skipped_count=skipped)
