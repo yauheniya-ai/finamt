@@ -2,6 +2,12 @@
 
 ## Version 0.14.2 (2026-04-06)
 
+### New features
+
+- **Frontend + Backend: "Recently uploaded" sidebar filter** — a new filter row is added below the period selector in the sidebar. Four toggle pills (`1h`, `8h`, `Today`, `3 days`) let the user filter the receipt list to entries uploaded within that window, independently of the active year/quarter/month filter. The filter is database-backed: `created_at` (UTC ISO-8601, already stored in the `receipts` table) is now included in `ReceiptData.to_dict()` and propagated through `_row_to_receipt()` in `sqlite.py`, so the filter works across browser sessions and devices. On the frontend, `created_at: string | null` is added to the `Receipt` TypeScript type and a `matchesRecent()` helper compares the timestamp against the selected cutoff. The period controls dim while a recent window is active. A dedicated empty-state message is shown when no receipts fall within the window. Full EN/DE translations added (`sidebar.recent_filter.*`).
+
+- **Frontend: name search across all receipts** — a search input row (magnify icon + transparent field + × clear button) is shown below the recent filter row in the sidebar. Typing any substring filters the receipt list by supplier name (`vendor` or counterparty name) across *all* uploaded receipts, bypassing the active period and recent filters. The priority chain is: name search > recent filter > period filter. The period and recent controls dim while a name query is active. A "no results" empty state with a dedicated message is shown when the query matches nothing. Full EN/DE translations added (`sidebar.search_placeholder`, `sidebar.search_no_results`).
+
 ## Version 0.14.1 (2026-04-06)
 
 ### New features
