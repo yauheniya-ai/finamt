@@ -362,6 +362,7 @@ Every receipt is tagged with a category and optional subcategory. Categories map
 | <img src="https://api.iconify.design/vaadin:office.svg" width="16" height="16"> `office` | `rent` `coworking` `storage` `cleaning` `security` |
 | <img src="https://api.iconify.design/mdi:loudspeaker.svg" width="16" height="16"> `marketing` | `advertising` `print_media` `trade_fairs` `sponsorship` `gifts` |
 | <img src="https://api.iconify.design/mdi:donation.svg" width="16" height="16"> `donations` | `charitable` `political` `church` |
+| <img src="https://api.iconify.design/mdi:gavel.svg" width="16" height="16"> `public_fees` | `broadcasting_fee` `ihk_hwk` `berufsgenossenschaft` `other_public_fee` |
 | <img src="https://api.iconify.design/flowbite:folder-plus-solid.svg" width="16" height="16"> `other` | `membership_fees` `sundry` |
 
 

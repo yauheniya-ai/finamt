@@ -40,6 +40,7 @@ _CATEGORY_KEYWORDS: Dict[str, List[str]] = {
     "utilities":         ["strom", "gas", "wasser", "heizung", "nebenkosten", "entsorgung"],
     "insurance":         ["versicherung", "haftpflicht", "police", "prämie"],
     "taxes":             ["steuer", "finanzamt", "steuerberater", "gebühr", "abgabe"],
+    "public_fees":       ["rundfunkbeitrag", "ard", "zdf", "gez", "ihk", "hwk", "berufsgenossenschaft", "pflichtbeitrag", "kammerbeitrag"],
 }
 
 # Keywords that anchor a line as the grand total (checked before max() fallback)

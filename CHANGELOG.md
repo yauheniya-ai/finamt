@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.14.1 (2026-04-06)
+
+### New features
+
+- **Frontend + Backend: `public_fees` category with subcategories** — a new top-level expense category "Public Fees" / "Pflichtabgaben" (icon `mdi:gavel`) is added for mandatory contributions such as ARD/ZDF broadcasting fees, IHK/HWK chamber fees, and Berufsgenossenschaft contributions. Four predefined subcategories are included: `broadcasting_fee`, `ihk_hwk`, `berufsgenossenschaft`, `other_public_fee`. The category is registered in `CATEGORY_META` and `CATEGORY_SUBCATEGORIES` (frontend), added to `RECEIPT_CATEGORIES` so the backend validator no longer falls back to `"other"`, and German heuristic keywords (`rundfunkbeitrag`, `ard`, `zdf`, `gez`, `ihk`, `hwk`, `berufsgenossenschaft`, `pflichtbeitrag`, `kammerbeitrag`) are added to `_CATEGORY_KEYWORDS` for offline classification. Full EN/DE translations added; README category tables and the test suite updated.
+
+- **Frontend + Backend: category / subcategory autofill from DB history when selecting a verified counterparty** — in the Manual Entry modal, picking an entry from the "Select from verified" counterparty picker now automatically prefills the Category and Subcategory fields. A new `GET /counterparties/{cp_id}/defaults` endpoint queries the most frequent `(category, subcategory)` pair stored for that counterparty, preferring non-`"other"` values. The frontend fires the request immediately after selection and updates the form fields if the response carries data.
+
+- **Frontend + Backend: "Verified" checkbox in Manual Entry modal** — a checkbox is shown next to the counterparty name field in the manual entry form. When ticked and the entry is saved, the backend sets `verified = 1` on the linked counterparty row via `repo.set_counterparty_verified()`. This mirrors the verified-tick workflow in the Preview Panel and lets users confirm a new supplier's identity in a single step without opening the Counterparty Explorer afterwards.
+
 ## Version 0.14.0 (2026-04-05)
 
 ### New features

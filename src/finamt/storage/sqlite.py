@@ -799,6 +799,46 @@ class SQLiteRepository:
             for r in rows
         ]
 
+    def get_category_defaults_for_counterparty(self, cp_id: str) -> dict:
+        """Return the most-used (category, subcategory) pair for a counterparty.
+
+        Prefers non-'other' categories.  Returns empty dict when no receipts
+        exist yet for this counterparty.
+        """
+        row = self._conn.execute(
+            """
+            SELECT category, subcategory, COUNT(*) AS cnt
+            FROM   receipts
+            WHERE  counterparty_id = ?
+              AND  category IS NOT NULL
+              AND  category != 'other'
+            GROUP BY category, subcategory
+            ORDER BY cnt DESC
+            LIMIT 1
+            """,
+            (cp_id,),
+        ).fetchone()
+        if row is None:
+            # Fall back to any category including 'other'
+            row = self._conn.execute(
+                """
+                SELECT category, subcategory, COUNT(*) AS cnt
+                FROM   receipts
+                WHERE  counterparty_id = ?
+                  AND  category IS NOT NULL
+                GROUP BY category, subcategory
+                ORDER BY cnt DESC
+                LIMIT 1
+                """,
+                (cp_id,),
+            ).fetchone()
+        if row is None:
+            return {}
+        return {
+            "category":    row["category"],
+            "subcategory": row["subcategory"] or "",
+        }
+
     def set_counterparty_verified(self, cp_id: str, verified: bool) -> None:
         self._exec(
             "UPDATE counterparties SET verified = ? WHERE id = ?",

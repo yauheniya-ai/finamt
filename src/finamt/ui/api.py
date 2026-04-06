@@ -396,15 +396,16 @@ def delete_taxpayer(db: Optional[str] = Query(default=None)):
 
 class ManualReceiptBody(BaseModel):
     """Payload for the manual receipt entry endpoint."""
-    date:           Optional[str]   = None   # ISO-8601 date string
-    vendor:         Optional[str]   = None
-    receipt_type:   str             = "purchase"  # "purchase" | "sale"
-    category:       str             = "other"
-    subcategory:    Optional[str]   = None
-    net_amount:     float           = 0.0
-    vat_percentage: float           = 0.0
-    description:    Optional[str]   = None
-    currency:       str             = "EUR"
+    date:            Optional[str]   = None   # ISO-8601 date string
+    vendor:          Optional[str]   = None
+    vendor_verified: bool            = False
+    receipt_type:    str             = "purchase"  # "purchase" | "sale"
+    category:        str             = "other"
+    subcategory:     Optional[str]   = None
+    net_amount:      float           = 0.0
+    vat_percentage:  float           = 0.0
+    description:     Optional[str]   = None
+    currency:        str             = "EUR"
 
 
 @app.post("/receipts", status_code=status.HTTP_201_CREATED, tags=["receipts"])
@@ -469,6 +470,9 @@ def create_manual_receipt(
     with _repo(db_path) as repo:
         repo.save(receipt)
         receipt = repo.get(receipt.id)  # re-fetch to normalise any DB defaults
+        if body.vendor_verified and receipt and receipt.counterparty:
+            repo.set_counterparty_verified(receipt.counterparty.id, True)
+            receipt = repo.get(receipt.id)  # re-fetch to pick up verified flag
 
     return _receipt_to_response(receipt, db_path)
 
@@ -776,6 +780,16 @@ def list_verified_counterparties(db: Optional[str] = Query(default=None)):
     with _repo(db_path) as repo:
         rows = repo.list_verified_counterparties()
     return {"counterparties": rows}
+
+
+@app.get("/counterparties/{cp_id}/defaults", tags=["counterparties"])
+def get_counterparty_defaults(cp_id: str, db: Optional[str] = Query(default=None)):
+    """Return the most-used category and subcategory for a given counterparty."""
+    db_path = _resolve_db(db)
+    if not db_path.exists():
+        return {}
+    with _repo(db_path) as repo:
+        return repo.get_category_defaults_for_counterparty(cp_id)
 
 
 @app.delete("/counterparties/{cp_id}", status_code=204, tags=["counterparties"])
