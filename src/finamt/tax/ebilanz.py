@@ -332,8 +332,14 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # For a Kleinstkapitalgesellschaft with no inventory / receivables tracked,
     # we report the full current assets as cash equivalent.
     ca = b.kassenbestand + b.vorräte + b.forderungen
-    _fact(root, NS_GAAP, "bs.ass.currAss",          ca,              CTX_END)
-    _fact(root, NS_GAAP, "bs.ass.currAss.cashEquiv", b.kassenbestand, CTX_END)
+    _fact(root, NS_GAAP, "bs.ass.currAss",               ca,              CTX_END)
+    # cashEquiv is a Summenmussfeld (sum field) in the taxonomy — its value may
+    # not be imported directly by some tools.  Report the leaf concept
+    # cashEquiv.bank (Bankguthaben) alongside the parent so that
+    # (a) the calculation check passes (cashEquiv = cashEquiv.bank) and
+    # (b) import tools that require a leaf concept can find it.
+    _fact(root, NS_GAAP, "bs.ass.currAss.cashEquiv",      b.kassenbestand, CTX_END)
+    _fact(root, NS_GAAP, "bs.ass.currAss.cashEquiv.bank", b.kassenbestand, CTX_END)
 
     # C. Ausstehende Einlagen (Bruttomethode only — if nettomethode=True this is 0)
     if b.ausstehende_einlagen:

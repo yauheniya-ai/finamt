@@ -375,11 +375,29 @@ Every receipt is tagged with a category and optional subcategory. Categories map
 
 ## TODO
 
-- [x] Receipt parsing
-- [x] Tax calculation engine
-- [ ] ELSTER field mapper
-- [ ] XML generator
-- [ ] XSD validator
+**Receipt processing**
+- [x] OCR pipeline (PaddleOCR + Tesseract fallback)
+- [x] 4-agent extraction (metadata, counterparty, amounts, line items)
+- [x] Deduplication, database storage, batch processing
+
+**Tax calculation**
+- [x] UStVA — VAT pre-return (monthly / quarterly)
+- [x] UStE — annual VAT return
+- [x] EÜR — income-surplus statement
+- [x] KSt 1 — corporate income tax return
+- [x] GewSt — trade tax return
+- [x] Jahresabschluss — annual accounts (Bilanz + GuV, § 267a HGB)
+
+**ELSTER transmission**
+- [x] UStVA — ELSTER XML builder + Kennzahlen mapper + RSA signing + HTTP submission
+- [x] E-Bilanz — XBRL instance document (HGB taxonomy v6, MicroBilG schema)
+- [ ] E-Bilanz — ERiC ctypes bridge for actual transmission
+- [ ] EÜR — ELSTER XML builder
+- [ ] KSt / GewSt — ELSTER XML builder
+
+**Validation**
+- [ ] XSD validation of generated XBRL against HGB taxonomy
+- [ ] ELSTER dry-run / test-server validation before live submission
 
 ## Contributing
 

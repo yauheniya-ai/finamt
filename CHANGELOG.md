@@ -1,5 +1,28 @@
 # Changelog
 
+## Version 0.16.1 (2026-04-19)
+
+### Bug fixes / improvements
+
+- **Frontend: Bilanz preview — in-app modal replaces `window.open`** — `generateBilanzPdf()` no longer opens the Bilanz in a new browser tab (which rendered full-width with no margins). It now opens an in-app modal overlay (`bilanzPreviewOpen` / `bilanzHtml` state, `bilanzIframeRef`). The modal is exactly 210 mm wide with a light-amber (`#fef3c7`) background; the white paper sheet inside has `padding: 20mm 18mm`, `min-height: 257mm` (full A4), and a drop shadow — matching a classic A4 document look. On print (`@media print`) all decoration is stripped so the printed output is clean.
+
+- **Frontend: Bilanz modal header — Print + Save button** — the modal now has a single combined button showing `[print icon] Drucken / [pdf icon] Speichern` (DE) / `[print icon] Print / [pdf icon] Save PDF` (EN) that triggers `iframe.contentWindow.print()`, which opens the browser print dialog where the user can print or save as PDF. The redundant `↓ HTML` download button was removed.
+
+- **Frontend: `IconPrint` added to `icons.tsx`** — mingcute `print-fill` SVG inlined as `IconPrint` in `frontend/src/constants/icons.tsx` (fills with `currentColor`) for offline use. `IconFilePdf` was already present from v0.16.0.
+
+- **Frontend: Bilanz PDF — negative number format** — negative amounts in the generated Bilanz HTML are now rendered as `- 1.234,56 €` (minus prefix) instead of `(1.234,56 €)` (accountant parentheses) and without red color. All `redIf()` helpers removed; `neg()` updated accordingly. Applies to Jahresergebnis, Gewinnvortrag, Steuerpositionen, Eigenkapital subtotal, Bilanzdifferenz.
+
+- **Frontend: Bilanz PDF — company name without Rechtsform** — the document header previously showed `Space Octahedron GmbH · GmbH` (name + redundant legal-form suffix). The `· ${rechtsform}` part is removed; only the company name is displayed.
+
+- **Frontend: Bilanz PDF — footnote link** — "Erstellt mit finamt" in the footnote is now a clickable `<a href="https://pypi.org/project/finamt/">` with `<strong>` text. Prints in black via `@media print { a { color: #000 } }`.
+
+- **Frontend: E-Bilanz / Bundesanzeiger buttons — icons** — all three action buttons in the Filing Obligations section now show icons alongside their text labels:
+  - **XBRL herunterladen** → `mdi:download` icon (via `@iconify/react`)
+  - **XBRL-Vorschau** → `mdi:eye-outline` icon
+  - **PDF generieren** → `IconFilePdf` icon (inlined, offline-safe); the redundant `(Bilanz)` suffix removed from both `en.json` and `de.json`.
+
+- **Frontend: i18n** — new keys `jab_bilanz_print` ("Drucken" / "Print") and `jab_bilanz_save` ("Speichern" / "Save PDF") added to `en.json` and `de.json`; `jab_bundesanzeiger_pdf` updated (removed `(Bilanz)` suffix in both locales).
+
 ## Version 0.16.0 (2026-04-19)
 
 ### New features / improvements
