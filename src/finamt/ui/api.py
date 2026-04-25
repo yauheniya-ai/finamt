@@ -869,6 +869,7 @@ def get_ustva(
 class EBilanzRequest(BaseModel):
     year:               int
     steuernummer:       str
+    elster_id:          str = ""   # 13-digit ELSTER number for XBRL context identifier
     company_name:       str
     legal_form:         str = "GmbH"
     fiscal_year_start:  str = ""
@@ -910,6 +911,7 @@ def post_ebilanz_xbrl(
 
     cfg = EBilanzConfig(
         steuernummer      = body.steuernummer,
+        elster_id         = body.elster_id,
         company_name      = body.company_name,
         legal_form        = body.legal_form,
         fiscal_year_start = body.fiscal_year_start or str(start),
@@ -937,6 +939,273 @@ def post_ebilanz_xbrl(
         media_type="application/xml",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/tax/ebilanz/settings", tags=["tax"])
+def get_ebilanz_settings(db: Optional[str] = Query(default=None)):
+    """Return all persisted ELSTER settings for this project."""
+    layout = _resolve_layout(db)
+    if not layout.db_path.exists():
+        return {"eric_home": None, "elster_id": None, "cert_pin": None}
+    with _repo(layout.db_path) as repo:
+        eric  = repo.get_metadata("elster_eric_home") or {}
+        misc  = repo.get_metadata("elster_misc") or {}
+    return {
+        "eric_home": eric.get("path") or None,
+        "elster_id": misc.get("elster_id") or None,
+        "cert_pin":  misc.get("cert_pin") or None,
+    }
+
+
+@app.post("/tax/ebilanz/settings", status_code=200, tags=["tax"])
+def post_ebilanz_settings(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+    """Persist ELSTER misc settings (elster_id, cert_pin) in the project DB."""
+    layout = _resolve_layout(db)
+    layout.create_dirs()
+    with _repo(layout.db_path) as repo:
+        existing = repo.get_metadata("elster_misc") or {}
+        if "elster_id" in body:
+            existing["elster_id"] = body["elster_id"]
+        if "cert_pin" in body:
+            existing["cert_pin"] = body["cert_pin"]
+        repo.set_metadata("elster_misc", existing)
+    return {"ok": True}
+
+
+@app.get("/tax/ebilanz/eric-home", tags=["tax"])
+def get_ebilanz_eric_home(db: Optional[str] = Query(default=None)):
+    """Return the ERiC lib/ path stored for this project (if any)."""
+    layout = _resolve_layout(db)
+    if not layout.db_path.exists():
+        return {"stored": False, "path": None}
+    with _repo(layout.db_path) as repo:
+        meta = repo.get_metadata("elster_eric_home")
+    path = (meta or {}).get("path", "") or ""
+    return {"stored": bool(path), "path": path or None}
+
+
+@app.post("/tax/ebilanz/eric-home", status_code=200, tags=["tax"])
+def post_ebilanz_eric_home(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+    """Persist the ERiC lib/ path in the project database."""
+    path = (body or {}).get("eric_home", "").strip()
+    if not path:
+        raise HTTPException(status_code=400, detail="eric_home is required")
+    layout = _resolve_layout(db)
+    layout.create_dirs()
+    with _repo(layout.db_path) as repo:
+        repo.set_metadata("elster_eric_home", {"path": path})
+    return {"stored": True, "path": path}
+
+
+@app.get("/tax/ebilanz/cert", tags=["tax"])
+def get_ebilanz_cert(db: Optional[str] = Query(default=None)):
+    """Check whether a stored ELSTER certificate (.pfx) exists for this project."""
+    layout = _resolve_layout(db)
+    cert   = layout.root / "elster_cert.pfx"
+    return {"stored": cert.exists(), "path": str(cert) if cert.exists() else None}
+
+
+@app.post("/tax/ebilanz/cert", status_code=200, tags=["tax"])
+def post_ebilanz_cert(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+    """
+    Persist an ELSTER certificate (.pfx) in the project folder
+    (~/.finamt/{project}/elster_cert.pfx).  Accepts base64-encoded bytes
+    so the browser does not have to perform a multipart upload.
+    """
+    import base64 as _b64
+    cert_b64 = (body or {}).get("cert_data_b64", "")
+    if not cert_b64:
+        raise HTTPException(status_code=400, detail="cert_data_b64 is required")
+    layout = _resolve_layout(db)
+    layout.create_dirs()
+    raw  = _b64.b64decode(cert_b64)
+    dest = layout.root / "elster_cert.pfx"
+    dest.write_bytes(raw)
+    return {"stored": True, "path": str(dest)}
+
+
+class EBilanzSubmitRequest(EBilanzRequest):
+    """
+    Extended E-Bilanz request body that also carries the ERIC / certificate
+    parameters needed for transmission.
+    """
+    # ERiC library home dir — defaults to FINAMT_ERIC_HOME env var
+    eric_home:      Optional[str] = None
+    # Certificate — either a server-side path OR base64-encoded bytes from the browser
+    cert_path:      Optional[str] = None
+    cert_data_b64:  Optional[str] = None   # base64 .pfx uploaded by the browser
+    cert_password:  Optional[str] = None
+    # Steuernummer for ElsterConfig (already in EBilanzRequest as steuernummer)
+    finanzamt_nr:   str = ""
+    bundesland_kz:  str = ""
+    # Submission mode
+    use_test:       bool = True
+    validate_only:  bool = False
+
+
+@app.post("/tax/ebilanz/submit", tags=["tax"])
+def post_ebilanz_submit(
+    body: EBilanzSubmitRequest,
+    db:   Optional[str] = Query(default=None),
+):
+    """
+    Build the E-Bilanz XBRL, wrap it in the ELSTER envelope, and transmit
+    it to ELSTER via the ERiC shared library.
+
+    Required environment variables (or body fields):
+    - ``FINAMT_ERIC_HOME``            — path to ERiC lib/ directory
+    - ``FINAMT_ELSTER_CERT_PATH``     — path to PKCS#12 certificate (.pfx)
+    - ``FINAMT_ELSTER_CERT_PASSWORD`` — certificate PIN
+    - ``FINAMT_ELSTER_FINANZAMT_NR``  — 4-digit Finanzamtsnummer
+    - ``FINAMT_ELSTER_BUNDESLAND_KZ`` — 2-digit Länderkennzeichen
+
+    Set ``validate_only=true`` to check the XML with ERiC without sending.
+    Set ``use_test=false`` only for production filings (legally binding!).
+    """
+    import os as _os
+
+    if not _LIB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="finamt library not available")
+
+    from decimal import Decimal
+    from datetime import date as _date
+    from finamt.tax.elster import ElsterConfig, ElsterEricClient
+
+    year   = body.year
+    layout = _resolve_layout(db)
+    db_path = layout.db_path
+    start   = _date(year, 1, 1)
+    end     = _date(year, 12, 31)
+    eric_log_dir = str(layout.root / "eric_logs")
+
+    # ── Resolve ERiC home ──────────────────────────────────────────────
+    def _load_stored_eric() -> Optional[str]:
+        if not layout.db_path.exists():
+            return None
+        with _repo(layout.db_path) as _r:
+            _m = _r.get_metadata("elster_eric_home")
+        return (_m or {}).get("path") or None
+
+    eric_home = (
+        body.eric_home
+        or _os.environ.get("FINAMT_ERIC_HOME")
+        or _load_stored_eric()
+    )
+    # Persist whenever the user supplies a value (so it auto-loads next time)
+    if body.eric_home:
+        layout.create_dirs()
+        with _repo(layout.db_path) as _r:
+            _r.set_metadata("elster_eric_home", {"path": body.eric_home})
+    if not eric_home:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "ERiC home directory not configured. "
+                "Set FINAMT_ERIC_HOME or pass eric_home in the request body."
+            ),
+        )
+
+    # ── Resolve certificate ────────────────────────────────────────────
+    import base64 as _b64
+    stored_cert = layout.root / "elster_cert.pfx"
+
+    cert_path = (
+        body.cert_path
+        or _os.environ.get("FINAMT_ELSTER_CERT_PATH")
+    )
+    cert_password = (
+        body.cert_password
+        or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
+    )
+    finanzamt_nr = (
+        body.finanzamt_nr
+        or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
+    )
+    bundesland_kz = (
+        body.bundesland_kz
+        or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
+    )
+
+    # New cert uploaded — save to project folder for future re-use (no temp file)
+    if body.cert_data_b64:
+        raw_cert = _b64.b64decode(body.cert_data_b64)
+        stored_cert.write_bytes(raw_cert)
+        cert_path = str(stored_cert)
+
+    # Fall back to the previously stored project cert
+    if not cert_path and stored_cert.exists():
+        cert_path = str(stored_cert)
+
+    if not cert_path:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "ELSTER certificate not configured. "
+                "Upload a .pfx file or set FINAMT_ELSTER_CERT_PATH."
+            ),
+        )
+
+    # ── Load receipts ─────────────────────────────────────────────────
+    receipts = []
+    if db_path.exists():
+        with _repo(db_path) as repo:
+            receipts = list(repo.find_by_period(_date(2000, 1, 1), end))
+
+    # ── Build XBRL ───────────────────────────────────────────────────
+    cfg_xbrl = EBilanzConfig(
+        steuernummer      = body.steuernummer,
+        elster_id         = body.elster_id,
+        company_name      = body.company_name,
+        legal_form        = body.legal_form,
+        fiscal_year_start = body.fiscal_year_start or str(start),
+        fiscal_year_end   = body.fiscal_year_end   or str(end),
+        preparer          = body.preparer,
+    )
+
+    jab = generate_jahresabschluss(
+        receipts=[r for r in receipts if r.receipt_date and r.receipt_date.year == year],
+        year=year,
+        stammkapital=Decimal(str(body.stammkapital)),
+        eingezahltes_kapital=Decimal(str(body.eingezahltes_kapital)),
+        vortrag_gewinnverlust=Decimal(str(body.vortrag)),
+        nettomethode=body.nettomethode,
+    )
+
+    try:
+        xbrl_bytes = build_xbrl(jab, cfg_xbrl)
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    # ── ElsterConfig for ElsterEricClient ─────────────────────────────
+    elster_cfg = ElsterConfig(
+        cert_path     = cert_path,
+        cert_password = cert_password,
+        steuernummer  = body.steuernummer,
+        finanzamt_nr  = finanzamt_nr,
+        bundesland_kz = bundesland_kz,
+    )
+
+    client = ElsterEricClient(
+        config    = elster_cfg,
+        eric_home = eric_home,
+        use_test  = body.use_test,
+        log_dir   = eric_log_dir,
+    )
+
+    # ── Validate or submit ────────────────────────────────────────────
+    if body.validate_only:
+        result = client.validate_ebilanz(xbrl_bytes, year=year)
+    else:
+        result = client.submit_ebilanz(xbrl_bytes, year=year)
+
+    return {
+        "success":       result.success,
+        "telenummer":    result.telenummer,
+        "error_code":    result.error_code,
+        "error_message": result.error_message,
+        "validate_only": body.validate_only,
+        "use_test":      body.use_test,
+    }
 
 
 # ---------------------------------------------------------------------------

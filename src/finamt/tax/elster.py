@@ -626,3 +626,326 @@ class ElsterClient:
         out = Path(path)
         out.write_bytes(xml_signed)
         return out
+
+
+# ---------------------------------------------------------------------------
+# E-Bilanz envelope builder (XBRL wrapped in ELSTER v12)
+# ---------------------------------------------------------------------------
+
+class EBilanzEnvelopeBuilder:
+    """
+    Wraps an XBRL instance document in the ELSTER v12 transmission envelope
+    required for E-Bilanz (§ 5b EStG) submission via ERiC.
+
+    The envelope uses:
+      Verfahren  →  ElsterBilanz
+      DatenArt   →  Bilanz
+      ERiC datenartVersion  →  Bilanz_6_9  (HGB taxonomy v6, latest plugin)
+    """
+
+    #: ERiC datenartVersion string that selects the Bilanz validation plugin.
+    #: Matches libcheckBilanz_6_9.dylib shipped in ERiC 43.x
+    DATENART_VERSION = "Bilanz_6_9"
+
+    def __init__(self, config: ElsterConfig) -> None:
+        if not _LXML_AVAILABLE:
+            raise ImportError(
+                "lxml is required for E-Bilanz envelope building. "
+                "Install with: pip install lxml"
+            )
+        self.config = config
+
+    def build(
+        self,
+        xbrl_bytes: bytes,
+        year: int,
+        use_test: bool = True,
+    ) -> bytes:
+        """
+        Wrap *xbrl_bytes* (a valid XBRL instance) in the ELSTER envelope.
+
+        Parameters
+        ----------
+        xbrl_bytes:
+            UTF-8 encoded XBRL XML produced by ``finamt.tax.ebilanz.build_xbrl``.
+        year:
+            Fiscal year (used in the NutzdatenHeader Veranlagungszeitraum).
+        use_test:
+            True → include Testmerker 700000004 (not legally binding).
+
+        Returns
+        -------
+        UTF-8 bytes of the full Elster XML envelope ready for ERiC.
+        """
+        ticket   = str(uuid.uuid4()).replace("-", "").upper()[:20]
+        steuernr = normalise_steuernummer(self.config.steuernummer, self.config.bundesland_kz)
+
+        root = etree.Element("Elster", xmlns=NS, version="12")
+
+        # ── TransferHeader ────────────────────────────────────────────
+        th = etree.SubElement(root, "TransferHeader", version="12")
+        etree.SubElement(th, "Verfahren").text   = "ElsterBilanz"
+        etree.SubElement(th, "DatenArt").text    = "Bilanz"
+        etree.SubElement(th, "Vorgang").text     = "send-Auth"
+        etree.SubElement(th, "TransferTicket").text = ticket
+        if use_test:
+            etree.SubElement(th, "Testmerker").text = TESTMERKER
+        etree.SubElement(th, "Empfaenger", id="L")
+        etree.SubElement(th, "HerstellerID").text = "74931"  # register at ELSTER
+        sig_root = etree.SubElement(th, "Signaturen")
+        sig      = etree.SubElement(sig_root, "Signatur", version="12")
+        etree.SubElement(sig, "Beschreibung").text = "Softwarezertifikat"
+        etree.SubElement(sig, "DigestValue")
+        etree.SubElement(sig, "SignatureValue")
+        etree.SubElement(sig, "X509Certificate")
+
+        # ── DatenTeil ─────────────────────────────────────────────────
+        dt  = etree.SubElement(root, "DatenTeil")
+        ndb = etree.SubElement(dt,   "Nutzdatenblock")
+
+        # NutzdatenHeader
+        ndh = etree.SubElement(ndb, "NutzdatenHeader", version="12")
+        etree.SubElement(ndh, "NutzdatenTicket").text = ticket
+        emp = etree.SubElement(ndh, "Empfaenger", id="F")
+        etree.SubElement(emp, "Adressat").text = self.config.finanzamt_nr
+        etree.SubElement(ndh, "Steuernummer").text = steuernr
+        herst = etree.SubElement(ndh, "Hersteller")
+        etree.SubElement(herst, "ProduktName").text    = PRODUKT_NAME
+        etree.SubElement(herst, "ProduktVersion").text = PRODUKT_VERSION
+
+        # Nutzdaten — XBRL content embedded as child XML
+        nd = etree.SubElement(ndb, "Nutzdaten")
+        try:
+            xbrl_tree = etree.fromstring(xbrl_bytes)
+            nd.append(xbrl_tree)
+        except etree.XMLSyntaxError as exc:
+            raise ValueError(f"Invalid XBRL XML: {exc}") from exc
+
+        return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+
+
+# ---------------------------------------------------------------------------
+# ERiC-based ELSTER client (E-Bilanz)
+# ---------------------------------------------------------------------------
+
+class ElsterEricClient:
+    """
+    Submit an E-Bilanz (XBRL Jahresabschluss, § 5b EStG) to ELSTER via ERiC.
+
+    This class uses the official ERiC shared library (libericapi.dylib on macOS)
+    for validation and transmission.  It does NOT use the simple HTTP path used
+    by ``ElsterClient`` — ERiC is mandatory for E-Bilanz submissions.
+
+    Parameters
+    ----------
+    config:
+        ``ElsterConfig`` with certificate path/password, Steuernummer, etc.
+    eric_home:
+        Path to the directory containing libericapi.dylib and plugins/.
+        E.g. ``/path/to/ERiC-43.4.6.0/Darwin-universal/lib``.
+    use_test:
+        True → Testmerker included; submission is not legally binding.
+        False → PRODUCTION — real filing.
+    log_dir:
+        Optional directory for ERiC log output.  Defaults to ``~/.finamt/eric_logs``.
+
+    Usage::
+
+        from finamt.tax.elster import ElsterConfig, ElsterEricClient
+
+        config = ElsterConfig.from_env()
+        client = ElsterEricClient(
+            config,
+            eric_home="/path/to/eric/lib",
+            use_test=True,
+        )
+        result = client.submit_ebilanz(xbrl_bytes, year=2025)
+        print(result)
+    """
+
+    def __init__(
+        self,
+        config: ElsterConfig,
+        eric_home: str,
+        use_test: bool = True,
+        log_dir: str | None = None,
+    ) -> None:
+        self.config   = config
+        self.eric_home = eric_home
+        self.use_test  = use_test
+        self.log_dir   = log_dir  # None means ERiC writes no log file
+        self._builder  = EBilanzEnvelopeBuilder(config)
+
+        if not use_test:
+            import warnings
+            warnings.warn(
+                "ElsterEricClient is in PRODUCTION mode. "
+                "Submissions are legally binding.",
+                stacklevel=2,
+            )
+
+    # ------------------------------------------------------------------
+
+    def validate_ebilanz(self, xbrl_bytes: bytes, year: int) -> SubmissionResult:
+        """
+        Validate the XBRL instance via ERiC without sending to ELSTER.
+
+        Useful during development to surface any ERiC validation errors
+        before attempting a real transmission.
+        """
+        return self._run(xbrl_bytes, year, send=False)
+
+    def submit_ebilanz(self, xbrl_bytes: bytes, year: int) -> SubmissionResult:
+        """
+        Validate and transmit the XBRL instance to ELSTER via ERiC.
+
+        Parameters
+        ----------
+        xbrl_bytes:
+            XBRL instance produced by ``finamt.tax.ebilanz.build_xbrl``.
+        year:
+            The fiscal year of the Jahresabschluss.
+
+        Returns
+        -------
+        ``SubmissionResult`` with ``success=True`` and a ``telenummer`` on success.
+        """
+        return self._run(xbrl_bytes, year, send=True)
+
+    # ------------------------------------------------------------------
+    # internals
+    # ------------------------------------------------------------------
+
+    def _run(self, xbrl_bytes: bytes, year: int, send: bool) -> SubmissionResult:
+        from .eric_wrapper import (
+            EricSession, EricBuffer, EricCertificate,
+            ERIC_VALIDIERE, ERIC_SENDE, EricError,
+        )
+
+        # 1. Build the ELSTER envelope
+        try:
+            envelope_xml = self._builder.build(
+                xbrl_bytes, year=year, use_test=self.use_test
+            )
+        except Exception as exc:
+            return SubmissionResult(
+                success=False,
+                error_code="XML_BUILD_ERROR",
+                error_message=str(exc),
+            )
+
+        # 2. Prepare flags
+        flags = ERIC_VALIDIERE
+        if send:
+            flags |= ERIC_SENDE
+
+        # 3. Ensure ERiC log directory exists
+        Path(self.log_dir).mkdir(parents=True, exist_ok=True)
+
+        # 4. Invoke ERiC
+        try:
+            with EricSession(self.eric_home, log_dir=self.log_dir) as eric:
+                with EricBuffer(eric) as resp_buf, EricBuffer(eric) as srv_buf:
+                    with EricCertificate(eric, str(self.config.cert_path), self.config.cert_password) as cert:
+                        rc, _th = eric.bearbeite_vorgang(
+                            xml_bytes=envelope_xml,
+                            datenart_version=EBilanzEnvelopeBuilder.DATENART_VERSION,
+                            flags=flags,
+                            crypto_params=cert.verschluesselungs_parameter,
+                            response_buffer=resp_buf.handle(),
+                            server_buffer=srv_buf.handle(),
+                        )
+                        response_xml  = resp_buf.content()
+                        server_xml    = srv_buf.content()
+
+        except EricError as exc:
+            return SubmissionResult(
+                success=False,
+                error_code=str(exc.code),
+                error_message=str(exc),
+            )
+        except OSError as exc:
+            return SubmissionResult(
+                success=False,
+                error_code="ERIC_LOAD_ERROR",
+                error_message=f"Could not load ERiC library from {self.eric_home}: {exc}",
+            )
+        except Exception as exc:
+            return SubmissionResult(
+                success=False,
+                error_code="ERIC_ERROR",
+                error_message=str(exc),
+            )
+
+        # 5. rc == 0 means success; non-zero is a validation / transmission error
+        if rc != 0:
+            # Try to parse ELSTER error details from the server response
+            err_msg = self._extract_eric_error(rc, server_xml or response_xml)
+            return SubmissionResult(
+                success=False,
+                error_code=str(rc),
+                error_message=err_msg,
+                raw_response=(server_xml or b"").decode("utf-8", errors="replace"),
+            )
+
+        # 6. Parse Transferticket (Telenummer) from server response
+        telenummer = self._extract_telenummer(server_xml)
+        return SubmissionResult(
+            success=True,
+            telenummer=telenummer,
+            raw_response=(server_xml or b"").decode("utf-8", errors="replace"),
+        )
+
+    @staticmethod
+    def _extract_telenummer(xml_bytes: bytes) -> str | None:
+        if not xml_bytes:
+            return None
+        if not _LXML_AVAILABLE:
+            raw = xml_bytes.decode("utf-8", errors="replace")
+            if "<Telenummer>" in raw:
+                s = raw.index("<Telenummer>") + len("<Telenummer>")
+                e = raw.index("</Telenummer>")
+                return raw[s:e]
+            return None
+        try:
+            tree  = etree.fromstring(xml_bytes)
+            nodes = tree.xpath("//*[local-name()='Telenummer']")
+            return nodes[0].text if nodes else None
+        except Exception:
+            return None
+
+    @staticmethod
+    def _extract_eric_error(rc: int, xml_bytes: bytes) -> str:
+        """Best-effort extraction of a human-readable error message."""
+        if not xml_bytes:
+            return f"ERiC returned code {rc}"
+        raw = xml_bytes.decode("utf-8", errors="replace")
+        if not _LXML_AVAILABLE:
+            return f"ERiC code {rc}: {raw[:300]}"
+        try:
+            tree  = etree.fromstring(xml_bytes)
+            texts = tree.xpath("//*[local-name()='Meldung']/text()")
+            if texts:
+                return f"ERiC {rc}: {' | '.join(texts)}"
+        except Exception:
+            pass
+        return f"ERiC code {rc}: {raw[:300]}"
+
+    # ------------------------------------------------------------------
+    # Convenience: export envelope XML without sending
+    # ------------------------------------------------------------------
+
+    def export_ebilanz_xml(
+        self,
+        xbrl_bytes: bytes,
+        year: int,
+        path: str | Path,
+    ) -> Path:
+        """
+        Build the ELSTER envelope and write it to *path* without submitting.
+        Useful for manual inspection or debugging.
+        """
+        xml = self._builder.build(xbrl_bytes, year=year, use_test=self.use_test)
+        out = Path(path)
+        out.write_bytes(xml)
+        return out

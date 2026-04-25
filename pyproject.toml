@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "finamt"
-version = "0.16.2"
+version = "0.17.0"
 description = "An agentic Python library for extracting key information from receipts and preparing essential German tax return statements."
 readme = "README.md"
 license = {text = "MIT"}
@@ -61,6 +61,7 @@ docs = [
 ]
 dev = [
     "twine",
+    "arelle-release",
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "pytest-mock",

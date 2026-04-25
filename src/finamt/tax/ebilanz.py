@@ -113,10 +113,13 @@ NSMAP = {
 }
 
 # Schema location for MicroBilG (§ 267a HGB Kleinstkapitalgesellschaft)
-# Relative to the transmitted document; ERiC resolves it from the installed taxonomy.
+# ERiC ignores xsi:schemaLocation and resolves from its own installed taxonomy.
+# These relative paths are used by Arelle for local pre-validation only:
+#   - GAAP-CI: resolved when XBRL is placed in de-gaap-ci-2025-04-01/
+#   - GCD:     resolved as ../de-gcd-2025-04-01/ from that same directory
 SCHEMA_LOCATION = (
     f"{NS_GAAP} de-gaap-ci-2025-04-01-shell-fiscal-microbilg.xsd "
-    f"{NS_GCD} de-gcd-2025-04-01-shell.xsd"
+    f"{NS_GCD} ../de-gcd-2025-04-01/de-gcd-2025-04-01.xsd"
 )
 
 # ---------------------------------------------------------------------------
@@ -133,6 +136,7 @@ class EBilanzConfig:
     steuernummer:       str               # e.g. "21/815/08150" — from Finanzamt notice
     company_name:       str               # registered company name
     legal_form:         str = "GmbH"      # "GmbH" | "UG (haftungsbeschränkt)" | ...
+    elster_id:          str = ""          # optional override for XBRL context identifier
     fiscal_year_start:  str = ""          # ISO date "YYYY-MM-DD"
     fiscal_year_end:    str = ""          # ISO date "YYYY-MM-DD"
     # Optional: filing metadata
@@ -200,8 +204,9 @@ def _add_context(root, ctx_id: str, start: str, end: str, steuernummer: str) -> 
     """
     Add a duration context (Berichtszeitraum) to the XBRL instance.
 
-    The entity identifier scheme follows the ELSTER convention:
+    The entity identifier scheme follows the ELSTER/ERiC convention:
       http://www.rzf.fin-nrw.de/  — used for Steuernummer-based identification.
+    The identifier text is the slash-format Steuernummer (e.g. "37/539/50531").
     """
     ctx = _ET.SubElement(root, _tag(NS_XBRLI, "context"), id=ctx_id)
     entity = _ET.SubElement(ctx, _tag(NS_XBRLI, "entity"))
@@ -269,6 +274,9 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     fy_start = cfg.fiscal_year_start or f"{year}-01-01"
     fy_end   = cfg.fiscal_year_end   or f"{year}-12-31"
 
+    # Use 13-digit ELSTER identifier if provided, otherwise fall back to slash-format
+    entity_id = cfg.steuernummer
+
     # Context IDs
     CTX_DURATION = f"D-{year}"          # GuV (from / to)
     CTX_END      = f"I-{year}-12-31"    # Bilanz (instant = balance sheet date)
@@ -286,7 +294,7 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # ----------------------------------------------------------------
     # Schema reference (link to MicroBilG shell)
     # ----------------------------------------------------------------
-    lr = _ET.SubElement(root, _tag(NS_LINK, "linkbaseRef"))
+    lr = _ET.SubElement(root, _tag(NS_LINK, "schemaRef"))
     lr.set(_tag(NS_XLINK, "type"), "simple")
     lr.set(
         _tag(NS_XLINK, "href"),
@@ -296,9 +304,9 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # ----------------------------------------------------------------
     # Contexts
     # ----------------------------------------------------------------
-    _add_context(root, CTX_DURATION, fy_start, fy_end, cfg.steuernummer)
-    _add_instant_context(root, CTX_END, fy_end, cfg.steuernummer)
-    _add_context(root, CTX_GCD, fy_start, fy_end, cfg.steuernummer)
+    _add_context(root, CTX_DURATION, fy_start, fy_end, entity_id)
+    _add_instant_context(root, CTX_END, fy_end, entity_id)
+    _add_context(root, CTX_GCD, fy_start, fy_end, entity_id)
 
     # ----------------------------------------------------------------
     # Unit
@@ -308,15 +316,27 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # ----------------------------------------------------------------
     # GCD module — company master data
     # ----------------------------------------------------------------
-    _str_fact(root, NS_GCD, "genInfo.company.id.name",        cfg.company_name,   CTX_GCD)
-    _str_fact(root, NS_GCD, "genInfo.company.id.legalStatus", cfg.legal_form,      CTX_GCD)
-    _str_fact(root, NS_GCD, "genInfo.report.id.statTaxID",    cfg.steuernummer,    CTX_GCD)
-    _str_fact(root, NS_GCD, "genInfo.doc.period.fiscalYear.start", fy_start,       CTX_GCD)
-    _str_fact(root, NS_GCD, "genInfo.doc.period.fiscalYear.end",   fy_end,         CTX_GCD)
-    if cfg.preparer:
-        _str_fact(root, NS_GCD, "genInfo.report.id.preparer", cfg.preparer, CTX_GCD)
-    if cfg.comment:
-        _str_fact(root, NS_GCD, "genInfo.report.id.comment",  cfg.comment,  CTX_GCD)
+    _str_fact(root, NS_GCD, "genInfo.company.id.name",               cfg.company_name, CTX_GCD)
+
+    # legalStatus is an XBRL tuple — parent element has no contextRef or text value.
+    # The tuple contains an enum child item (xbrli:item, periodType=duration) that
+    # indicates the current legal form. The child item does need a contextRef.
+    _LEGAL_FORM_CODES = {
+        "GmbH":                   "GMBH",
+        "UG (haftungsbeschränkt)": "UG",
+        "AG":                     "AG",
+        "GbR":                    "GBR",
+        "OHG":                    "OHG",
+        "KG":                     "KG",
+    }
+    code = _LEGAL_FORM_CODES.get(cfg.legal_form, "GMBH")
+    ls_tuple = _ET.SubElement(root, _tag(NS_GCD, "genInfo.company.id.legalStatus"))
+    child = _ET.SubElement(ls_tuple, _tag(NS_GCD, f"genInfo.company.id.legalStatus.legalStatus.{code}"))
+    child.set("contextRef", CTX_GCD)
+
+    # Fiscal year dates (correct GCD v6 concept paths)
+    _str_fact(root, NS_GCD, "genInfo.report.period.fiscalYearBegin", fy_start, CTX_GCD)
+    _str_fact(root, NS_GCD, "genInfo.report.period.fiscalYearEnd",   fy_end,   CTX_GCD)
 
     # ----------------------------------------------------------------
     # GAAP module — Bilanz (Aktiva) — instant context
@@ -381,13 +401,13 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # IV. Jahresergebnis
     _fact(root, NS_GAAP, "bs.eqLiab.equity.netIncome", b.jahresergebnis, CTX_END)
 
-    # B. Rückstellungen
+    # B. Rückstellungen (taxonomy: bs.eqLiab.accruals)
     if b.rückstellungen:
-        _fact(root, NS_GAAP, "bs.eqLiab.provisions", b.rückstellungen, CTX_END)
+        _fact(root, NS_GAAP, "bs.eqLiab.accruals", b.rückstellungen, CTX_END)
 
-    # C. Verbindlichkeiten
+    # C. Verbindlichkeiten (taxonomy: bs.eqLiab.liab)
     if b.verbindlichkeiten:
-        _fact(root, NS_GAAP, "bs.eqLiab.liabilities", b.verbindlichkeiten, CTX_END)
+        _fact(root, NS_GAAP, "bs.eqLiab.liab", b.verbindlichkeiten, CTX_END)
 
     # ----------------------------------------------------------------
     # GAAP module — GuV / Income Statement (MicroBilG, duration context)

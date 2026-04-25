@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 0.17.0 (2026-04-26)
+
+### New features
+
+- **Backend: ERiC integration — E-Bilanz submission via official ELSTER library** — new module `finamt.tax.eric_wrapper` provides a ctypes bridge to `libericapi.dylib` (ERiC 43.x) with `EricSession`, `EricBuffer`, and `EricCertificate` context managers. `EricSession` wraps `EricInitialisiere` / `EricBeende`; `EricBuffer` manages return buffer handles; `EricCertificate` loads PKCS#12 certificates.
+
+- **Backend: `ElsterEricClient` + `EBilanzEnvelopeBuilder`** — `finamt.tax.elster` gains two new classes. `EBilanzEnvelopeBuilder` wraps an XBRL instance in the ELSTER v12 envelope (`Verfahren=ElsterBilanz`, `DatenArt=Bilanz`, `datenartVersion=Bilanz_6_9`). `ElsterEricClient` provides `validate_ebilanz(xbrl, year)` and `submit_ebilanz(xbrl, year)` using ERiC for validation + transmission.
+
+- **Backend: `POST /tax/ebilanz/submit`** — new API endpoint that builds XBRL from DB receipts, wraps it in the ELSTER envelope, and submits via ERiC. Reads `FINAMT_ERIC_HOME`, `FINAMT_ELSTER_CERT_PATH`, `FINAMT_ELSTER_CERT_PASSWORD`, `FINAMT_ELSTER_FINANZAMT_NR`, `FINAMT_ELSTER_BUNDESLAND_KZ` from environment or request body. Supports `validate_only=true` for a dry-run check without transmission.
+
 ## Version 0.16.2 (2026-04-25)
 
 ### Bug fixes / improvements
