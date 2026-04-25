@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.16.2 (2026-04-25)
+
+### Bug fixes / improvements
+
+- **Frontend: Jahresabschluss panel — negative number format** — negative amounts in the GuV and Bilanz tables are now rendered with a `−` prefix in black instead of red accountant parentheses, matching the KSt panel.
+
 ## Version 0.16.1 (2026-04-19)
 
 ### Bug fixes / improvements
@@ -10,9 +16,7 @@
 
 - **Frontend: `IconPrint` added to `icons.tsx`** — mingcute `print-fill` SVG inlined as `IconPrint` in `frontend/src/constants/icons.tsx` (fills with `currentColor`) for offline use. `IconFilePdf` was already present from v0.16.0.
 
-- **Frontend: Bilanz PDF — negative number format** — negative amounts in the generated Bilanz HTML are now rendered as `- 1.234,56 €` (minus prefix) instead of `(1.234,56 €)` (accountant parentheses) and without red color. All `redIf()` helpers removed; `neg()` updated accordingly. Applies to Jahresergebnis, Gewinnvortrag, Steuerpositionen, Eigenkapital subtotal, Bilanzdifferenz.
-
-- **Frontend: Bilanz PDF — company name without Rechtsform** — the document header previously showed `Space Octahedron GmbH · GmbH` (name + redundant legal-form suffix). The `· ${rechtsform}` part is removed; only the company name is displayed.
+- **Frontend: Bilanz PDF — negative number format** — negative amounts in the generated Bilanz HTML are now rendered as minus prefix instead of accountant parentheses and without red color. 
 
 - **Frontend: Bilanz PDF — footnote link** — "Erstellt mit finamt" in the footnote is now a clickable `<a href="https://pypi.org/project/finamt/">` with `<strong>` text. Prints in black via `@media print { a { color: #000 } }`.
 
@@ -273,8 +277,6 @@ Offline-safe icons — inline SVG components replace CDN-fetched icon font
 - **`DBSelector.tsx`** — `@iconify/react` import removed; all nine icon usages replaced with inline components
 - **`Sidebar.tsx`**, **`PreviewPanel.tsx`**, **`Dashboard.tsx`** — high-frequency icons (`mdi:chevron-down`, `mdi:close`, `mdi:trash-can-outline`, `svg-spinners:12-dots-scale-rotate`, `mdi:plus-circle-outline`) replaced with inline components; remaining low-frequency icons (dynamic category icons, `mdi:upload`, etc.) retain `@iconify/react` for now
 - **Motivation** — `@iconify/react` loads icon data from the Iconify CDN when a specific icon has not been bundled; with no network access the icons silently disappeared; inline SVGs are bundled at build time and render correctly offline
-
-
 
 Counterparties Explorer — keep receipt visible in background
 
