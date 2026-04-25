@@ -65,8 +65,9 @@ Usage::
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
-import uuid
+import random
 from base64 import b64encode
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -100,6 +101,7 @@ except ImportError:
 
 from .ustva import USTVAReport
 
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ELSTER endpoints
@@ -111,12 +113,84 @@ ELSTER_URL_TEST       = "https://www.elster.de/ekona/upload/elstertest"
 # Testmerker — signals the Finanzamt that this is a test submission
 TESTMERKER = "700000004"
 
-# ELSTER XML namespace
-NS = "http://www.elster.de/elsterxml/schema/v12"
+# ELSTER XML namespace (v11 — required by ERiC libcheckBilanz plugin)
+NS = "http://www.elster.de/elsterxml/schema/v11"
 
 # Product identification sent to ELSTER
 PRODUKT_NAME    = "finamt"
 PRODUKT_VERSION = "0.1"
+
+# Länderkennzeichen (2-digit numeric) → ELSTER <Ziel> code for TransferHeader
+_BUNDESLAND_ZIEL: dict[str, str] = {
+    "01": "SH", "02": "HH", "03": "NI", "04": "HB",
+    "05": "NW", "06": "HE", "07": "RP", "08": "BW",
+    "09": "BY", "10": "SL", "11": "BE", "12": "BB",
+    "13": "MV", "14": "SN", "15": "ST", "16": "TH",
+    # also accept 2-letter values passed directly
+}
+
+
+def _make_ticket() -> str:
+    """Generate a transfer ticket matching ERiC regex ``[0-9a-km-z]{2}[0-9]{3}[0-9a-km-z]{27}``."""
+    _alpha = "abcdefghijkmnopqrstuvwxyz0123456789"  # a-z minus 'l', plus digits
+    _digits = "0123456789"
+    part1 = "".join(random.choices(_alpha, k=2))
+    part2 = "".join(random.choices(_digits, k=3))
+    part3 = "".join(random.choices(_alpha, k=27))
+    return part1 + part2 + part3
+
+
+def _bundesland_ziel(bundesland_kz: str) -> str:
+    """Return the 2-letter ELSTER <Ziel> code from a numeric Länderkennzeichen."""
+    return _BUNDESLAND_ZIEL.get(bundesland_kz, bundesland_kz)
+
+
+# city/state name → Länderkennzeichen (lower-cased for matching)
+_CITY_TO_KZ: dict[str, str] = {
+    # Stadtstaaten
+    "berlin":            "11",
+    "hamburg":           "02",
+    "bremen":            "04",
+    "bremerhaven":       "04",
+    # Flächenländer – capitals + common aliases
+    "kiel":              "01",  # Schleswig-Holstein
+    "schleswig-holstein":"01",
+    "niedersachsen":     "03",
+    "hannover":          "03",
+    "nordrhein-westfalen":"05",
+    "düsseldorf":        "05",
+    "köln":              "05",
+    "hessen":            "06",
+    "wiesbaden":         "06",
+    "frankfurt":         "06",
+    "rheinland-pfalz":   "07",
+    "mainz":             "07",
+    "baden-württemberg": "08",
+    "stuttgart":         "08",
+    "bayern":            "09",
+    "munich":            "09",
+    "münchen":           "09",
+    "saarland":          "10",
+    "saarbrücken":       "10",
+    "brandenburg":       "12",
+    "potsdam":           "12",
+    "mecklenburg-vorpommern": "13",
+    "schwerin":          "13",
+    "sachsen":           "14",
+    "dresden":           "14",
+    "sachsen-anhalt":    "15",
+    "magdeburg":         "15",
+    "thüringen":         "16",
+    "erfurt":            "16",
+}
+
+
+def bundesland_kz_from_city(city: str) -> str:
+    """
+    Derive a numeric Länderkennzeichen from an (approximate) city or state name.
+    Returns ``""`` when not recognised.
+    """
+    return _CITY_TO_KZ.get(city.strip().lower(), "")
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +227,7 @@ class ElsterConfig:
     steuernummer:   str
     finanzamt_nr:   str
     bundesland_kz:  str
+    hersteller_id:  str = ""  # register at https://www.elster.de/eportal/softwareentwickler
 
     @classmethod
     def from_env(cls) -> "ElsterConfig":
@@ -163,6 +238,7 @@ class ElsterConfig:
             steuernummer  = os.environ["FINAMT_ELSTER_STEUERNUMMER"],
             finanzamt_nr  = os.environ["FINAMT_ELSTER_FINANZAMT_NR"],
             bundesland_kz = os.environ["FINAMT_ELSTER_BUNDESLAND_KZ"],
+            hersteller_id = os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", ""),
         )
 
 
@@ -317,60 +393,72 @@ class ElsterXMLBuilder:
         use_test:
             True → include Testmerker (test submission, not legally binding).
         """
-        ticket    = str(uuid.uuid4()).replace("-", "").upper()[:20]
+        ticket    = _make_ticket()
         steuernr  = normalise_steuernummer(self.config.steuernummer, self.config.bundesland_kz)
+        if len(steuernr) != 13:
+            raise ValueError(
+                f"Cannot normalise Steuernummer '{self.config.steuernummer}' to 13 digits. "
+                "Either pass bundesland_kz (e.g. '11' for Berlin) or supply the "
+                "13-digit ELSTER form directly (e.g. '1137053950531')."
+            )
+        # Derive bundesland_kz from the normalised steuernummer prefix if not given
+        bund_kz   = self.config.bundesland_kz or steuernr[:2]
+        # BUFA = first 4 digits of the 13-digit normalised steuernummer
+        fa_nr     = self.config.finanzamt_nr or steuernr[:4]
         kz        = _ustva_kennzahlen(report)
         timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S")
 
-        root = etree.Element("Elster", xmlns=NS, version="12")
+        # Helper: Clark-notation tag in the ELSTER namespace
+        def _t(tag: str) -> str:
+            return f"{{{NS}}}{tag}"
+
+        root = etree.Element(_t("Elster"), nsmap={None: NS})
 
         # ── TransferHeader ────────────────────────────────────────────
-        th = etree.SubElement(root, "TransferHeader", version="12")
-        etree.SubElement(th, "Verfahren").text  = "ElsterAnmeldung"
-        etree.SubElement(th, "DatenArt").text   = "UStVA"
-        etree.SubElement(th, "Vorgang").text    = "send-Auth"
-        etree.SubElement(th, "TransferTicket").text = ticket
+        th = etree.SubElement(root, _t("TransferHeader"), version="11")
+        etree.SubElement(th, _t("Verfahren")).text  = "ElsterAnmeldung"
+        etree.SubElement(th, _t("DatenArt")).text   = "UStVA"
+        etree.SubElement(th, _t("Vorgang")).text    = "send-Auth"
+        etree.SubElement(th, _t("TransferTicket")).text = ticket
         if use_test:
-            etree.SubElement(th, "Testmerker").text = TESTMERKER
-        etree.SubElement(th, "Empfaenger", id="L")   # L = Landesfinanzbehörde
-        etree.SubElement(th, "HerstellerID").text = "74931"  # placeholder — register at ELSTER
-        sig_root = etree.SubElement(th, "Signaturen")
-        sig      = etree.SubElement(sig_root, "Signatur", version="12")
-        etree.SubElement(sig, "Beschreibung").text = "Softwarezertifikat"
-        # Placeholder nodes — filled in by ElsterSigner
-        etree.SubElement(sig, "DigestValue")
-        etree.SubElement(sig, "SignatureValue")
-        etree.SubElement(sig, "X509Certificate")
+            etree.SubElement(th, _t("Testmerker")).text = TESTMERKER
+        emp_th = etree.SubElement(th, _t("Empfaenger"), id="L")   # L = Landesfinanzbehörde
+        etree.SubElement(emp_th, _t("Ziel")).text = _bundesland_ziel(bund_kz)
+        etree.SubElement(th, _t("HerstellerID")).text = self.config.hersteller_id
+        etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
+        datei = etree.SubElement(th, _t("Datei"))
+        etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
+        etree.SubElement(datei, _t("Kompression")).text      = "GZIP"
+        etree.SubElement(datei, _t("TransportSchluessel"))
 
         # ── DatenTeil ─────────────────────────────────────────────────
-        dt    = etree.SubElement(root, "DatenTeil")
-        ndb   = etree.SubElement(dt,   "Nutzdatenblock")
+        dt    = etree.SubElement(root, _t("DatenTeil"))
+        ndb   = etree.SubElement(dt,   _t("Nutzdatenblock"))
 
         # NutzdatenHeader
-        ndh = etree.SubElement(ndb, "NutzdatenHeader", version="12")
-        etree.SubElement(ndh, "NutzdatenTicket").text = ticket
-        emp = etree.SubElement(ndh, "Empfaenger", id="F")    # F = Finanzamt
-        etree.SubElement(emp, "Adressat").text = self.config.finanzamt_nr
-        herst = etree.SubElement(ndh, "Hersteller")
-        etree.SubElement(herst, "ProduktName").text    = PRODUKT_NAME
-        etree.SubElement(herst, "ProduktVersion").text = PRODUKT_VERSION
+        ndh = etree.SubElement(ndb, _t("NutzdatenHeader"), version="11")
+        etree.SubElement(ndh, _t("NutzdatenTicket")).text = ticket
+        etree.SubElement(ndh, _t("Empfaenger"), id="F").text = fa_nr
+        herst = etree.SubElement(ndh, _t("Hersteller"))
+        etree.SubElement(herst, _t("ProduktName")).text    = PRODUKT_NAME
+        etree.SubElement(herst, _t("ProduktVersion")).text = PRODUKT_VERSION
 
         # Nutzdaten — UStVA payload
-        nd    = etree.SubElement(ndb, "Nutzdaten")
-        anm   = etree.SubElement(nd,  "Anmeldungssteuern",
+        nd    = etree.SubElement(ndb, _t("Nutzdaten"))
+        anm   = etree.SubElement(nd,  _t("Anmeldungssteuern"),
                                   art="UStVA", version=f"{year}01")
-        sf    = etree.SubElement(anm, "Steuerfall")
-        ustva = etree.SubElement(sf,  "Umsatzsteuervoranmeldung")
+        sf    = etree.SubElement(anm, _t("Steuerfall"))
+        ustva = etree.SubElement(sf,  _t("Umsatzsteuervoranmeldung"))
 
-        etree.SubElement(ustva, "Jahr").text    = str(year)
-        etree.SubElement(ustva, "Zeitraum").text = str(period).zfill(2)
-        etree.SubElement(ustva, "Steuernummer").text = steuernr
-        etree.SubElement(ustva, "Kz09").text    = self.config.finanzamt_nr
-        etree.SubElement(ustva, "Kz10").text    = "1" if is_berichtigung else "0"
+        etree.SubElement(ustva, _t("Jahr")).text     = str(year)
+        etree.SubElement(ustva, _t("Zeitraum")).text = str(period).zfill(2)
+        etree.SubElement(ustva, _t("Steuernummer")).text = steuernr
+        etree.SubElement(ustva, _t("Kz09")).text    = self.config.finanzamt_nr
+        etree.SubElement(ustva, _t("Kz10")).text    = "1" if is_berichtigung else "0"
 
         # Write Kennzahlen
         for kz_name, kz_value in kz.items():
-            etree.SubElement(ustva, kz_name).text = kz_value
+            etree.SubElement(ustva, _t(kz_name)).text = kz_value
 
         return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
@@ -677,44 +765,56 @@ class EBilanzEnvelopeBuilder:
         -------
         UTF-8 bytes of the full Elster XML envelope ready for ERiC.
         """
-        ticket   = str(uuid.uuid4()).replace("-", "").upper()[:20]
+        ticket   = _make_ticket()
         steuernr = normalise_steuernummer(self.config.steuernummer, self.config.bundesland_kz)
+        if len(steuernr) != 13:
+            raise ValueError(
+                f"Cannot normalise Steuernummer '{self.config.steuernummer}' to 13 digits. "
+                "Either pass bundesland_kz (e.g. '11' for Berlin) or supply the "
+                "13-digit ELSTER form directly (e.g. '1137053950531')."
+            )
+        # Derive bundesland_kz from the normalised steuernummer prefix if not given
+        bund_kz  = self.config.bundesland_kz or steuernr[:2]
+        # BUFA = first 4 digits of the 13-digit normalised steuernummer
+        fa_nr    = self.config.finanzamt_nr or steuernr[:4]
 
-        root = etree.Element("Elster", xmlns=NS, version="12")
+        # Helper: Clark-notation tag in the ELSTER namespace
+        def _t(tag: str) -> str:
+            return f"{{{NS}}}{tag}"
+
+        root = etree.Element(_t("Elster"), nsmap={None: NS})
 
         # ── TransferHeader ────────────────────────────────────────────
-        th = etree.SubElement(root, "TransferHeader", version="12")
-        etree.SubElement(th, "Verfahren").text   = "ElsterBilanz"
-        etree.SubElement(th, "DatenArt").text    = "Bilanz"
-        etree.SubElement(th, "Vorgang").text     = "send-Auth"
-        etree.SubElement(th, "TransferTicket").text = ticket
+        th = etree.SubElement(root, _t("TransferHeader"), version="11")
+        etree.SubElement(th, _t("Verfahren")).text   = "ElsterBilanz"
+        etree.SubElement(th, _t("DatenArt")).text    = "Bilanz"
+        etree.SubElement(th, _t("Vorgang")).text     = "send-Auth"
+        etree.SubElement(th, _t("TransferTicket")).text = ticket
         if use_test:
-            etree.SubElement(th, "Testmerker").text = TESTMERKER
-        etree.SubElement(th, "Empfaenger", id="L")
-        etree.SubElement(th, "HerstellerID").text = "74931"  # register at ELSTER
-        sig_root = etree.SubElement(th, "Signaturen")
-        sig      = etree.SubElement(sig_root, "Signatur", version="12")
-        etree.SubElement(sig, "Beschreibung").text = "Softwarezertifikat"
-        etree.SubElement(sig, "DigestValue")
-        etree.SubElement(sig, "SignatureValue")
-        etree.SubElement(sig, "X509Certificate")
+            etree.SubElement(th, _t("Testmerker")).text = TESTMERKER
+        emp_th = etree.SubElement(th, _t("Empfaenger"), id="L")
+        etree.SubElement(emp_th, _t("Ziel")).text = _bundesland_ziel(bund_kz)
+        etree.SubElement(th, _t("HerstellerID")).text = self.config.hersteller_id
+        etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
+        datei = etree.SubElement(th, _t("Datei"))
+        etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
+        etree.SubElement(datei, _t("Kompression")).text      = "GZIP"
+        etree.SubElement(datei, _t("TransportSchluessel"))
 
         # ── DatenTeil ─────────────────────────────────────────────────
-        dt  = etree.SubElement(root, "DatenTeil")
-        ndb = etree.SubElement(dt,   "Nutzdatenblock")
+        dt  = etree.SubElement(root, _t("DatenTeil"))
+        ndb = etree.SubElement(dt,   _t("Nutzdatenblock"))
 
         # NutzdatenHeader
-        ndh = etree.SubElement(ndb, "NutzdatenHeader", version="12")
-        etree.SubElement(ndh, "NutzdatenTicket").text = ticket
-        emp = etree.SubElement(ndh, "Empfaenger", id="F")
-        etree.SubElement(emp, "Adressat").text = self.config.finanzamt_nr
-        etree.SubElement(ndh, "Steuernummer").text = steuernr
-        herst = etree.SubElement(ndh, "Hersteller")
-        etree.SubElement(herst, "ProduktName").text    = PRODUKT_NAME
-        etree.SubElement(herst, "ProduktVersion").text = PRODUKT_VERSION
+        ndh = etree.SubElement(ndb, _t("NutzdatenHeader"), version="11")
+        etree.SubElement(ndh, _t("NutzdatenTicket")).text = ticket
+        etree.SubElement(ndh, _t("Empfaenger"), id="F").text = fa_nr
+        herst = etree.SubElement(ndh, _t("Hersteller"))
+        etree.SubElement(herst, _t("ProduktName")).text    = PRODUKT_NAME
+        etree.SubElement(herst, _t("ProduktVersion")).text = PRODUKT_VERSION
 
         # Nutzdaten — XBRL content embedded as child XML
-        nd = etree.SubElement(ndb, "Nutzdaten")
+        nd = etree.SubElement(ndb, _t("Nutzdaten"))
         try:
             xbrl_tree = etree.fromstring(xbrl_bytes)
             nd.append(xbrl_tree)
@@ -843,6 +943,7 @@ class ElsterEricClient:
         Path(self.log_dir).mkdir(parents=True, exist_ok=True)
 
         # 4. Invoke ERiC
+        eric_text: str = ""
         try:
             with EricSession(self.eric_home, log_dir=self.log_dir) as eric:
                 with EricBuffer(eric) as resp_buf, EricBuffer(eric) as srv_buf:
@@ -855,8 +956,24 @@ class ElsterEricClient:
                             response_buffer=resp_buf.handle(),
                             server_buffer=srv_buf.handle(),
                         )
-                        response_xml  = resp_buf.content()
-                        server_xml    = srv_buf.content()
+                        response_xml = resp_buf.content()
+                        server_xml   = srv_buf.content()
+                        if rc != 0:
+                            # Retrieve human-readable text while session is still open
+                            eric_text = eric.get_error_text(rc)
+                            # Dump validation protocol to log dir for offline inspection
+                            if response_xml:
+                                _dump = Path(self.log_dir) / "eric_response_last.xml"
+                                try:
+                                    _dump.write_bytes(response_xml)
+                                    logger.debug("ERiC response XML written to %s", _dump)
+                                except Exception:
+                                    pass
+                            logger.error(
+                                "ERiC rc=%d  eric_text=%r  response_xml=%s",
+                                rc, eric_text,
+                                response_xml.decode("utf-8", errors="replace") if response_xml else "<empty>",
+                            )
 
         except EricError as exc:
             return SubmissionResult(
@@ -879,13 +996,14 @@ class ElsterEricClient:
 
         # 5. rc == 0 means success; non-zero is a validation / transmission error
         if rc != 0:
-            # Try to parse ELSTER error details from the server response
-            err_msg = self._extract_eric_error(rc, server_xml or response_xml)
+            err_msg = self._extract_eric_error(rc, response_xml, server_xml, eric_text)
             return SubmissionResult(
                 success=False,
                 error_code=str(rc),
                 error_message=err_msg,
-                raw_response=(server_xml or b"").decode("utf-8", errors="replace"),
+                raw_response=(
+                    (response_xml or b"") + (b"\n" if response_xml and server_xml else b"") + (server_xml or b"")
+                ).decode("utf-8", errors="replace"),
             )
 
         # 6. Parse Transferticket (Telenummer) from server response
@@ -915,21 +1033,57 @@ class ElsterEricClient:
             return None
 
     @staticmethod
-    def _extract_eric_error(rc: int, xml_bytes: bytes) -> str:
-        """Best-effort extraction of a human-readable error message."""
-        if not xml_bytes:
-            return f"ERiC returned code {rc}"
-        raw = xml_bytes.decode("utf-8", errors="replace")
-        if not _LXML_AVAILABLE:
-            return f"ERiC code {rc}: {raw[:300]}"
-        try:
-            tree  = etree.fromstring(xml_bytes)
-            texts = tree.xpath("//*[local-name()='Meldung']/text()")
-            if texts:
-                return f"ERiC {rc}: {' | '.join(texts)}"
-        except Exception:
-            pass
-        return f"ERiC code {rc}: {raw[:300]}"
+    def _extract_eric_error(
+        rc: int,
+        response_xml: bytes,
+        server_xml: bytes,
+        eric_text: str = "",
+    ) -> str:
+        """Best-effort extraction of a human-readable error message.
+
+        ERiC puts validation rule failures in *response_xml* under
+        ``FehlerRegelpruefung/Text``; server-side errors land in *server_xml*
+        under ``Meldung``.
+        """
+        parts: list[str] = []
+        if eric_text:
+            parts.append(eric_text)
+
+        if _LXML_AVAILABLE:
+            # --- validation protocol (local ERiC check, rc 610301xxx) ---
+            if response_xml:
+                try:
+                    tree = etree.fromstring(response_xml)
+                    texts = tree.xpath("//*[local-name()='Text']/text()")
+                    if texts:
+                        parts.extend(texts)
+                    # Also look for FachlicheFehlerId + RegelName for context
+                    ids = tree.xpath("//*[local-name()='FachlicheFehlerId']/text()")
+                    names = tree.xpath("//*[local-name()='RegelName']/text()")
+                    for fid, rn in zip(ids, names):
+                        parts.append(f"[{rn} / FehlerID {fid}]")
+                except Exception:
+                    if response_xml:
+                        parts.append(response_xml.decode("utf-8", errors="replace")[:500])
+
+            # --- server response errors ---
+            if server_xml:
+                try:
+                    tree = etree.fromstring(server_xml)
+                    msgs = tree.xpath("//*[local-name()='Meldung']/text()")
+                    if msgs:
+                        parts.extend(msgs)
+                except Exception:
+                    parts.append(server_xml.decode("utf-8", errors="replace")[:300])
+        else:
+            # lxml not available — return raw bytes
+            for xml in (response_xml, server_xml):
+                if xml:
+                    parts.append(xml.decode("utf-8", errors="replace")[:300])
+
+        if parts:
+            return f"ERiC {rc}: " + " | ".join(parts)
+        return f"ERiC returned code {rc}"
 
     # ------------------------------------------------------------------
     # Convenience: export envelope XML without sending

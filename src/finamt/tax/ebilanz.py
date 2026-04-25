@@ -429,10 +429,11 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
         _fact(root, NS_GAAP, "ismi.netIncome.staff",             g.personalaufwand,          CTX_DURATION)
     if g.abschreibungen:
         _fact(root, NS_GAAP, "ismi.netIncome.deprAmort",         g.abschreibungen,           CTX_DURATION)
-    if g.sonstige_betriebsausgaben:
-        _fact(root, NS_GAAP, "ismi.netIncome.otherCost",         g.sonstige_betriebsausgaben, CTX_DURATION)
-    if g.zinsaufwendungen:
-        _fact(root, NS_GAAP, "ismi.netIncome.interestExpense",   g.zinsaufwendungen,         CTX_DURATION)
+    # MicroBilG has no separate interest-expense concept; fold Zinsaufwendungen
+    # into sonstige Aufwendungen (ismi.netIncome.otherCost).
+    _other_cost = (g.sonstige_betriebsausgaben or 0) + (g.zinsaufwendungen or 0)
+    if _other_cost:
+        _fact(root, NS_GAAP, "ismi.netIncome.otherCost", _other_cost, CTX_DURATION)
 
     # ----------------------------------------------------------------
     # Serialise

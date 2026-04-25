@@ -22,10 +22,6 @@ Usage:
     # Explicit taxonomy dir:
     python scripts/validate_xbrl.py --taxonomy-dir /path/to/german-gaap-taxonomy-v6
 
-Requirements:
-    pip install finamt[dev]       # includes arelle-release
-    # or individually:
-    pip install arelle-release lxml
 """
 
 from __future__ import annotations

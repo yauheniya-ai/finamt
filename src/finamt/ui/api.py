@@ -1038,6 +1038,7 @@ class EBilanzSubmitRequest(EBilanzRequest):
     # Steuernummer for ElsterConfig (already in EBilanzRequest as steuernummer)
     finanzamt_nr:   str = ""
     bundesland_kz:  str = ""
+    hersteller_id:  str = ""
     # Submission mode
     use_test:       bool = True
     validate_only:  bool = False
@@ -1125,6 +1126,30 @@ def post_ebilanz_submit(
         body.bundesland_kz
         or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
     )
+    hersteller_id = (
+        body.hersteller_id
+        or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
+    )
+    if not hersteller_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "ELSTER Hersteller-ID not configured. "
+                "Register at https://www.elster.de/eportal/softwareentwickler "
+                "then pass hersteller_id in the request or set "
+                "FINAMT_ELSTER_HERSTELLER_ID."
+            ),
+        )
+    # Last-resort: derive from the taxpayer profile city/state stored in the DB
+    if not bundesland_kz and db_path.exists():
+        from finamt.tax.elster import bundesland_kz_from_city as _bkz_from_city
+        with _repo(db_path) as _r:
+            _tp = _r.get_metadata("taxpayer") or {}
+        for _field in ("state", "city"):
+            _kz = _bkz_from_city(_tp.get(_field) or "")
+            if _kz:
+                bundesland_kz = _kz
+                break
 
     # New cert uploaded — save to project folder for future re-use (no temp file)
     if body.cert_data_b64:
@@ -1183,6 +1208,7 @@ def post_ebilanz_submit(
         steuernummer  = body.steuernummer,
         finanzamt_nr  = finanzamt_nr,
         bundesland_kz = bundesland_kz,
+        hersteller_id = hersteller_id,
     )
 
     client = ElsterEricClient(
