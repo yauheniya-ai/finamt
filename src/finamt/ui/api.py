@@ -946,14 +946,15 @@ def get_ebilanz_settings(db: Optional[str] = Query(default=None)):
     """Return all persisted ELSTER settings for this project."""
     layout = _resolve_layout(db)
     if not layout.db_path.exists():
-        return {"eric_home": None, "elster_id": None, "cert_pin": None}
+        return {"eric_home": None, "elster_id": None, "cert_pin": None, "hersteller_id": None}
     with _repo(layout.db_path) as repo:
         eric  = repo.get_metadata("elster_eric_home") or {}
         misc  = repo.get_metadata("elster_misc") or {}
     return {
-        "eric_home": eric.get("path") or None,
-        "elster_id": misc.get("elster_id") or None,
-        "cert_pin":  misc.get("cert_pin") or None,
+        "eric_home":     eric.get("path") or None,
+        "elster_id":     misc.get("elster_id") or None,
+        "cert_pin":      misc.get("cert_pin") or None,
+        "hersteller_id": misc.get("hersteller_id") or None,
     }
 
 
@@ -968,6 +969,8 @@ def post_ebilanz_settings(body: dict = Body(...), db: Optional[str] = Query(defa
             existing["elster_id"] = body["elster_id"]
         if "cert_pin" in body:
             existing["cert_pin"] = body["cert_pin"]
+        if "hersteller_id" in body:
+            existing["hersteller_id"] = body["hersteller_id"]
         repo.set_metadata("elster_misc", existing)
     return {"ok": True}
 
@@ -1130,6 +1133,11 @@ def post_ebilanz_submit(
         body.hersteller_id
         or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
     )
+    # Fallback: load from stored settings
+    if not hersteller_id and db_path.exists():
+        with _repo(db_path) as _r:
+            _misc = _r.get_metadata("elster_misc") or {}
+        hersteller_id = _misc.get("hersteller_id") or ""
     if not hersteller_id:
         raise HTTPException(
             status_code=400,

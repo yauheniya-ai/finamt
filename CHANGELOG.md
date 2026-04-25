@@ -4,11 +4,13 @@
 
 ### New features
 
-- **Backend: ERiC integration — E-Bilanz submission via official ELSTER library** — new module `finamt.tax.eric_wrapper` provides a ctypes bridge to `libericapi.dylib` (ERiC 43.x) with `EricSession`, `EricBuffer`, and `EricCertificate` context managers. `EricSession` wraps `EricInitialisiere` / `EricBeende`; `EricBuffer` manages return buffer handles; `EricCertificate` loads PKCS#12 certificates.
+- **Backend: ERiC integration — E-Bilanz submission via official ELSTER library** — new module `finamt.tax.eric_wrapper` provides a ctypes bridge to `libericapi.dylib` (ERiC 43.x). `EricSession` / `EricBuffer` / `EricCertificate` context managers handle library lifecycle, buffer allocation, and PKCS#12 certificate loading.
 
-- **Backend: `ElsterEricClient` + `EBilanzEnvelopeBuilder`** — `finamt.tax.elster` gains two new classes. `EBilanzEnvelopeBuilder` wraps an XBRL instance in the ELSTER v12 envelope (`Verfahren=ElsterBilanz`, `DatenArt=Bilanz`, `datenartVersion=Bilanz_6_9`). `ElsterEricClient` provides `validate_ebilanz(xbrl, year)` and `submit_ebilanz(xbrl, year)` using ERiC for validation + transmission.
+- **Backend: `EBilanzEnvelopeBuilder` + `ElsterEricClient`** — `EBilanzEnvelopeBuilder` wraps an XBRL instance in a schema-valid ELSTER v11 envelope (`Verfahren=ElsterBilanz`, `DatenArt=Bilanz`, `Bilanz_6_9`), deriving `Länderkennzeichen`, BUFA, and `<Ziel>` automatically from the normalised 13-digit Steuernummer. `ElsterEricClient` exposes `validate_ebilanz()` and `submit_ebilanz()`. Required fields `DatenLieferant`, `Datei` (with `CMSEncryptedData`/`GZIP`), and `HerstellerID` are included; the envelope passes ERiC schema validation with zero errors.
 
-- **Backend: `POST /tax/ebilanz/submit`** — new API endpoint that builds XBRL from DB receipts, wraps it in the ELSTER envelope, and submits via ERiC. Reads `FINAMT_ERIC_HOME`, `FINAMT_ELSTER_CERT_PATH`, `FINAMT_ELSTER_CERT_PASSWORD`, `FINAMT_ELSTER_FINANZAMT_NR`, `FINAMT_ELSTER_BUNDESLAND_KZ` from environment or request body. Supports `validate_only=true` for a dry-run check without transmission.
+- **Backend: `POST /tax/ebilanz/submit`** — transmits the E-Bilanz to ELSTER via ERiC. All ELSTER parameters (`eric_home`, `cert_path`, `cert_password`, `hersteller_id`, `bundesland_kz`) can be supplied in the request body, via environment variables, or are loaded from the project database as a fallback. `bundesland_kz` is auto-derived from the taxpayer profile city/state when not provided. Supports `validate_only=true` for a dry-run ERiC schema check without transmission.
+
+- **Frontend: E-Bilanz submission panel** — the Jahresabschluss panel gains a full ELSTER submission UI: ERiC library path, `.pfx` certificate upload, PIN field, Hersteller-ID field (with tooltip explaining registration at `elster.de/eportal/softwareentwickler`), test-mode toggle, and Validate / Submit buttons. All settings are persisted in the project database and reloaded automatically. `bundesland_kz` is resolved transparently from the stored taxpayer address.
 
 ## Version 0.16.2 (2026-04-25)
 
