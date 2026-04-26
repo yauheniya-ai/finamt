@@ -392,6 +392,36 @@ def delete_taxpayer(db: Optional[str] = Query(default=None)):
 
 
 # ---------------------------------------------------------------------------
+# Submissions log  (stored in project_metadata under the key "submissions")
+# ---------------------------------------------------------------------------
+
+_SUBMISSIONS_KEY = "submissions"
+
+
+@app.get("/submissions", tags=["projects"])
+def get_submissions(db: Optional[str] = Query(default=None)):
+    """Return all recorded submission events for this project."""
+    db_path = _resolve_db(db)
+    if not db_path.exists():
+        return {"submissions": []}
+    with _repo(db_path) as repo:
+        records = repo.get_metadata(_SUBMISSIONS_KEY) or []
+    return {"submissions": records}
+
+
+@app.post("/submissions", tags=["projects"])
+def add_submission(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+    """Append a submission record {type, year, submitted_at, note?}."""
+    db_path = _resolve_db(db)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with _repo(db_path) as repo:
+        records = repo.get_metadata(_SUBMISSIONS_KEY) or []
+        records.append(body)
+        repo.set_metadata(_SUBMISSIONS_KEY, records)
+    return {"submission": body, "total": len(records)}
+
+
+# ---------------------------------------------------------------------------
 # Receipts
 # ---------------------------------------------------------------------------
 
@@ -938,6 +968,136 @@ def post_ebilanz_xbrl(
         iter([xml_bytes]),
         media_type="application/xml",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+class EBilanzEnvelopeRequest(EBilanzRequest):
+    """Minimal request for building the ELSTER envelope (no ERiC / cert needed)."""
+    bundesland_kz: str = ""
+    hersteller_id: str = ""
+    finanzamt_nr:  str = ""
+    use_test:      bool = True
+
+
+@app.post("/tax/ebilanz/envelope", tags=["tax"])
+def post_ebilanz_envelope(
+    body: EBilanzEnvelopeRequest,
+    db:   Optional[str] = Query(default=None),
+):
+    """
+    Build the E-Bilanz XBRL and wrap it in the ELSTER transmission envelope —
+    the exact XML that ERiC would send to Finanzamt.  No ERiC / certificate
+    required; suitable for previewing the full payload before a real filing.
+
+    If ``hersteller_id`` is absent the placeholder ``"00000"`` is used so the
+    preview still works without a registered publisher ID.
+    """
+    if not _LIB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="finamt library not available")
+
+    import os as _os
+    from decimal import Decimal
+    from datetime import date as _date
+    from finamt.tax.elster import ElsterConfig, EBilanzEnvelopeBuilder
+
+    year    = body.year
+    layout  = _resolve_layout(db)
+    db_path = layout.db_path
+    start   = _date(year, 1, 1)
+    end     = _date(year, 12, 31)
+
+    receipts = []
+    if db_path.exists():
+        with _repo(db_path) as repo:
+            receipts = list(repo.find_by_period(_date(2000, 1, 1), end))
+
+    cfg = EBilanzConfig(
+        steuernummer      = body.steuernummer,
+        elster_id         = body.elster_id,
+        company_name      = body.company_name,
+        legal_form        = body.legal_form,
+        fiscal_year_start = body.fiscal_year_start or str(start),
+        fiscal_year_end   = body.fiscal_year_end   or str(end),
+        preparer          = body.preparer,
+    )
+
+    jab = generate_jahresabschluss(
+        receipts=[r for r in receipts if r.receipt_date and r.receipt_date.year == year],
+        year=year,
+        stammkapital=Decimal(str(body.stammkapital)),
+        eingezahltes_kapital=Decimal(str(body.eingezahltes_kapital)),
+        vortrag_gewinnverlust=Decimal(str(body.vortrag)),
+        nettomethode=body.nettomethode,
+    )
+
+    try:
+        xbrl_bytes = build_xbrl(jab, cfg)
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    # ── Resolve bundesland_kz ──────────────────────────────────────────
+    bundesland_kz = (
+        body.bundesland_kz
+        or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
+    )
+    if not bundesland_kz and db_path.exists():
+        from finamt.tax.elster import bundesland_kz_from_city as _bkz
+        with _repo(db_path) as _r:
+            _tp = _r.get_metadata("taxpayer") or {}
+        for _field in ("state", "city"):
+            _kz = _bkz(_tp.get(_field) or "")
+            if _kz:
+                bundesland_kz = _kz
+                break
+    # Last resort: derive from steuernummer prefix
+    if not bundesland_kz and len(body.steuernummer) >= 2:
+        _prefix_map = {
+            "11": "BE", "12": "BB", "28": "HB", "20": "HH", "06": "HE",
+            "13": "MV", "23": "NI", "10": "SL", "09": "BY", "08": "BW",
+            "05": "NW", "07": "RP", "03": "NI", "04": "HH", "01": "SH",
+            "14": "SN", "15": "ST", "16": "TH",
+        }
+        bundesland_kz = _prefix_map.get(body.steuernummer[:2], "")
+
+    # ── Resolve hersteller_id ──────────────────────────────────────────
+    hersteller_id = (
+        body.hersteller_id
+        or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
+    )
+    if not hersteller_id and db_path.exists():
+        with _repo(db_path) as _r:
+            _misc = _r.get_metadata("elster_misc") or {}
+        hersteller_id = _misc.get("hersteller_id") or ""
+    if not hersteller_id:
+        hersteller_id = "00000"  # preview placeholder — no ERiC call made
+
+    # ── Resolve finanzamt_nr ───────────────────────────────────────────
+    finanzamt_nr = (
+        body.finanzamt_nr
+        or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
+    )
+
+    elster_cfg = ElsterConfig(
+        cert_path     = "",
+        cert_password = "",
+        steuernummer  = body.steuernummer,
+        finanzamt_nr  = finanzamt_nr,
+        bundesland_kz = bundesland_kz,
+        hersteller_id = hersteller_id,
+    )
+
+    try:
+        env_bytes = EBilanzEnvelopeBuilder(elster_cfg).build(
+            xbrl_bytes, year=year, use_test=body.use_test
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    filename = f"elster_envelope_{year}_{body.steuernummer.replace('/', '-')}.xml"
+    return StreamingResponse(
+        iter([env_bytes]),
+        media_type="application/xml",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 

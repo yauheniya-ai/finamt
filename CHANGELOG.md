@@ -1,5 +1,30 @@
 # Changelog
 
+## Version 0.17.1 (2026-04-26)
+
+### New features / improvements
+
+- **Frontend: Taxonomie — custom dropdown replaces native `<select>`** — the HGB taxonomy version selector in the E-Bilanz config block is replaced with a styled custom dropdown matching the rest of the UI. Options are labelled "Taxonomie 6.9 vom 01.04.2025" and "Taxonomie 6.8 vom 01.04.2024". An `ElsterTip` tooltip links to `esteuer.de` for the official taxonomy overview.
+
+- **Frontend: `ElsterTip` — link support and hover-gap fix** — `ElsterTip` gains `link` and `linkLabel` props so tooltips can embed a clickable external link. An invisible `after:` pseudo-element bridge between the trigger icon and the tooltip card prevents the tooltip from closing when the cursor moves to click the link.
+
+- **Frontend: ERiC config block — cert + PIN merged, tooltip updated** — the certificate path/upload and PIN field are now grouped in a single white config card instead of two separate boxes. The ERiC tooltip is shortened to one concise sentence with a direct link to the ELSTER developer portal (`esteuer.de`); the redundant "ERiC darf nicht in finamt enthalten sein" note is removed.
+
+- **Frontend: Hersteller-ID — width capped, tooltip shortened** — the Hersteller-ID input is capped at `w-32` to prevent it from stretching across the full config card. The tooltip is shortened to a single sentence and links directly to the correct software-developer registration page on the ELSTER portal.
+
+- **Frontend: company logo in taxpayer profile** — `TaxpayerProfile` gains an optional `logo?: string | null` field (base64 data URL). The taxpayer modal shows a logo upload section above the Unternehmensgegenstand field with Change and Remove buttons. The logo is persisted in the project database via the existing `PUT /taxpayer` endpoint.
+
+- **Frontend: Bilanz PDF — logo in header** — the generated Bilanz PDF header now renders the company logo (if set) above the company name and the "Bilanz zum…" title, in that order.
+
+- **Frontend: Bilanz PDF — `html2canvas` + `jsPDF` download** — `generateBilanzPdf()` no longer relies on `iframe.contentWindow.print()`. It uses `html2canvas` to rasterise the A4 paper sheet and `jsPDF` to produce a clean single-page PDF download, eliminating browser print-dialog artifacts and header/footer chrome. `jspdf` and `html2canvas` added as npm dependencies.
+
+- **Backend: `GET /submissions` + `POST /submissions`** — two new endpoints in `api.py` for tracking E-Bilanz submission history per project. `POST /submissions` records a submission event (year, timestamp, optional note); `GET /submissions` returns the list ordered by date descending.
+
+- **Frontend: submission tracking UI** — the E-Bilanz section gains a "Als eingereicht markieren" button that calls `POST /submissions` and displays a green "Eingereicht am …" badge. A collapsible submission history list shows all past submissions for the active project.
+
+- **Frontend: i18n** — new keys added to `de.json` and `en.json`: `jab_optional`, `jab_mark_submitted`, `jab_submitted_on`, `jab_submission_history`, `jab_bilanz_generating`, `taxpayer_logo_*`, `jab_bilanz_save` updated.
+
+
 ## Version 0.17.0 (2026-04-26)
 
 ### New features
