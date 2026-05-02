@@ -11,13 +11,13 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/finamt)](https://pypistats.org/packages/finamt)
+[![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 [![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finamt)](https://github.com/yauheniya-ai/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 
-<img src="https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg" width="16" height="16"> [English](https://github.com/yauheniya-ai/finamt/blob/main/README.md) • <img src="https://api.iconify.design/noto-v1:flag-for-flag-germany.svg" width="16" height="16"> Deutsch
+![US](https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg?height=16) [English](https://github.com/yauheniya-ai/finamt/blob/main/README.md) | ![DE](https://api.iconify.design/noto-v1:flag-for-flag-germany.svg?height=16) Deutsch
 
 </div>
 
@@ -33,25 +33,26 @@ Eine agentische Python-Bibliothek zur strukturierten Extraktion von Daten aus Be
 ## Technologie-Stack
 
 **Backend**
-- <img src="https://api.iconify.design/devicon:python.svg" width="16" height="16"> Python — Paketsprache
-- <img src="https://api.iconify.design/devicon:fastapi.svg" width="16" height="16"> FastAPI — Backend der Web-Oberfläche
-- <img src="https://api.iconify.design/simple-icons:paddlepaddle.svg" width="16" height="16"> PaddleOCR — OCR für gescannte PDFs
-- <img src="https://api.iconify.design/devicon:google.svg" width="16" height="16"> Tesseract — OCR für gescannte PDFs und Bilder als Fallback bei PaddleOCR-Fehlern oder Timeouts
-- <img src="https://api.iconify.design/devicon:ollama.svg" width="16" height="16"> Ollama — Lokale LLMs zur strukturierten Extraktion von Beleginformationen
-- <img src="https://api.iconify.design/hugeicons:qwen.svg" width="16" height="16"> Qwen — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M ist derzeit das empfohlene Standardmodell für textbasierte Extraktion
-- <img src="https://api.iconify.design/devicon:sqlite.svg" width="16" height="16"> SQLite — Lokale Datenbank für Originalbelege und extrahierte Daten
+- ![Python](https://api.iconify.design/devicon:python.svg?height=16) [Python](https://www.python.org) — Paketsprache
+- ![FastAPI](https://api.iconify.design/devicon:fastapi.svg?height=16) [FastAPI](https://fastapi.tiangolo.com) — Backend der Web-Oberfläche
+- ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR für gescannte PDFs
+- ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR für gescannte PDFs und Bilder als Fallback bei PaddleOCR-Fehlern oder Timeouts
+- ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — Lokale LLMs zur strukturierten Extraktion von Beleginformationen
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M ist derzeit das empfohlene Standardmodell für textbasierte Extraktion
+- ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) — Lokale Datenbank für Originalbelege und extrahierte Daten
 
 **Frontend**
-- <img src="https://api.iconify.design/devicon:react.svg" width="16" height="16"> React — Interaktives Frontend
-- <img src="https://api.iconify.design/devicon:vitejs.svg" width="16" height="16"> Vite — Schneller Dev-Server und Produktions-Bundler
-- <img src="https://api.iconify.design/devicon:tailwindcss.svg" width="16" height="16"> Tailwind CSS — Utility-First-Styling
-- <img src="https://api.iconify.design/devicon:typescript.svg" width="16" height="16"> TypeScript — Typsichere Komponenten- und API-Code
+- ![React](https://api.iconify.design/devicon:react.svg?height=16) [React](https://react.dev) — Interaktives Frontend
+- ![Vite](https://api.iconify.design/devicon:vitejs.svg?height=16) [Vite](https://vite.dev) — Schneller Dev-Server und Produktions-Bundler
+- ![Tailwind CSS](https://api.iconify.design/devicon:tailwindcss.svg?height=16) [Tailwind CSS](https://tailwindcss.com) — Utility-First-Styling
+- ![TypeScript](https://api.iconify.design/devicon:typescript.svg?height=16) [TypeScript](https://www.typescriptlang.org) — Typsichere Komponenten- und API-Code
+
 
 **CLI**
-- <img src="https://api.iconify.design/devicon:python.svg" width="16" height="16"> argparse — Flag-basierte CLI (`--ui`, `--file`, `--batch`, `--ustva`, `--type`, `--db`, `--version`)
+- ![Typer](https://api.iconify.design/devicon:typer.svg?height=16) [Typer](https://typer.tiangolo.com/) — CLI mit farbiger Fortschrittsausgabe
 
 **Paketierung**
-- <img src="https://api.iconify.design/devicon:pypi.svg" width="16" height="16"> PyPI — Als installierbares Python-Paket verteilt
+- ![PyPI](https://api.iconify.design/devicon:pypi.svg?height=16) [PyPI](https://pypi.org/project/finamt/) — Als installierbares Python-Paket verteilt
 
 ## Installation
 
@@ -64,6 +65,12 @@ Für die CLI-Nutzung empfiehlt sich die Installation über [pipx](https://pipx.p
 ```bash
 pipx install finamt
 ```
+
+> **Hinweis für Python 3.14+-Nutzer:** `finamt` erfordert derzeit Python 3.13. Falls das System-Python 3.14 oder neuer ist, kann [uv](https://docs.astral.sh/uv/) zur Verwaltung von Python-Versionen genutzt werden:
+> ```bash
+> uv python install 3.13
+> pipx install finamt --python $(uv python find 3.13)
+> ```
 
 ### Systemvoraussetzungen
 
@@ -104,7 +111,7 @@ Installer herunterladen von https://github.com/UB-Mannheim/tesseract/wiki und zu
 ### Interaktive Oberfläche
 
 ```bash
-finamt --ui
+finamt serve
 ```
 
 <p align="center">
@@ -344,34 +351,52 @@ Jeder Beleg wird mit einer Kategorie und einer optionalen Unterkategorie versehe
 
 | Kategorie | Unterkategorien |
 |---|---|
-| <img src="https://api.iconify.design/mdi:briefcase.svg" width="16" height="16"> `services` | `freelance` `consulting` `legal` `accounting` `notary` |
-| <img src="https://api.iconify.design/ant-design:product-filled.svg" width="16" height="16"> `products` | `physical_goods` `digital_goods` `merchandise` `samples` |
-| <img src="https://api.iconify.design/solar:box-bold.svg" width="16" height="16"> `material` | `consumables` `raw_materials` `packaging` `merchandise` |
-| <img src="https://api.iconify.design/streamline-plump:computer-pc-desktop-solid.svg" width="16" height="16"> `equipment` | `low_value_asset` `computer` `machinery` `furniture` `tools` |
-| <img src="https://api.iconify.design/heroicons:cpu-chip-16-solid.svg" width="16" height="16"> `software` | `subscriptions` `pay_as_you_go` `licenses` `hosting` `domains` |
-| <img src="https://api.iconify.design/mdi:file-certificate.svg" width="16" height="16"> `licensing` | `software_licenses` `media_licenses` `other_ip` |
-| <img src="https://api.iconify.design/streamline-flex:satellite-dish-solid.svg" width="16" height="16"> `telecommunication` | `phone` `internet` `bundled` |
-| <img src="https://api.iconify.design/mdi:airplane.svg" width="16" height="16"> `travel` | `transport` `accommodation` `meals` `per_diem` `incidental` |
-| <img src="https://api.iconify.design/boxicons:car-filled.svg" width="16" height="16"> `car` | `fuel` `parking` `garage` `repair` `maintenance` `insurance` `leasing` `rental` |
-| <img src="https://api.iconify.design/wpf:books.svg" width="16" height="16"> `education` | `courses` `books` `conferences` `certifications` |
-| <img src="https://api.iconify.design/roentgen:electricity.svg" width="16" height="16"> `utilities` | `electricity` `heating` `water` `waste` |
-| <img src="https://api.iconify.design/fa:shield.svg" width="16" height="16"> `insurance` | `liability` `health` `vehicle` `property` |
-| <img src="https://api.iconify.design/boxicons:bank-filled.svg" width="16" height="16"> `financial` | `bank_fees` `interest` `loan_costs` `payment_fees` |
-| <img src="https://api.iconify.design/vaadin:office.svg" width="16" height="16"> `office` | `rent` `coworking` `storage` `cleaning` `security` |
-| <img src="https://api.iconify.design/mdi:loudspeaker.svg" width="16" height="16"> `marketing` | `advertising` `print_media` `trade_fairs` `sponsorship` `gifts` |
-| <img src="https://api.iconify.design/mdi:donation.svg" width="16" height="16"> `donations` | `charitable` `political` `church` |
-| <img src="https://api.iconify.design/mdi:gavel.svg" width="16" height="16"> `public_fees` | `broadcasting_fee` `ihk_hwk` `berufsgenossenschaft` `other_public_fee` |
-| <img src="https://api.iconify.design/flowbite:folder-plus-solid.svg" width="16" height="16"> `other` | `membership_fees` `sundry` |
+| ![services](https://api.iconify.design/mdi:briefcase.svg?height=16&color=%23EF4444) `services` | `freelance` `consulting` `legal` `accounting` `notary` |
+| ![products](https://api.iconify.design/ant-design:product-filled.svg?height=16&color=%23EF4444) `products` | `physical_goods` `digital_goods` `merchandise` `samples` |
+| ![material](https://api.iconify.design/solar:box-bold.svg?height=16&color=%23EF4444) `material` | `consumables` `raw_materials` `packaging` `merchandise` |
+| ![equipment](https://api.iconify.design/streamline-plump:computer-pc-desktop-solid.svg?height=16&color=%23EF4444) `equipment` | `low_value_asset` `computer` `machinery` `furniture` `tools` |
+| ![software](https://api.iconify.design/heroicons:cpu-chip-16-solid.svg?height=16&color=%23EF4444) `software` | `subscriptions` `pay_as_you_go` `licenses` `hosting` `domains` |
+| ![licensing](https://api.iconify.design/mdi:file-certificate.svg?height=16&color=%23EF4444) `licensing` | `software_licenses` `media_licenses` `other_ip` |
+| ![telecommunication](https://api.iconify.design/streamline-flex:satellite-dish-solid.svg?height=16&color=%23EF4444) `telecommunication` | `phone` `internet` `bundled` |
+| ![travel](https://api.iconify.design/mdi:airplane.svg?height=16&color=%23EF4444) `travel` | `transport` `accommodation` `meals` `per_diem` `incidental` |
+| ![car](https://api.iconify.design/boxicons:car-filled.svg?height=16&color=%23EF4444) `car` | `fuel` `parking` `garage` `repair` `maintenance` `insurance` `leasing` `rental` |
+| ![education](https://api.iconify.design/wpf:books.svg?height=16&color=%23EF4444) `education` | `courses` `books` `conferences` `certifications` |
+| ![utilities](https://api.iconify.design/roentgen:electricity.svg?height=16&color=%23EF4444) `utilities` | `electricity` `heating` `water` `waste` |
+| ![insurance](https://api.iconify.design/fa:shield.svg?height=16&color=%23EF4444) `insurance` | `liability` `health` `vehicle` `property` |
+| ![financial](https://api.iconify.design/boxicons:bank-filled.svg?height=16&color=%23EF4444) `financial` | `bank_fees` `interest` `loan_costs` `payment_fees` |
+| ![office](https://api.iconify.design/vaadin:office.svg?height=16&color=%23EF4444) `office` | `rent` `coworking` `storage` `cleaning` `security` |
+| ![marketing](https://api.iconify.design/mdi:loudspeaker.svg?height=16&color=%23EF4444) `marketing` | `advertising` `print_media` `trade_fairs` `sponsorship` `gifts` |
+| ![donations](https://api.iconify.design/mdi:donation.svg?height=16&color=%23EF4444) `donations` | `charitable` `political` `church` |
+| ![public_fees](https://api.iconify.design/mdi:gavel.svg?height=16&color=%23EF4444) `public_fees` | `broadcasting_fee` `ihk_hwk` `berufsgenossenschaft` `other_public_fee` |
+| ![other](https://api.iconify.design/flowbite:folder-plus-solid.svg?height=16&color=%23EF4444) `other` | `membership_fees` `sundry` |
 
 
 
 ## Aufgabenliste
 
-- [x] Beleganalyse
-- [x] Steuerberechnungsmodul
-- [ ] ELSTER-Feldzuordnung
-- [ ] XML-Generator
-- [ ] XSD-Validierung
+**Belegverarbeitung**
+- [x] OCR-Pipeline (PaddleOCR + Tesseract-Fallback)
+- [x] 4-Agenten-Extraktion (Metadaten, Geschäftspartner, Beträge, Positionen)
+- [x] Deduplizierung, Datenbankspeicherung, Stapelverarbeitung
+
+**Steuerberechnung**
+- [x] UStVA — Umsatzsteuervoranmeldung (monatlich / vierteljährlich)
+- [x] UStE — Jährliche Umsatzsteuererklärung
+- [x] EÜR — Einnahmenüberschussrechnung
+- [x] KSt 1 — Körperschaftsteuererklärung
+- [x] GewSt — Gewerbesteuererklärung
+- [x] Jahresabschluss — Jahresabschluss (Bilanz + GuV, § 267a HGB)
+
+**ELSTER-Übermittlung**
+- [x] UStVA — ELSTER-XML-Generator + Kennzahlen-Mapper + RSA-Signierung + HTTP-Übermittlung
+- [x] E-Bilanz — XBRL-Instanzdokument (HGB-Taxonomie v6, MicroBilG-Schema)
+- [ ] E-Bilanz — ERiC-ctypes-Brücke für die eigentliche Übermittlung
+- [ ] KSt, GewSt, UStVA, USt — ELSTER-XML-Generator
+- [ ] EÜR, ESt — ELSTER-XML-Generator
+
+**Validierung**
+- [ ] XSD-Validierung des generierten XBRL gegen die HGB-Taxonomie
+- [ ] ELSTER-Probelauf / Testserver-Validierung vor der Live-Übermittlung
 
 ## Mitwirken
 
