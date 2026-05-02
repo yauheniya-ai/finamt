@@ -417,12 +417,19 @@ def generate_jahresabschluss(
         if not (period_start <= d <= period_end):
             skipped += 1
             continue
-        if not r.net_amount:
+        # Mirror frontend fallback: net_amount ?? (total_amount - vat_amount)
+        net_amount = r.net_amount
+        if not net_amount:
+            total  = getattr(r, "total_amount", None)
+            vat    = getattr(r, "vat_amount",   None) or _ZERO
+            if total:
+                net_amount = _r(total - vat)
+        if not net_amount:
             skipped += 1
             continue
 
         cat = str(r.category) if r.category else "other"
-        net = _r(r.business_net if r.business_net is not None else r.net_amount)
+        net = _r(r.business_net if r.business_net is not None else net_amount)
 
         # Cashflow-only: skip from GuV, track cash impact separately
         if cat in _CASHFLOW_ONLY:

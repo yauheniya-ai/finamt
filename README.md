@@ -17,7 +17,7 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finamt)](https://github.com/yauheniya-ai/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 
-<img src="https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg" width="16" height="16"> English | <img src="https://api.iconify.design/noto-v1:flag-for-flag-germany.svg" width="16" height="16"> [German](https://github.com/yauheniya-ai/finamt/blob/main/readme/README_de.md)
+![US](https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg?height=16) English | ![DE](https://api.iconify.design/noto-v1:flag-for-flag-germany.svg?height=16) [German](https://github.com/yauheniya-ai/finamt/blob/main/readme/README_de.md)
 
 </div>
 
@@ -34,26 +34,26 @@ managing receipts
 ## Tech Stack
 
 **Backend**
-- <img src="https://api.iconify.design/devicon:python.svg" width="16" height="16"> [Python](https://www.python.org) — package language
-- <img src="https://api.iconify.design/devicon:fastapi.svg" width="16" height="16"> [FastAPI](https://fastapi.tiangolo.com) — backend for the web UI
-- <img src="https://api.iconify.design/simple-icons:paddlepaddle.svg" width="16" height="16"> [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR for scanned PDFs 
-- <img src="https://api.iconify.design/devicon:google.svg" width="16" height="16"> [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR for scanned PDFs and images when PaddleOCR fails or times out
-- <img src="https://api.iconify.design/devicon:ollama.svg" width="16" height="16"> [Ollama](https://ollama.com) — local LLMs for structured extraction of information from receipts and invoices
-    - <img src="https://upload.wikimedia.org/wikipedia/commons/6/69/Qwen_logo.svg" width="16" height="16"> [Qwen](https://qwen.ai/home) – laptop-compatible LLMs with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
-- <img src="https://api.iconify.design/devicon:sqlite.svg" width="16" height="16"> [SQLite](https://sqlite.org) – local database for original receipts and extracted data
+- ![Python](https://api.iconify.design/devicon:python.svg?height=16) [Python](https://www.python.org) — package language
+- ![FastAPI](https://api.iconify.design/devicon:fastapi.svg?height=16) [FastAPI](https://fastapi.tiangolo.com) — backend for the web UI
+- ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR for scanned PDFs 
+- ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR for scanned PDFs and images when PaddleOCR fails or times out
+- ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — local LLMs for structured extraction of information from receipts and invoices
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – laptop-compatible LLMs with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
+- ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) – local database for original receipts and extracted data
 
 **Frontend**
-- <img src="https://api.iconify.design/devicon:react.svg" width="16" height="16"> [React](https://react.dev) — interactive frontend
-- <img src="https://api.iconify.design/devicon:vitejs.svg" width="16" height="16"> [Vite](https://vite.dev) — fast dev server and production bundler
-- <img src="https://api.iconify.design/devicon:tailwindcss.svg" width="16" height="16"> [Tailwind CSS](https://tailwindcss.com) — utility-first styling
-- <img src="https://api.iconify.design/devicon:typescript.svg" width="16" height="16"> [TypeScript](https://www.typescriptlang.org) — type-safe component and API code
+- ![React](https://api.iconify.design/devicon:react.svg?height=16) [React](https://react.dev) — interactive frontend
+- ![Vite](https://api.iconify.design/devicon:vitejs.svg?height=16) [Vite](https://vite.dev) — fast dev server and production bundler
+- ![Tailwind CSS](https://api.iconify.design/devicon:tailwindcss.svg?height=16) [Tailwind CSS](https://tailwindcss.com) — utility-first styling
+- ![TypeScript](https://api.iconify.design/devicon:typescript.svg?height=16) [TypeScript](https://www.typescriptlang.org) — type-safe component and API code
 
 
 **CLI**
-- <img src="https://api.iconify.design/devicon:typer.svg" width="16" height="16"> [Typer](https://typer.tiangolo.com/) — CLI with coloured progress output
+- ![Typer](https://api.iconify.design/devicon:typer.svg?height=16) [Typer](https://typer.tiangolo.com/) — CLI with coloured progress output
 
 **Packaging**
-- <img src="https://api.iconify.design/devicon:pypi.svg" width="16" height="16"> [PyPI](https://pypi.org/project/finamt/) — distributed as an installable Python package
+- ![PyPI](https://api.iconify.design/devicon:pypi.svg?height=16) [PyPI](https://pypi.org/project/finamt/) — distributed as an installable Python package
 
 ## Installation
 
@@ -352,24 +352,24 @@ Every receipt is tagged with a category and optional subcategory. Categories map
 
 | Category | Subcategories |
 |---|---|
-| <img src="https://api.iconify.design/mdi:briefcase.svg" width="16" height="16"> `services` | `freelance` `consulting` `legal` `accounting` `notary` |
-| <img src="https://api.iconify.design/ant-design:product-filled.svg" width="16" height="16"> `products` | `physical_goods` `digital_goods` `merchandise` `samples` |
-| <img src="https://api.iconify.design/solar:box-bold.svg" width="16" height="16"> `material` | `consumables` `raw_materials` `packaging` `merchandise` |
-| <img src="https://api.iconify.design/streamline-plump:computer-pc-desktop-solid.svg" width="16" height="16"> `equipment` | `low_value_asset` `computer` `machinery` `furniture` `tools` |
-| <img src="https://api.iconify.design/heroicons:cpu-chip-16-solid.svg" width="16" height="16"> `software` | `subscriptions` `pay_as_you_go` `licenses` `hosting` `domains` |
-| <img src="https://api.iconify.design/mdi:file-certificate.svg" width="16" height="16"> `licensing` | `software_licenses` `media_licenses` `other_ip` |
-| <img src="https://api.iconify.design/streamline-flex:satellite-dish-solid.svg" width="16" height="16"> `telecommunication` | `phone` `internet` `bundled` |
-| <img src="https://api.iconify.design/mdi:airplane.svg" width="16" height="16"> `travel` | `transport` `accommodation` `meals` `per_diem` `incidental` |
-| <img src="https://api.iconify.design/boxicons:car-filled.svg" width="16" height="16"> `car` | `fuel` `parking` `garage` `repair` `maintenance` `insurance` `leasing` `rental` |
-| <img src="https://api.iconify.design/wpf:books.svg" width="16" height="16"> `education` | `courses` `books` `conferences` `certifications` |
-| <img src="https://api.iconify.design/roentgen:electricity.svg" width="16" height="16"> `utilities` | `electricity` `heating` `water` `waste` |
-| <img src="https://api.iconify.design/fa:shield.svg" width="16" height="16"> `insurance` | `liability` `health` `vehicle` `property` |
-| <img src="https://api.iconify.design/boxicons:bank-filled.svg" width="16" height="16"> `financial` | `bank_fees` `interest` `loan_costs` `payment_fees` |
-| <img src="https://api.iconify.design/vaadin:office.svg" width="16" height="16"> `office` | `rent` `coworking` `storage` `cleaning` `security` |
-| <img src="https://api.iconify.design/mdi:loudspeaker.svg" width="16" height="16"> `marketing` | `advertising` `print_media` `trade_fairs` `sponsorship` `gifts` |
-| <img src="https://api.iconify.design/mdi:donation.svg" width="16" height="16"> `donations` | `charitable` `political` `church` |
-| <img src="https://api.iconify.design/mdi:gavel.svg" width="16" height="16"> `public_fees` | `broadcasting_fee` `ihk_hwk` `berufsgenossenschaft` `other_public_fee` |
-| <img src="https://api.iconify.design/flowbite:folder-plus-solid.svg" width="16" height="16"> `other` | `membership_fees` `sundry` |
+| ![services](https://api.iconify.design/mdi:briefcase.svg?height=16) `services` | `freelance` `consulting` `legal` `accounting` `notary` |
+| ![products](https://api.iconify.design/ant-design:product-filled.svg?height=16) `products` | `physical_goods` `digital_goods` `merchandise` `samples` |
+| ![material](https://api.iconify.design/solar:box-bold.svg?height=16) `material` | `consumables` `raw_materials` `packaging` `merchandise` |
+| ![equipment](https://api.iconify.design/streamline-plump:computer-pc-desktop-solid.svg?height=16) `equipment` | `low_value_asset` `computer` `machinery` `furniture` `tools` |
+| ![software](https://api.iconify.design/heroicons:cpu-chip-16-solid.svg?height=16) `software` | `subscriptions` `pay_as_you_go` `licenses` `hosting` `domains` |
+| ![licensing](https://api.iconify.design/mdi:file-certificate.svg?height=16) `licensing` | `software_licenses` `media_licenses` `other_ip` |
+| ![telecommunication](https://api.iconify.design/streamline-flex:satellite-dish-solid.svg?height=16) `telecommunication` | `phone` `internet` `bundled` |
+| ![travel](https://api.iconify.design/mdi:airplane.svg?height=16) `travel` | `transport` `accommodation` `meals` `per_diem` `incidental` |
+| ![car](https://api.iconify.design/boxicons:car-filled.svg?height=16) `car` | `fuel` `parking` `garage` `repair` `maintenance` `insurance` `leasing` `rental` |
+| ![education](https://api.iconify.design/wpf:books.svg?height=16) `education` | `courses` `books` `conferences` `certifications` |
+| ![utilities](https://api.iconify.design/roentgen:electricity.svg?height=16) `utilities` | `electricity` `heating` `water` `waste` |
+| ![insurance](https://api.iconify.design/fa:shield.svg?height=16) `insurance` | `liability` `health` `vehicle` `property` |
+| ![financial](https://api.iconify.design/boxicons:bank-filled.svg?height=16) `financial` | `bank_fees` `interest` `loan_costs` `payment_fees` |
+| ![office](https://api.iconify.design/vaadin:office.svg?height=16) `office` | `rent` `coworking` `storage` `cleaning` `security` |
+| ![marketing](https://api.iconify.design/mdi:loudspeaker.svg?height=16) `marketing` | `advertising` `print_media` `trade_fairs` `sponsorship` `gifts` |
+| ![donations](https://api.iconify.design/mdi:donation.svg?height=16) `donations` | `charitable` `political` `church` |
+| ![public_fees](https://api.iconify.design/mdi:gavel.svg?height=16) `public_fees` | `broadcasting_fee` `ihk_hwk` `berufsgenossenschaft` `other_public_fee` |
+| ![other](https://api.iconify.design/flowbite:folder-plus-solid.svg?height=16) `other` | `membership_fees` `sundry` |
 
 
 
