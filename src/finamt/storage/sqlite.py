@@ -22,21 +22,26 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import json
 import threading
+from collections.abc import Iterable
 from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Iterable
 
-from .base import ReceiptRepository
-from .project import resolve_project
 from ..models import (
-    Address, Counterparty, Posting, PostingDirection, PostingType,
-    ReceiptCategory, ReceiptData, ReceiptItem, ReceiptType,
+    Address,
+    Counterparty,
+    Posting,
+    PostingDirection,
+    PostingType,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptItem,
+    ReceiptType,
 )
+from .project import resolve_project
 
-DEFAULT_DB_PATH = resolve_project().db_path   # ~/.finamt/default/finamt.db
+DEFAULT_DB_PATH = resolve_project().db_path  # ~/.finamt/default/finamt.db
 _SCHEMA_VERSION = 1
 
 
@@ -48,7 +53,8 @@ class SQLiteRepository:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(
-            self.db_path, check_same_thread=False,
+            self.db_path,
+            check_same_thread=False,
             detect_types=sqlite3.PARSE_DECLTYPES,
         )
         self._conn.row_factory = sqlite3.Row
@@ -61,7 +67,7 @@ class SQLiteRepository:
     # Context manager
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "SQLiteRepository":
+    def __enter__(self) -> SQLiteRepository:
         return self
 
     def __exit__(self, *_) -> None:
@@ -88,37 +94,37 @@ class SQLiteRepository:
     def _migrate(self) -> None:
         """Idempotent column/table additions for schema evolution."""
         for tbl, col, typedef in [
-            ("receipt_items",      "position",            "INTEGER"),
-            ("receipt_items",      "vat_amount",           "TEXT"),
-            ("counterparties",     "verified",             "INTEGER DEFAULT 0"),
-            ("counterparties",     "street_and_number",    "TEXT"),
-            ("counterparties",     "address_supplement",   "TEXT"),
-            ("counterparties",     "state",                "TEXT"),
-            ("receipt_vat_splits", "net_amount",           "TEXT"),
-            ("receipts",           "currency",             "TEXT DEFAULT 'EUR'"),
-            ("receipts",           "subcategory",          "TEXT"),
-            ("receipts",           "description",          "TEXT"),
-            ("receipts",           "private_use_share",    "TEXT DEFAULT '0'"),
-            ("receipts",           "validation_warnings",  "TEXT"),
-            ("receipts",           "einfuhr_vat",          "TEXT"),
+            ("receipt_items", "position", "INTEGER"),
+            ("receipt_items", "vat_amount", "TEXT"),
+            ("counterparties", "verified", "INTEGER DEFAULT 0"),
+            ("counterparties", "street_and_number", "TEXT"),
+            ("counterparties", "address_supplement", "TEXT"),
+            ("counterparties", "state", "TEXT"),
+            ("receipt_vat_splits", "net_amount", "TEXT"),
+            ("receipts", "currency", "TEXT DEFAULT 'EUR'"),
+            ("receipts", "subcategory", "TEXT"),
+            ("receipts", "description", "TEXT"),
+            ("receipts", "private_use_share", "TEXT DEFAULT '0'"),
+            ("receipts", "validation_warnings", "TEXT"),
+            ("receipts", "einfuhr_vat", "TEXT"),
         ]:
             try:
                 self._conn.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {typedef}")
                 self._conn.commit()
             except Exception:
                 pass  # column already exists — expected on all but first run
-        
+
         # Migrate existing street/street_number data to street_and_number
         try:
             self._conn.execute("""
-                UPDATE counterparties 
+                UPDATE counterparties
                 SET street_and_number = TRIM(COALESCE(street, '') || ' ' || COALESCE(street_number, ''))
                 WHERE street_and_number IS NULL AND (street IS NOT NULL OR street_number IS NOT NULL)
             """)
             self._conn.commit()
         except Exception:
             pass  # migration already done or not needed
-        
+
         # vat_splits table (safe CREATE IF NOT EXISTS)
         self._conn.executescript("""
             CREATE TABLE IF NOT EXISTS receipt_vat_splits (
@@ -248,7 +254,6 @@ class SQLiteRepository:
             CREATE INDEX IF NOT EXISTS idx_postings_type    ON postings (posting_type);
         """)
 
-
     # ------------------------------------------------------------------
     # Write helpers
     # ------------------------------------------------------------------
@@ -308,11 +313,17 @@ class SQLiteRepository:
                     tax_number, vat_id, created_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    cp.id, cp.name,
-                    cp.address.street_and_number, cp.address.address_supplement,
-                    cp.address.postcode, cp.address.city,
-                    cp.address.state, cp.address.country,
-                    cp.tax_number, cp.vat_id, self._now(),
+                    cp.id,
+                    cp.name,
+                    cp.address.street_and_number,
+                    cp.address.address_supplement,
+                    cp.address.postcode,
+                    cp.address.city,
+                    cp.address.state,
+                    cp.address.country,
+                    cp.tax_number,
+                    cp.vat_id,
+                    self._now(),
                 ),
             )
             self._conn.commit()
@@ -344,7 +355,9 @@ class SQLiteRepository:
             name=row["name"],
             address=Address(
                 street_and_number=row["street_and_number"],
-                address_supplement=row["address_supplement"] if "address_supplement" in row.keys() else None,
+                address_supplement=row["address_supplement"]
+                if "address_supplement" in row.keys()
+                else None,
                 postcode=row["postcode"],
                 city=row["city"],
                 state=row["state"],
@@ -378,7 +391,11 @@ class SQLiteRepository:
 
         date_str: str | None = None
         if receipt.receipt_date is not None:
-            d = receipt.receipt_date.date() if isinstance(receipt.receipt_date, datetime) else receipt.receipt_date
+            d = (
+                receipt.receipt_date.date()
+                if isinstance(receipt.receipt_date, datetime)
+                else receipt.receipt_date
+            )
             date_str = d.isoformat()
 
         with self._lock:
@@ -391,11 +408,14 @@ class SQLiteRepository:
                     private_use_share, validation_warnings, einfuhr_vat, created_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
-                    receipt.id, cp_id, str(receipt.receipt_type),
-                    receipt.receipt_number, date_str,
-                    str(receipt.total_amount)   if receipt.total_amount   is not None else None,
+                    receipt.id,
+                    cp_id,
+                    str(receipt.receipt_type),
+                    receipt.receipt_number,
+                    date_str,
+                    str(receipt.total_amount) if receipt.total_amount is not None else None,
                     str(receipt.vat_percentage) if receipt.vat_percentage is not None else None,
-                    str(receipt.vat_amount)     if receipt.vat_amount     is not None else None,
+                    str(receipt.vat_amount) if receipt.vat_amount is not None else None,
                     getattr(receipt, "currency", "EUR") or "EUR",
                     str(receipt.category),
                     getattr(receipt, "subcategory", None),
@@ -409,16 +429,18 @@ class SQLiteRepository:
 
             # receipt_items
             import uuid as _uuid
+
             item_rows = [
                 (
-                    str(_uuid.uuid4()), receipt.id,
+                    str(_uuid.uuid4()),
+                    receipt.id,
                     item.position,
                     item.description,
-                    str(item.quantity)    if item.quantity    is not None else None,
-                    str(item.unit_price)  if item.unit_price  is not None else None,
+                    str(item.quantity) if item.quantity is not None else None,
+                    str(item.unit_price) if item.unit_price is not None else None,
                     str(item.total_price) if item.total_price is not None else None,
-                    str(item.vat_rate)    if item.vat_rate    is not None else None,
-                    str(item.vat_amount)  if item.vat_amount  is not None else None,
+                    str(item.vat_rate) if item.vat_rate is not None else None,
+                    str(item.vat_amount) if item.vat_amount is not None else None,
                     str(item.category),
                 )
                 for item in receipt.items
@@ -432,16 +454,25 @@ class SQLiteRepository:
             )
 
             # vat_splits
-            if hasattr(receipt, 'vat_splits') and receipt.vat_splits:
+            if hasattr(receipt, "vat_splits") and receipt.vat_splits:
                 import uuid as _uuid_vs
+
                 for pos, split in enumerate(receipt.vat_splits, start=1):
                     self._conn.execute(
                         """INSERT INTO receipt_vat_splits (id, receipt_id, position, vat_rate, vat_amount, net_amount)
                            VALUES (?, ?, ?, ?, ?, ?)""",
-                        (str(_uuid_vs.uuid4()), receipt.id, split.get("position", pos),
-                         str(split["vat_rate"]) if split.get("vat_rate") is not None else None,
-                         str(split["vat_amount"]) if split.get("vat_amount") is not None else None,
-                         str(split["net_amount"]) if split.get("net_amount") is not None else None),
+                        (
+                            str(_uuid_vs.uuid4()),
+                            receipt.id,
+                            split.get("position", pos),
+                            str(split["vat_rate"]) if split.get("vat_rate") is not None else None,
+                            str(split["vat_amount"])
+                            if split.get("vat_amount") is not None
+                            else None,
+                            str(split["net_amount"])
+                            if split.get("net_amount") is not None
+                            else None,
+                        ),
                     )
 
             # receipt_content
@@ -469,6 +500,7 @@ class SQLiteRepository:
         ``self._lock`` again.
         """
         import uuid as _uuid_p
+
         postings = receipt.generate_postings()
         now = self._now()
         for pos, p in enumerate(postings, start=1):
@@ -498,9 +530,7 @@ class SQLiteRepository:
         if receipt is None:
             return
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM postings WHERE receipt_id = ?", (receipt_id,)
-            )
+            self._conn.execute("DELETE FROM postings WHERE receipt_id = ?", (receipt_id,))
             self._insert_postings(receipt)
             self._conn.commit()
 
@@ -537,15 +567,15 @@ class SQLiteRepository:
         ).fetchall()
         return [
             {
-                "receipt_id":   r["receipt_id"],
+                "receipt_id": r["receipt_id"],
                 "receipt_date": r["receipt_date"],
                 "receipt_type": r["receipt_type"],
-                "category":     r["category"],
-                "position":     r["position"],
+                "category": r["category"],
+                "position": r["position"],
                 "posting_type": r["posting_type"],
-                "direction":    r["direction"],
-                "amount":       float(Decimal(str(r["amount"]))),
-                "description":  r["description"] or "",
+                "direction": r["direction"],
+                "amount": float(Decimal(str(r["amount"]))),
+                "description": r["description"] or "",
             }
             for r in rows
         ]
@@ -555,9 +585,7 @@ class SQLiteRepository:
     # ------------------------------------------------------------------
 
     def exists(self, receipt_id: str) -> bool:
-        row = self._conn.execute(
-            "SELECT 1 FROM receipts WHERE id = ?", (receipt_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT 1 FROM receipts WHERE id = ?", (receipt_id,)).fetchone()
         return row is not None
 
     def get(self, receipt_id: str) -> ReceiptData | None:
@@ -578,7 +606,6 @@ class SQLiteRepository:
         cur = self._exec("DELETE FROM receipts WHERE id = ?", (receipt_id,))
         return cur.rowcount > 0
 
-
     def update(self, receipt_id: str, fields: dict) -> bool:
         """
         Partially update a receipt's mutable fields (user corrections).
@@ -595,22 +622,42 @@ class SQLiteRepository:
         Returns True if the receipt row was found.
         """
         RECEIPT_MUTABLE = {
-            "receipt_type", "receipt_number", "receipt_date",
-            "total_amount", "vat_percentage", "vat_amount", "currency", "category",
-            "subcategory", "description", "private_use_share", "validation_warnings",
+            "receipt_type",
+            "receipt_number",
+            "receipt_date",
+            "total_amount",
+            "vat_percentage",
+            "vat_amount",
+            "currency",
+            "category",
+            "subcategory",
+            "description",
+            "private_use_share",
+            "validation_warnings",
             "einfuhr_vat",
         }
         # Financial fields whose change should trigger posting regeneration
         _POSTING_SENSITIVE = {
-            "total_amount", "vat_percentage", "vat_amount",
-            "currency", "receipt_type", "private_use_share",
+            "total_amount",
+            "vat_percentage",
+            "vat_amount",
+            "currency",
+            "receipt_type",
+            "private_use_share",
         }
         CP_SCALAR = {
             "counterparty_name": "name",
-            "vat_id":            "vat_id",
-            "tax_number":        "tax_number",
+            "vat_id": "vat_id",
+            "tax_number": "tax_number",
         }
-        ADDR_FIELDS = {"street_and_number", "address_supplement", "postcode", "city", "state", "country"}
+        ADDR_FIELDS = {
+            "street_and_number",
+            "address_supplement",
+            "postcode",
+            "city",
+            "state",
+            "country",
+        }
 
         receipt_updates = {k: v for k, v in fields.items() if k in RECEIPT_MUTABLE}
 
@@ -624,12 +671,16 @@ class SQLiteRepository:
         if "einfuhr_vat" in receipt_updates:
             try:
                 ev = receipt_updates["einfuhr_vat"]
-                receipt_updates["einfuhr_vat"] = str(Decimal(str(ev))) if ev not in (None, "") else None
+                receipt_updates["einfuhr_vat"] = (
+                    str(Decimal(str(ev))) if ev not in (None, "") else None
+                )
             except Exception:
                 receipt_updates.pop("einfuhr_vat", None)
         if "currency" in receipt_updates:
             raw_cur = str(receipt_updates["currency"]).strip().upper()
-            receipt_updates["currency"] = raw_cur if (2 <= len(raw_cur) <= 4 and raw_cur.isalpha()) else "EUR"
+            receipt_updates["currency"] = (
+                raw_cur if (2 <= len(raw_cur) <= 4 and raw_cur.isalpha()) else "EUR"
+            )
         if "private_use_share" in receipt_updates:
             try:
                 p = Decimal(str(receipt_updates["private_use_share"]))
@@ -676,7 +727,7 @@ class SQLiteRepository:
             if field_in not in fields:
                 continue
             val = fields[field_in]
-            if col == "name" and not val:   # never clear the supplier name
+            if col == "name" and not val:  # never clear the supplier name
                 continue
             # Normalise empty string → None so SQLite stores NULL
             cp_updates[col] = val if val else None
@@ -696,12 +747,11 @@ class SQLiteRepository:
                 # orphan-cleanup routine uses receipt references, not this flag.
                 set_clause = ", ".join(f"{col} = ?" for col in cp_updates)
                 params = tuple(cp_updates.values()) + (cp_id,)
-                self._exec(
-                    f"UPDATE counterparties SET {set_clause} WHERE id = ?", params
-                )
+                self._exec(f"UPDATE counterparties SET {set_clause} WHERE id = ?", params)
             else:
                 # No counterparty row yet — create one and link it to the receipt
                 import uuid
+
                 new_cp_id = str(uuid.uuid4())
                 self._exec(
                     """INSERT INTO counterparties
@@ -730,16 +780,20 @@ class SQLiteRepository:
         # VAT splits — full replace when provided
         if "vat_splits" in fields and isinstance(fields["vat_splits"], list):
             import uuid as _uuid_vs2
+
             self._exec("DELETE FROM receipt_vat_splits WHERE receipt_id = ?", (receipt_id,))
             for pos, split in enumerate(fields["vat_splits"], start=1):
                 self._exec(
                     """INSERT INTO receipt_vat_splits (id, receipt_id, position, vat_rate, vat_amount, net_amount)
                        VALUES (?, ?, ?, ?, ?, ?)""",
-                    (str(_uuid_vs2.uuid4()), receipt_id,
-                     split.get("position", pos),
-                     str(split["vat_rate"])    if split.get("vat_rate")    is not None else None,
-                     str(split["vat_amount"])  if split.get("vat_amount")  is not None else None,
-                     str(split["net_amount"])  if split.get("net_amount")  is not None else None),
+                    (
+                        str(_uuid_vs2.uuid4()),
+                        receipt_id,
+                        split.get("position", pos),
+                        str(split["vat_rate"]) if split.get("vat_rate") is not None else None,
+                        str(split["vat_amount"]) if split.get("vat_amount") is not None else None,
+                        str(split["net_amount"]) if split.get("net_amount") is not None else None,
+                    ),
                 )
 
         # Counterparty verified flag
@@ -752,6 +806,7 @@ class SQLiteRepository:
         # Items — full replace when provided
         if "items" in fields and isinstance(fields["items"], list):
             import uuid as _uuid3
+
             self._exec("DELETE FROM receipt_items WHERE receipt_id = ?", (receipt_id,))
             for pos, item in enumerate(fields["items"], start=1):
                 self._exec(
@@ -764,11 +819,11 @@ class SQLiteRepository:
                         receipt_id,
                         item.get("position", pos),
                         item.get("description"),
-                        str(item["quantity"])    if item.get("quantity")    is not None else None,
-                        str(item["unit_price"])  if item.get("unit_price")  is not None else None,
+                        str(item["quantity"]) if item.get("quantity") is not None else None,
+                        str(item["unit_price"]) if item.get("unit_price") is not None else None,
                         str(item["total_price"]) if item.get("total_price") is not None else None,
-                        str(item["vat_rate"])    if item.get("vat_rate")    is not None else None,
-                        str(item["vat_amount"])  if item.get("vat_amount")  is not None else None,
+                        str(item["vat_rate"]) if item.get("vat_rate") is not None else None,
+                        str(item["vat_amount"]) if item.get("vat_amount") is not None else None,
                         item.get("category", "other"),
                     ),
                 )
@@ -791,18 +846,18 @@ class SQLiteRepository:
         ).fetchall()
         return [
             {
-                "id":           r["id"],
-                "name":         r["name"],
-                "tax_number":   r["tax_number"],
-                "vat_id":       r["vat_id"],
-                "verified":     bool(r["verified"]),
+                "id": r["id"],
+                "name": r["name"],
+                "tax_number": r["tax_number"],
+                "vat_id": r["vat_id"],
+                "verified": bool(r["verified"]),
                 "address": {
-                    "street_and_number":  r["street_and_number"],
+                    "street_and_number": r["street_and_number"],
                     "address_supplement": r["address_supplement"],
-                    "postcode":           r["postcode"],
-                    "city":               r["city"],
-                    "state":              r["state"],
-                    "country":            r["country"],
+                    "postcode": r["postcode"],
+                    "city": r["city"],
+                    "state": r["state"],
+                    "country": r["country"],
                 },
             }
             for r in rows
@@ -844,7 +899,7 @@ class SQLiteRepository:
         if row is None:
             return {}
         return {
-            "category":    row["category"],
+            "category": row["category"],
             "subcategory": row["subcategory"] or "",
         }
 
@@ -865,19 +920,19 @@ class SQLiteRepository:
         ).fetchall()
         return [
             {
-                "id":         r["id"],
-                "name":       r["name"],
+                "id": r["id"],
+                "name": r["name"],
                 "tax_number": r["tax_number"],
-                "vat_id":     r["vat_id"],
-                "verified":   bool(r["verified"]),
+                "vat_id": r["vat_id"],
+                "verified": bool(r["verified"]),
                 "created_at": r["created_at"],
                 "address": {
-                    "street_and_number":  r["street_and_number"],
+                    "street_and_number": r["street_and_number"],
                     "address_supplement": r["address_supplement"],
-                    "postcode":           r["postcode"],
-                    "city":               r["city"],
-                    "state":              r["state"],
-                    "country":            r["country"],
+                    "postcode": r["postcode"],
+                    "city": r["city"],
+                    "state": r["state"],
+                    "country": r["country"],
                 },
             }
             for r in rows
@@ -890,17 +945,23 @@ class SQLiteRepository:
         ordinary field edits (name, address, VAT-ID, …) must not touch it.
         """
         allowed = {
-            "name", "tax_number", "vat_id", "verified",
-            "street_and_number", "address_supplement", "postcode", "city", "state", "country",
+            "name",
+            "tax_number",
+            "vat_id",
+            "verified",
+            "street_and_number",
+            "address_supplement",
+            "postcode",
+            "city",
+            "state",
+            "country",
         }
         updates = {k: v for k, v in fields.items() if k in allowed}
         if not updates:
             return False
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [cp_id]
-        cur = self._exec(
-            f"UPDATE counterparties SET {set_clause} WHERE id = ?", values
-        )
+        cur = self._exec(f"UPDATE counterparties SET {set_clause} WHERE id = ?", values)
         return cur.rowcount > 0
 
     def relink_counterparty(self, receipt_id: str, fields: dict) -> bool:
@@ -910,18 +971,19 @@ class SQLiteRepository:
         startup orphan-cleanup will remove it on the next open.
         Returns True if the receipt row was found and updated.
         """
-        from finamt.models import Counterparty, Address
+        from finamt.models import Address, Counterparty
+
         cp = Counterparty(
-            name        = fields.get("name") or None,
-            vat_id      = fields.get("vat_id") or None,
-            tax_number  = fields.get("tax_number") or None,
-            address     = Address(
-                street_and_number  = fields.get("street_and_number"),
-                address_supplement = fields.get("address_supplement"),
-                postcode           = fields.get("postcode"),
-                city               = fields.get("city"),
-                state              = fields.get("state"),
-                country            = fields.get("country"),
+            name=fields.get("name") or None,
+            vat_id=fields.get("vat_id") or None,
+            tax_number=fields.get("tax_number") or None,
+            address=Address(
+                street_and_number=fields.get("street_and_number"),
+                address_supplement=fields.get("address_supplement"),
+                postcode=fields.get("postcode"),
+                city=fields.get("city"),
+                state=fields.get("state"),
+                country=fields.get("country"),
             ),
         )
         resolved = self.get_or_create_counterparty(cp)
@@ -938,13 +1000,11 @@ class SQLiteRepository:
         return cur.rowcount > 0
 
     def list_all(self) -> Iterable[ReceiptData]:
-        return self._query_receipts(
-            "ORDER BY receipt_date DESC NULLS LAST"
-        )
+        return self._query_receipts("ORDER BY receipt_date DESC NULLS LAST")
 
     def find_by_period(self, start: date, end: date) -> Iterable[ReceiptData]:
         s = (start.date() if isinstance(start, datetime) else start).isoformat()
-        e = (end.date()   if isinstance(end,   datetime) else end  ).isoformat()
+        e = (end.date() if isinstance(end, datetime) else end).isoformat()
         return self._query_receipts(
             "WHERE r.receipt_date BETWEEN ? AND ? ORDER BY r.receipt_date DESC",
             (s, e),
@@ -990,7 +1050,9 @@ class SQLiteRepository:
                 name=row["cp_name"],
                 address=Address(
                     street_and_number=row["street_and_number"],
-                    address_supplement=row["address_supplement"] if "address_supplement" in row.keys() else None,
+                    address_supplement=row["address_supplement"]
+                    if "address_supplement" in row.keys()
+                    else None,
                     postcode=row["postcode"],
                     city=row["city"],
                     state=row["state"],
@@ -1010,18 +1072,18 @@ class SQLiteRepository:
         # items (separate query to keep row simple)
         item_rows = self._conn.execute(
             "SELECT * FROM receipt_items WHERE receipt_id = ? ORDER BY position ASC NULLS LAST",
-            (row["id"],)
+            (row["id"],),
         ).fetchall()
         items = [
             ReceiptItem(
                 description=ir["description"] or "",
-                position=   ir["position"] if "position" in ir.keys() else None,
-                quantity=   self._dec(ir["quantity"]),
-                unit_price= self._dec(ir["unit_price"]),
+                position=ir["position"] if "position" in ir.keys() else None,
+                quantity=self._dec(ir["quantity"]),
+                unit_price=self._dec(ir["unit_price"]),
                 total_price=self._dec(ir["total_price"]),
-                vat_rate=   self._dec(ir["vat_rate"]),
-                vat_amount= self._dec(ir["vat_amount"]) if "vat_amount" in ir.keys() else None,
-                category=   ReceiptCategory(ir["category"] or "other"),
+                vat_rate=self._dec(ir["vat_rate"]),
+                vat_amount=self._dec(ir["vat_amount"]) if "vat_amount" in ir.keys() else None,
+                category=ReceiptCategory(ir["category"] or "other"),
             )
             for ir in item_rows
         ]
@@ -1029,12 +1091,12 @@ class SQLiteRepository:
         # vat_splits
         split_rows = self._conn.execute(
             "SELECT * FROM receipt_vat_splits WHERE receipt_id = ? ORDER BY position ASC",
-            (row["id"],)
+            (row["id"],),
         ).fetchall()
         vat_splits = [
             {
-                "position":   sr["position"],
-                "vat_rate":   float(self._dec(sr["vat_rate"]))   if sr["vat_rate"]   else None,
+                "position": sr["position"],
+                "vat_rate": float(self._dec(sr["vat_rate"])) if sr["vat_rate"] else None,
                 "vat_amount": float(self._dec(sr["vat_amount"])) if sr["vat_amount"] else None,
                 "net_amount": float(self._dec(sr["net_amount"])) if sr["net_amount"] else None,
             }
@@ -1042,21 +1104,25 @@ class SQLiteRepository:
         ]
 
         receipt = ReceiptData.__new__(ReceiptData)
-        receipt.raw_text          = row["raw_text"] or ""
-        receipt.vat_splits        = vat_splits
-        receipt.id                = row["id"]
-        receipt.receipt_type      = ReceiptType(row["receipt_type"] or "purchase")
-        receipt.counterparty      = cp
-        receipt.receipt_number    = row["receipt_number"]
-        receipt.receipt_date      = receipt_date
-        receipt.total_amount      = self._dec(row["total_amount"])
-        receipt.vat_percentage    = self._dec(row["vat_percentage"])
-        receipt.vat_amount        = self._dec(row["vat_amount"])
-        receipt.currency          = row["currency"] if "currency" in row.keys() and row["currency"] else "EUR"
-        receipt.category          = ReceiptCategory(row["category"] or "other")
-        receipt.subcategory       = row["subcategory"] if "subcategory" in row.keys() else None
-        receipt.description       = row["description"] if "description" in row.keys() and row["description"] else ""
-        receipt.items             = items
+        receipt.raw_text = row["raw_text"] or ""
+        receipt.vat_splits = vat_splits
+        receipt.id = row["id"]
+        receipt.receipt_type = ReceiptType(row["receipt_type"] or "purchase")
+        receipt.counterparty = cp
+        receipt.receipt_number = row["receipt_number"]
+        receipt.receipt_date = receipt_date
+        receipt.total_amount = self._dec(row["total_amount"])
+        receipt.vat_percentage = self._dec(row["vat_percentage"])
+        receipt.vat_amount = self._dec(row["vat_amount"])
+        receipt.currency = (
+            row["currency"] if "currency" in row.keys() and row["currency"] else "EUR"
+        )
+        receipt.category = ReceiptCategory(row["category"] or "other")
+        receipt.subcategory = row["subcategory"] if "subcategory" in row.keys() else None
+        receipt.description = (
+            row["description"] if "description" in row.keys() and row["description"] else ""
+        )
+        receipt.items = items
         # private_use_share — default to 0 for receipts created before this column existed
         _pus = row["private_use_share"] if "private_use_share" in row.keys() else None
         receipt.private_use_share = self._dec(_pus) or Decimal("0")
@@ -1103,7 +1169,5 @@ class SQLiteRepository:
     def delete_metadata(self, key: str) -> None:
         """Remove *key* from project_metadata (no-op if absent)."""
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM project_metadata WHERE key = ?", (key,)
-            )
+            self._conn.execute("DELETE FROM project_metadata WHERE key = ?", (key,))
             self._conn.commit()

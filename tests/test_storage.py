@@ -7,6 +7,7 @@ All tests use tmp_path, never touching ~/.finamt/finamt.db.
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -14,15 +15,20 @@ from decimal import Decimal
 import pytest
 
 from finamt.models import (
-    Address, Counterparty, ReceiptCategory, ReceiptData, ReceiptItem, ReceiptType,
+    Address,
+    Counterparty,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptItem,
+    ReceiptType,
 )
 from finamt.storage.base import ReceiptRepository
 from finamt.storage.sqlite import SQLiteRepository
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def repo(tmp_path) -> SQLiteRepository:
@@ -36,7 +42,10 @@ def _make_counterparty(name: str = "Test GmbH") -> Counterparty:
         name=name,
         address=Address(
             street_and_number="Musterstraße 1",
-            postcode="10115", city="Berlin", state="Berlin", country="Germany",
+            postcode="10115",
+            city="Berlin",
+            state="Berlin",
+            country="Germany",
         ),
         vat_id=f"DE{abs(hash(name)) % 10**9:09d}",
     )
@@ -92,6 +101,7 @@ def _make_item(
 # Protocol conformance
 # ---------------------------------------------------------------------------
 
+
 class TestProtocolConformance:
     def test_is_receipt_repository(self, repo):
         assert isinstance(repo, ReceiptRepository)
@@ -101,18 +111,20 @@ class TestProtocolConformance:
 # Context manager
 # ---------------------------------------------------------------------------
 
+
 class TestContextManager:
     def test_context_manager_closes_connection(self, tmp_path):
         with SQLiteRepository(db_path=tmp_path / "ctx.db") as repo:
             r = _make_receipt()
             repo.save(r)
-        with pytest.raises(Exception):
+        with pytest.raises(sqlite3.ProgrammingError):
             repo.get(r.id)
 
 
 # ---------------------------------------------------------------------------
 # save / get
 # ---------------------------------------------------------------------------
+
 
 class TestSaveGet:
     def test_save_and_retrieve(self, repo):
@@ -135,8 +147,10 @@ class TestSaveGet:
 
     def test_none_fields_round_trip(self, repo):
         r = _make_receipt(
-            total_amount=None, vat_percentage=None,
-            vat_amount=None, receipt_date=None,
+            total_amount=None,
+            vat_percentage=None,
+            vat_amount=None,
+            receipt_date=None,
         )
         repo.save(r)
         found = repo.get(r.id)
@@ -197,6 +211,7 @@ class TestSaveGet:
 # Counterparty deduplication
 # ---------------------------------------------------------------------------
 
+
 class TestCounterpartyDedup:
     def test_same_name_reuses_counterparty(self, repo):
         """Same name → second receipt reuses existing counterparty row, no error.
@@ -220,8 +235,8 @@ class TestCounterpartyDedup:
         in the UI for the user to resolve manually.
         """
         shared_vat = "DE123456789"
-        cp1 = Counterparty(name="Deutsche Bank AG",   vat_id=shared_vat)
-        cp2 = Counterparty(name="Deutsche Bahn AG",   vat_id=shared_vat)
+        cp1 = Counterparty(name="Deutsche Bank AG", vat_id=shared_vat)
+        cp2 = Counterparty(name="Deutsche Bahn AG", vat_id=shared_vat)
         r1 = _make_receipt(counterparty=cp1)
         r2 = _make_receipt(counterparty=cp2)
         repo.save(r1)
@@ -260,6 +275,7 @@ class TestCounterpartyDedup:
 # ---------------------------------------------------------------------------
 # Line items
 # ---------------------------------------------------------------------------
+
 
 class TestLineItems:
     def test_items_persisted_and_restored(self, repo):
@@ -308,6 +324,7 @@ class TestLineItems:
 # delete
 # ---------------------------------------------------------------------------
 
+
 class TestDelete:
     def test_delete_existing_returns_true(self, repo):
         r = _make_receipt()
@@ -332,6 +349,7 @@ class TestDelete:
 # list_all
 # ---------------------------------------------------------------------------
 
+
 class TestListAll:
     def test_empty_repo_returns_empty(self, repo):
         assert list(repo.list_all()) == []
@@ -352,11 +370,24 @@ class TestListAll:
 # find_by_period
 # ---------------------------------------------------------------------------
 
+
 class TestFindByPeriod:
     def test_returns_receipts_in_range(self, repo):
-        repo.save(_make_receipt(counterparty=_make_counterparty("Jan"), receipt_date=datetime(2024, 1, 15)))
-        repo.save(_make_receipt(counterparty=_make_counterparty("Mar"), receipt_date=datetime(2024, 3, 10)))
-        repo.save(_make_receipt(counterparty=_make_counterparty("Dec"), receipt_date=datetime(2024, 12, 1)))
+        repo.save(
+            _make_receipt(
+                counterparty=_make_counterparty("Jan"), receipt_date=datetime(2024, 1, 15)
+            )
+        )
+        repo.save(
+            _make_receipt(
+                counterparty=_make_counterparty("Mar"), receipt_date=datetime(2024, 3, 10)
+            )
+        )
+        repo.save(
+            _make_receipt(
+                counterparty=_make_counterparty("Dec"), receipt_date=datetime(2024, 12, 1)
+            )
+        )
         result = list(repo.find_by_period(date(2024, 1, 1), date(2024, 3, 31)))
         assert {r.counterparty.name for r in result} == {"Jan", "Mar"}
 
@@ -387,6 +418,7 @@ class TestFindByPeriod:
 # find_by_category
 # ---------------------------------------------------------------------------
 
+
 class TestFindByCategory:
     def test_returns_matching_receipts(self, repo):
         repo.save(_make_receipt(counterparty=_make_counterparty("Soft 1"), category="software"))
@@ -405,6 +437,7 @@ class TestFindByCategory:
 # find_by_type
 # ---------------------------------------------------------------------------
 
+
 class TestFindByType:
     def test_finds_purchases(self, repo):
         repo.save(_make_receipt(receipt_type="purchase"))
@@ -422,6 +455,7 @@ class TestFindByType:
 # ---------------------------------------------------------------------------
 # Persistence across re-opens
 # ---------------------------------------------------------------------------
+
 
 class TestPersistence:
     def test_data_survives_close_and_reopen(self, tmp_path):
@@ -447,6 +481,7 @@ class TestPersistence:
 # ---------------------------------------------------------------------------
 # update (receipt partial update)
 # ---------------------------------------------------------------------------
+
 
 class TestUpdate:
     def test_update_receipt_amount(self, repo):
@@ -488,9 +523,17 @@ class TestUpdate:
     def test_update_items_replaces(self, repo):
         r = _make_receipt(items=[_make_item(description="Old Item")])
         repo.save(r)
-        new_items = [{"description": "New Item", "total_price": "10.00",
-                      "vat_rate": "19", "vat_amount": None, "unit_price": None,
-                      "quantity": None, "category": "software"}]
+        new_items = [
+            {
+                "description": "New Item",
+                "total_price": "10.00",
+                "vat_rate": "19",
+                "vat_amount": None,
+                "unit_price": None,
+                "quantity": None,
+                "category": "software",
+            }
+        ]
         repo.update(r.id, {"items": new_items})
         found = repo.get(r.id)
         assert len(found.items) == 1
@@ -519,6 +562,7 @@ class TestUpdate:
 # ---------------------------------------------------------------------------
 # Counterparty management methods
 # ---------------------------------------------------------------------------
+
 
 class TestCounterpartyManagement:
     def test_list_all_counterparties_empty(self, repo):
@@ -610,6 +654,7 @@ class TestCounterpartyManagement:
 # Startup deduplication sweep
 # ---------------------------------------------------------------------------
 
+
 class TestStartupDedup:
     def test_dedup_runs_on_reopen(self, tmp_path):
         """When duplicate counterparties exist on disk, re-opening merges them."""
@@ -648,12 +693,13 @@ class TestStartupDedup:
 # VAT splits round-trip
 # ---------------------------------------------------------------------------
 
+
 class TestVatSplits:
     def test_vat_splits_saved_and_restored(self, repo):
         r = _make_receipt()
         r.vat_splits = [
             {"position": 1, "vat_rate": 19.0, "vat_amount": 19.0, "net_amount": 100.0},
-            {"position": 2, "vat_rate": 7.0,  "vat_amount":  7.0, "net_amount": 100.0},
+            {"position": 2, "vat_rate": 7.0, "vat_amount": 7.0, "net_amount": 100.0},
         ]
         repo.save(r)
         found = repo.get(r.id)

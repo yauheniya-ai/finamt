@@ -9,7 +9,6 @@
 <div align="center">
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 [![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
@@ -35,7 +34,7 @@ Eine agentische Python-Bibliothek zur strukturierten Extraktion von Daten aus Be
 **Backend**
 - ![Python](https://api.iconify.design/devicon:python.svg?height=16) [Python](https://www.python.org) — Paketsprache
 - ![FastAPI](https://api.iconify.design/devicon:fastapi.svg?height=16) [FastAPI](https://fastapi.tiangolo.com) — Backend der Web-Oberfläche
-- ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR für gescannte PDFs
+- ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16&color=%23363FE5) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR für gescannte PDFs
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR für gescannte PDFs und Bilder als Fallback bei PaddleOCR-Fehlern oder Timeouts
 - ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — Lokale LLMs zur strukturierten Extraktion von Beleginformationen
     - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M ist derzeit das empfohlene Standardmodell für textbasierte Extraktion
@@ -403,8 +402,16 @@ Jeder Beleg wird mit einer Kategorie und einer optionalen Unterkategorie versehe
 1. Repository forken
 2. Feature-Branch erstellen (`git checkout -b feature/meine-änderung`)
 3. Änderungen vornehmen
-4. Testsuite ausführen: `pytest --cov=src --cov-report=term-missing`
-5. Pull Request einreichen
+4. Lint und Formatierung mit Ruff:
+   ```bash
+   ruff check --fix src/ tests/
+   ruff format src/ tests/
+   ```
+5. Testsuite ausführen:
+   ```bash
+   pytest --cov=src --cov-report=term-missing
+   ```
+6. Pull Request einreichen
 
 ## Lizenz
 

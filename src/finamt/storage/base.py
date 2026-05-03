@@ -6,8 +6,9 @@ Abstract repository interface.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date
-from typing import Iterable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from ..models import Counterparty, ReceiptData
 

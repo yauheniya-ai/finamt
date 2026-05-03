@@ -11,16 +11,21 @@ from decimal import Decimal
 
 import pytest
 
-from finamt.agents.config import Config, AgentsConfig
+from finamt.agents.config import Config
 from finamt.models import (
-    Address, Counterparty, ExtractionResult,
-    ReceiptCategory, ReceiptData, ReceiptItem, ReceiptType,
+    Address,
+    Counterparty,
+    ExtractionResult,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptItem,
+    ReceiptType,
 )
-
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def default_config() -> Config:
@@ -30,6 +35,7 @@ def default_config() -> Config:
 # ---------------------------------------------------------------------------
 # Model helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_item() -> ReceiptItem:
@@ -96,6 +102,7 @@ def failed_result() -> ExtractionResult:
 # OCR / LLM fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def german_receipt_text() -> str:
     return """
@@ -144,7 +151,19 @@ def agent3_response() -> dict:
 
 @pytest.fixture
 def agent4_response() -> dict:
-    return {"items": [
-        {"description": "Druckerpapier A4", "vat_rate": 19.0, "vat_amount": 2.47, "total_price": 13.00},
-        {"description": "Kugelschreiber",   "vat_rate": 19.0, "vat_amount": 0.94, "total_price": 4.95},
-    ]}
+    return {
+        "items": [
+            {
+                "description": "Druckerpapier A4",
+                "vat_rate": 19.0,
+                "vat_amount": 2.47,
+                "total_price": 13.00,
+            },
+            {
+                "description": "Kugelschreiber",
+                "vat_rate": 19.0,
+                "vat_amount": 0.94,
+                "total_price": 4.95,
+            },
+        ]
+    }

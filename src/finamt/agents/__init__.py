@@ -12,9 +12,9 @@ Multi-agent extraction pipeline.
   prompts     — per-agent prompt templates
 """
 
-from .pipeline import run_pipeline
-from .config import AgentsConfig, AgentModelConfig
-from .prompts import RECEIPT_CATEGORIES
 from .agent import FinanceAgent
+from .config import AgentModelConfig, AgentsConfig
+from .pipeline import run_pipeline
+from .prompts import RECEIPT_CATEGORIES
 
-__all__ = ["run_pipeline", "AgentsConfig", "AgentModelConfig", "RECEIPT_CATEGORIES"]
+__all__ = ["FinanceAgent", "run_pipeline", "AgentsConfig", "AgentModelConfig", "RECEIPT_CATEGORIES"]

@@ -6,13 +6,28 @@ Pattern: instruction → schema → text → output reminder (sandwich).
 """
 
 from __future__ import annotations
-from typing import Optional
 
 RECEIPT_CATEGORIES = [
-    "services", "products", "material", "equipment", "software",
-    "licensing", "telecommunication", "travel", "car", "education",
-    "utilities", "insurance", "financial", "office", "marketing",
-    "donations", "public_fees", "tax_settlement", "capital_movement", "other",
+    "services",
+    "products",
+    "material",
+    "equipment",
+    "software",
+    "licensing",
+    "telecommunication",
+    "travel",
+    "car",
+    "education",
+    "utilities",
+    "insurance",
+    "financial",
+    "office",
+    "marketing",
+    "donations",
+    "public_fees",
+    "tax_settlement",
+    "capital_movement",
+    "other",
 ]
 
 _CATS = "|".join(RECEIPT_CATEGORIES)
@@ -94,6 +109,7 @@ Return only JSON:"""
 # Builder functions
 # ---------------------------------------------------------------------------
 
+
 def _truncate(text: str, max_chars: int = 3000) -> str:
     """Keep prompts short for local models."""
     if len(text) <= max_chars:
@@ -105,7 +121,7 @@ def build_agent1_prompt(text: str) -> str:
     return AGENT1_TEMPLATE.format(cats=_CATS, text=_truncate(text))
 
 
-def build_agent2_prompt(text: str, receipt_type: str, taxpayer_info: Optional[dict] = None) -> str:
+def build_agent2_prompt(text: str, receipt_type: str, taxpayer_info: dict | None = None) -> str:
     if receipt_type == "purchase":
         party = "vendor/supplier"
     else:
@@ -114,16 +130,20 @@ def build_agent2_prompt(text: str, receipt_type: str, taxpayer_info: Optional[di
     exclusion = ""
     if taxpayer_info:
         parts: list[str] = []
-        if taxpayer_info.get("name"):       parts.append(f"Name: {taxpayer_info['name']}")
-        if taxpayer_info.get("vat_id"):     parts.append(f"VAT ID: {taxpayer_info['vat_id']}")
-        if taxpayer_info.get("tax_number"): parts.append(f"Tax Number: {taxpayer_info['tax_number']}")
-        if taxpayer_info.get("address"):    parts.append(f"Address: {taxpayer_info['address']}")
+        if taxpayer_info.get("name"):
+            parts.append(f"Name: {taxpayer_info['name']}")
+        if taxpayer_info.get("vat_id"):
+            parts.append(f"VAT ID: {taxpayer_info['vat_id']}")
+        if taxpayer_info.get("tax_number"):
+            parts.append(f"Tax Number: {taxpayer_info['tax_number']}")
+        if taxpayer_info.get("address"):
+            parts.append(f"Address: {taxpayer_info['address']}")
         if parts:
             exclusion = (
                 f"IMPORTANT: The following data belong to the USER not {party} "
                 f"— do NOT extract it: "
-                + "; ".join(parts) +
-                f". Instead, find other suitable data for these fields."
+                + "; ".join(parts)
+                + ". Instead, find other suitable data for these fields."
             )
 
     return AGENT2_TEMPLATE.format(party=party, exclusion=exclusion, text=_truncate(text))

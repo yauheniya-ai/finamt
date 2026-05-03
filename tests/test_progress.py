@@ -3,6 +3,7 @@ tests/test_progress.py
 ~~~~~~~~~~~~~~~~~~~~~~~
 Tests for finamt.progress — thread-local callback emitter.
 """
+
 from __future__ import annotations
 
 import threading

@@ -32,14 +32,13 @@ Usage::
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Iterable
 
 from ..models import ReceiptData
-
 
 _TWO = Decimal("0.01")
 
@@ -56,19 +55,20 @@ def _to_date(dt: date | datetime) -> date:
 # Per-rate line
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class USTVALineItem:
     """Aggregated figures for one VAT rate, split by receipt type."""
 
-    vat_rate:              Decimal
+    vat_rate: Decimal
     # Purchase side (Vorsteuer — input tax you reclaim)
-    purchase_net:          Decimal = field(default_factory=Decimal)
-    purchase_vat:          Decimal = field(default_factory=Decimal)
-    purchase_count:        int = 0
+    purchase_net: Decimal = field(default_factory=Decimal)
+    purchase_vat: Decimal = field(default_factory=Decimal)
+    purchase_count: int = 0
     # Sale side (Umsatzsteuer — output tax you remit)
-    sale_net:              Decimal = field(default_factory=Decimal)
-    sale_vat:              Decimal = field(default_factory=Decimal)
-    sale_count:            int = 0
+    sale_net: Decimal = field(default_factory=Decimal)
+    sale_vat: Decimal = field(default_factory=Decimal)
+    sale_count: int = 0
 
     @property
     def net_liability(self) -> Decimal:
@@ -77,20 +77,21 @@ class USTVALineItem:
 
     def to_dict(self) -> dict:
         return {
-            "vat_rate":       str(self.vat_rate),
-            "purchase_net":   str(self.purchase_net),
-            "purchase_vat":   str(self.purchase_vat),
+            "vat_rate": str(self.vat_rate),
+            "purchase_net": str(self.purchase_net),
+            "purchase_vat": str(self.purchase_vat),
             "purchase_count": self.purchase_count,
-            "sale_net":       str(self.sale_net),
-            "sale_vat":       str(self.sale_vat),
-            "sale_count":     self.sale_count,
-            "net_liability":  str(self.net_liability),
+            "sale_net": str(self.sale_net),
+            "sale_vat": str(self.sale_vat),
+            "sale_count": self.sale_count,
+            "net_liability": str(self.net_liability),
         }
 
 
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class USTVAReport:
@@ -101,13 +102,13 @@ class USTVAReport:
     ``net_liability < 0``  → the Finanzamt owes you (Erstattung)
     """
 
-    period_start:   date
-    period_end:     date
-    lines:          dict[str, USTVALineItem] = field(default_factory=dict)
-    skipped_count:  int = 0
+    period_start: date
+    period_end: date
+    lines: dict[str, USTVALineItem] = field(default_factory=dict)
+    skipped_count: int = 0
     # Einfuhrumsatzsteuer (§ 15 Abs. 1 Satz 1 Nr. 2 UStG) — import VAT assessed
     # by customs; tracked separately for ELSTER line 62 (pre-return) / 124 (annual).
-    einfuhr_vat:    Decimal = field(default_factory=Decimal)
+    einfuhr_vat: Decimal = field(default_factory=Decimal)
 
     # ------------------------------------------------------------------
     # Aggregated totals
@@ -155,17 +156,17 @@ class USTVAReport:
 
     def to_dict(self) -> dict:
         return {
-            "period_start":      self.period_start.isoformat(),
-            "period_end":        self.period_end.isoformat(),
-            "total_receipts":    self.total_receipts,
-            "skipped_count":     self.skipped_count,
+            "period_start": self.period_start.isoformat(),
+            "period_end": self.period_end.isoformat(),
+            "total_receipts": self.total_receipts,
+            "skipped_count": self.skipped_count,
             "total_purchase_net": str(self.total_purchase_net),
-            "total_input_vat":   str(self.total_input_vat),
-            "einfuhr_vat":       str(self.einfuhr_vat),
-            "total_sale_net":    str(self.total_sale_net),
-            "total_output_vat":  str(self.total_output_vat),
-            "net_liability":     str(self.net_liability),
-            "lines":             {k: v.to_dict() for k, v in sorted(self.lines.items())},
+            "total_input_vat": str(self.total_input_vat),
+            "einfuhr_vat": str(self.einfuhr_vat),
+            "total_sale_net": str(self.total_sale_net),
+            "total_output_vat": str(self.total_output_vat),
+            "net_liability": str(self.net_liability),
+            "lines": {k: v.to_dict() for k, v in sorted(self.lines.items())},
         }
 
     def to_json(self, path: str | Path | None = None) -> str:
@@ -176,7 +177,7 @@ class USTVAReport:
 
     def summary(self) -> str:
         W = 52
-        div  = "─" * W
+        div = "─" * W
         hdiv = "═" * W
 
         def owe_str() -> str:
@@ -196,13 +197,13 @@ class USTVAReport:
 
         if self.lines:
             lines.append(div)
-            for rate_key, ln in sorted(self.lines.items()):
+            for _rate_key, ln in sorted(self.lines.items()):
                 lines += [
                     f"  USt-Satz {ln.vat_rate} %",
-                    f"    Einkauf (Vorsteuer)",
+                    "    Einkauf (Vorsteuer)",
                     f"      Nettobetrag    : {ln.purchase_net:>10.2f} EUR  ({ln.purchase_count} Belege)",
                     f"      Vorsteuer      : {ln.purchase_vat:>10.2f} EUR",
-                    f"    Verkauf (Umsatzsteuer)",
+                    "    Verkauf (Umsatzsteuer)",
                     f"      Nettobetrag    : {ln.sale_net:>10.2f} EUR  ({ln.sale_count} Belege)",
                     f"      Umsatzsteuer   : {ln.sale_vat:>10.2f} EUR",
                     f"      Saldo          : {ln.net_liability:>+10.2f} EUR",
@@ -227,6 +228,7 @@ class USTVAReport:
 # Generator
 # ---------------------------------------------------------------------------
 
+
 def generate_ustva(
     receipts: Iterable[ReceiptData],
     period_start: date,
@@ -242,7 +244,7 @@ def generate_ustva(
     """
     report = USTVAReport(period_start=period_start, period_end=period_end)
     start = _to_date(period_start)
-    end   = _to_date(period_end)
+    end = _to_date(period_end)
 
     for r in receipts:
         if r.receipt_date is None:
@@ -252,8 +254,8 @@ def generate_ustva(
             report.skipped_count += 1
             continue
 
-        has_vat     = bool(r.vat_amount and r.vat_amount > 0)
-        ev          = getattr(r, "einfuhr_vat", None)
+        has_vat = bool(r.vat_amount and r.vat_amount > 0)
+        ev = getattr(r, "einfuhr_vat", None)
         has_einfuhr = bool(r.is_purchase and ev and ev > 0)
 
         if not has_vat and not has_einfuhr:
@@ -281,7 +283,9 @@ def generate_ustva(
             # Only the *business* portion is tax-deductible.
             # business_vat / business_net already apply (1 - private_use_share).
             vat = _r(r.business_vat if r.business_vat is not None else r.vat_amount)
-            net = _r(r.business_net if r.business_net is not None else (r.net_amount or Decimal("0")))
+            net = _r(
+                r.business_net if r.business_net is not None else (r.net_amount or Decimal("0"))
+            )
             ln.purchase_vat += vat
             ln.purchase_net += net
             ln.purchase_count += 1
@@ -296,7 +300,7 @@ def generate_ustva(
     for ln in report.lines.values():
         ln.purchase_vat = _r(ln.purchase_vat)
         ln.purchase_net = _r(ln.purchase_net)
-        ln.sale_vat     = _r(ln.sale_vat)
-        ln.sale_net     = _r(ln.sale_net)
+        ln.sale_vat = _r(ln.sale_vat)
+        ln.sale_net = _r(ln.sale_net)
 
     return report

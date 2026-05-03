@@ -3,33 +3,32 @@ tests/test_llm_caller.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Tests for finamt.agents.llm_caller — call_llm and _regex_fallback.
 """
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 import requests
 
-from finamt.agents.llm_caller import _regex_fallback, call_llm
 from finamt.agents.config import AgentModelConfig
-
+from finamt.agents.llm_caller import _regex_fallback, call_llm
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _cfg(**kwargs) -> AgentModelConfig:
-    defaults = dict(
-        model="testmodel",
-        base_url="http://localhost:11434",
-        temperature=0.0,
-        top_p=1.0,
-        num_ctx=512,
-        timeout=5,
-        max_retries=2,
-    )
+    defaults = {
+        "model": "testmodel",
+        "base_url": "http://localhost:11434",
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "num_ctx": 512,
+        "timeout": 5,
+        "max_retries": 2,
+    }
     defaults.update(kwargs)
     return AgentModelConfig(**defaults)
 
@@ -44,6 +43,7 @@ def _mock_resp(data: dict, status: int = 200) -> MagicMock:
 # ---------------------------------------------------------------------------
 # _regex_fallback
 # ---------------------------------------------------------------------------
+
 
 class TestRegexFallback:
     def test_extracts_string_value(self):
@@ -79,6 +79,7 @@ class TestRegexFallback:
 # ---------------------------------------------------------------------------
 # call_llm — success paths
 # ---------------------------------------------------------------------------
+
 
 class TestCallLlm:
     def test_success_returns_dict(self):

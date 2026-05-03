@@ -23,18 +23,17 @@ from __future__ import annotations
 import logging
 import shutil
 import time
-from finamt import progress as _progress
 from pathlib import Path
-from typing import Optional, Union
 
-from .pipeline import run_pipeline
-from .config import AgentsConfig
+from finamt import progress as _progress
+
 from ..exceptions import InvalidReceiptError, OCRProcessingError
 from ..models import ExtractionResult, ReceiptData, _content_hash
 from ..ocr_processor import OCRProcessor
-from .config import Config
-from ..storage.sqlite import DEFAULT_DB_PATH, SQLiteRepository
-from ..storage.project import resolve_project, layout_from_db_path, ProjectLayout
+from ..storage.project import ProjectLayout, layout_from_db_path, resolve_project
+from ..storage.sqlite import SQLiteRepository
+from .config import AgentsConfig, Config
+from .pipeline import run_pipeline
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -57,20 +56,20 @@ class FinanceAgent:
 
     def __init__(
         self,
-        config:     Optional[Config] = None,
-        project:    Optional[str] = None,
-        db_path:    Union[str, Path, None] = _UNSET,
-        agents_cfg: Optional[AgentsConfig] = None,
+        config: Config | None = None,
+        project: str | None = None,
+        db_path: str | Path | None = _UNSET,
+        agents_cfg: AgentsConfig | None = None,
     ) -> None:
-        self.config     = config or Config()
+        self.config = config or Config()
         self.agents_cfg = agents_cfg or AgentsConfig()
-        self.ocr        = OCRProcessor(self.config)
+        self.ocr = OCRProcessor(self.config)
 
         # Resolve project layout
         if db_path is not _UNSET and db_path is not None:
             # Explicit path takes precedence — infer layout from it
-            self._layout: Optional[ProjectLayout] = layout_from_db_path(Path(db_path))
-            self._db_path: Optional[Path] = Path(db_path)
+            self._layout: ProjectLayout | None = layout_from_db_path(Path(db_path))
+            self._db_path: Path | None = Path(db_path)
         elif db_path is None:
             # Explicitly disabled — no persistence
             self._layout = resolve_project(project) if project else None
@@ -86,9 +85,9 @@ class FinanceAgent:
 
     def process_receipt(
         self,
-        pdf_path:      Union[str, Path, bytes],
-        receipt_type:  str = "purchase",
-        taxpayer_info: Optional[dict] = None,
+        pdf_path: str | Path | bytes,
+        receipt_type: str = "purchase",
+        taxpayer_info: dict | None = None,
     ) -> ExtractionResult:
         """
         Process a receipt or invoice PDF through the full pipeline.
@@ -135,7 +134,7 @@ class FinanceAgent:
 
             # 3-7 — Multi-agent extraction ----------------------------------
             _progress.emit(f"  {time.strftime('[%H:%M:%S]')} → Extraction pipeline ...")
-            pdf_file_path: Optional[Path] = (
+            pdf_file_path: Path | None = (
                 Path(pdf_path) if isinstance(pdf_path, (str, Path)) else None
             )
             receipt_data: ReceiptData = run_pipeline(
@@ -183,14 +182,11 @@ class FinanceAgent:
 
     def batch_process(
         self,
-        pdf_paths:    list[Union[str, Path]],
+        pdf_paths: list[str | Path],
         receipt_type: str = "purchase",
     ) -> dict[str, ExtractionResult]:
         """Process multiple receipts sequentially."""
-        return {
-            str(p): self.process_receipt(p, receipt_type=receipt_type)
-            for p in pdf_paths
-        }
+        return {str(p): self.process_receipt(p, receipt_type=receipt_type) for p in pdf_paths}
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -201,14 +197,10 @@ class FinanceAgent:
         if not src.exists():
             return
         try:
-            pdf_dir = (
-                self._layout.pdfs_dir
-                if self._layout
-                else self._db_path.parent / "pdfs"
-            )
+            pdf_dir = self._layout.pdfs_dir if self._layout else self._db_path.parent / "pdfs"
             pdf_dir.mkdir(parents=True, exist_ok=True)
             # Preserve original extension so images stay as .png / .jpg etc.
-            ext  = src.suffix.lower() or ".pdf"
+            ext = src.suffix.lower() or ".pdf"
             dest = pdf_dir / f"{receipt_id}{ext}"
             if not dest.exists():
                 shutil.copy2(src, dest)

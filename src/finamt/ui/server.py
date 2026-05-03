@@ -43,9 +43,11 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 def _open_browser(url: str, delay: float = 1.2) -> None:
     """Open the browser after a short delay so the server is ready."""
+
     def _open():
         time.sleep(delay)
         webbrowser.open(url)
+
     t = threading.Thread(target=_open, daemon=True)
     t.start()
 
@@ -93,7 +95,7 @@ def launch(
 
     print(f"\n  finamt UI  →  {url}")
     print(f"  API docs      →  {url}/docs")
-    print(f"  Press Ctrl+C to stop.\n")
+    print("  Press Ctrl+C to stop.\n")
 
     if open_browser:
         _open_browser(url)
@@ -111,22 +113,24 @@ def launch(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="Start the finamt web UI server.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--host",       default=DEFAULT_HOST,
-                   help="Bind address.")
-    p.add_argument("--port", "-p", default=DEFAULT_PORT, type=int,
-                   help="TCP port.")
-    p.add_argument("--reload",     action="store_true",
-                   help="Enable hot-reload (development mode).")
-    p.add_argument("--no-browser", action="store_true",
-                   help="Do not open the browser automatically.")
-    p.add_argument("--log-level",  default="warning",
-                   choices=["debug", "info", "warning", "error"],
-                   help="Uvicorn log level.")
+    p.add_argument("--host", default=DEFAULT_HOST, help="Bind address.")
+    p.add_argument("--port", "-p", default=DEFAULT_PORT, type=int, help="TCP port.")
+    p.add_argument("--reload", action="store_true", help="Enable hot-reload (development mode).")
+    p.add_argument(
+        "--no-browser", action="store_true", help="Do not open the browser automatically."
+    )
+    p.add_argument(
+        "--log-level",
+        default="warning",
+        choices=["debug", "info", "warning", "error"],
+        help="Uvicorn log level.",
+    )
     return p
 
 

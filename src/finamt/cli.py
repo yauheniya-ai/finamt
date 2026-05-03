@@ -34,8 +34,10 @@ Usage examples
 from __future__ import annotations
 
 import warnings
+
 try:
     from requests.exceptions import RequestsDependencyWarning
+
     warnings.filterwarnings("ignore", category=RequestsDependencyWarning)
 except ImportError:
     pass
@@ -48,24 +50,23 @@ from datetime import date
 from decimal import Decimal
 from importlib.metadata import version
 from pathlib import Path
-from typing import Optional
+from typing import Annotated
 
 import typer
 from rich import print as rprint
 from rich.console import Console
-from typing_extensions import Annotated
 
 from finamt import FinanceAgent
-from finamt.storage.sqlite import DEFAULT_DB_PATH
 from finamt.storage import get_repository
+from finamt.storage.sqlite import DEFAULT_DB_PATH
 from finamt.tax.ustva import generate_ustva
 
 # ---------------------------------------------------------------------------
 # CLI class
 # ---------------------------------------------------------------------------
 
-class FinamtCLI:
 
+class FinamtCLI:
     # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
@@ -138,7 +139,7 @@ class FinamtCLI:
     ) -> int:
         """Batch-process all PDFs. DB save is automatic. Returns exit code."""
         input_dir = Path(input_dir)
-        out_dir   = Path(output_dir) if output_dir else None
+        out_dir = Path(output_dir) if output_dir else None
         pdf_files = sorted(input_dir.glob("*.pdf"))
 
         if not pdf_files:
@@ -148,7 +149,7 @@ class FinamtCLI:
         if out_dir:
             out_dir.mkdir(parents=True, exist_ok=True)
 
-        agent   = FinanceAgent(db_path=None if no_db else (db_path if db_path else DEFAULT_DB_PATH))
+        agent = FinanceAgent(db_path=None if no_db else (db_path if db_path else DEFAULT_DB_PATH))
         results = {}
 
         for pdf_path in pdf_files:
@@ -170,11 +171,11 @@ class FinamtCLI:
     def _print_batch_report(self, results: dict) -> None:
         successful = [r for r in results.values() if r.success and not r.duplicate]
         duplicates = [r for r in results.values() if r.duplicate]
-        failed     = [r for r in results.values() if not r.success]
+        failed = [r for r in results.values() if not r.success]
 
         total_amount: Decimal = Decimal(0)
-        total_vat:    Decimal = Decimal(0)
-        by_category:  dict[str, Decimal] = defaultdict(Decimal)
+        total_vat: Decimal = Decimal(0)
+        by_category: dict[str, Decimal] = defaultdict(Decimal)
 
         for result in successful:
             d = result.data
@@ -185,8 +186,8 @@ class FinamtCLI:
             if d.category:
                 by_category[str(d.category)] += d.total_amount or Decimal(0)
 
-        W    = 50
-        div  = "─" * W
+        W = 50
+        div = "─" * W
         hdiv = "═" * W
         rate = len(successful) / len(results) if results else 0
 
@@ -217,12 +218,12 @@ class FinamtCLI:
             if result.duplicate:
                 print(f"\n  ⚠  {name}  [duplicate — skipped]")
             elif result.success:
-                d   = result.data
+                d = result.data
                 amt = f"{d.total_amount:.2f} EUR" if d.total_amount else "—"
-                dt  = d.receipt_date.date() if d.receipt_date else "—"
+                dt = d.receipt_date.date() if d.receipt_date else "—"
                 vat = f"{d.vat_percentage}%" if d.vat_percentage else "—"
-                t   = f"{result.processing_time:.1f}s" if result.processing_time else ""
-                cp  = d.counterparty.name if d.counterparty else "—"
+                t = f"{result.processing_time:.1f}s" if result.processing_time else ""
+                cp = d.counterparty.name if d.counterparty else "—"
                 print(f"\n  ✓  {name}  ({t})")
                 print(f"     {str(d.receipt_type).upper():<10}  {cp}")
                 print(f"     Date    : {dt}   Total: {amt}   VAT: {vat}")
@@ -240,7 +241,7 @@ class FinamtCLI:
     @staticmethod
     def _quarter_bounds(quarter: int, year: int) -> tuple[date, date]:
         starts = {1: (1, 1), 2: (4, 1), 3: (7, 1), 4: (10, 1)}
-        ends   = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
+        ends = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
         ms, ds = starts[quarter]
         me, de = ends[quarter]
         return date(year, ms, ds), date(year, me, de)
@@ -273,7 +274,7 @@ class FinamtCLI:
             elif result.success:
                 saved += 1
                 if verbose:
-                    d  = result.data
+                    d = result.data
                     cp = d.counterparty.name if d.counterparty else "unknown"
                     print(f"OK  ({cp}, {d.total_amount} EUR)")
             else:
@@ -329,7 +330,6 @@ class FinamtCLI:
         return 0
 
 
-
 # ---------------------------------------------------------------------------
 # Typer app
 # ---------------------------------------------------------------------------
@@ -352,10 +352,12 @@ app = typer.Typer(
 )
 
 ReceiptType = typer.Option("--type", help="purchase = Eingangsrechnung; sale = Ausgangsrechnung.")
-QuarterOpt  = typer.Option("--quarter", help="Fiscal quarter (1–4).", show_default=True)
-YearOpt     = typer.Option("--year", help="Fiscal year.", show_default=True)
-DbOpt       = typer.Option("--db", help="SQLite DB path (default: ~/.finamt/finamt.db).", show_default=False)
-VerboseOpt  = typer.Option("--verbose", "-v", help="Enable verbose output.")
+QuarterOpt = typer.Option("--quarter", help="Fiscal quarter (1–4).", show_default=True)
+YearOpt = typer.Option("--year", help="Fiscal year.", show_default=True)
+DbOpt = typer.Option(
+    "--db", help="SQLite DB path (default: ~/.finamt/finamt.db).", show_default=False
+)
+VerboseOpt = typer.Option("--verbose", "-v", help="Enable verbose output.")
 
 
 def _version_callback(value: bool) -> None:
@@ -392,14 +394,19 @@ def callback(
 # process sub-command
 # ---------------------------------------------------------------------------
 
+
 @app.command("process")
 def cmd_process(
     file: Annotated[str, typer.Argument(help="Receipt filename without the .pdf extension.")],
-    input_dir: Annotated[Path, typer.Option("--input-dir", help="Directory containing the receipt PDF.")],
-    output_dir: Annotated[Optional[Path], typer.Option("--output-dir", help="Write extracted JSON here.")] = None,
+    input_dir: Annotated[
+        Path, typer.Option("--input-dir", help="Directory containing the receipt PDF.")
+    ],
+    output_dir: Annotated[
+        Path | None, typer.Option("--output-dir", help="Write extracted JSON here.")
+    ] = None,
     verbose: Annotated[bool, VerboseOpt] = False,
     receipt_type: Annotated[str, ReceiptType] = "purchase",
-    db: Annotated[Optional[Path], DbOpt] = None,
+    db: Annotated[Path | None, DbOpt] = None,
     no_db: Annotated[bool, typer.Option("--no-db", help="Disable DB persistence.")] = False,
 ) -> None:
     """Process a single receipt PDF and extract its data."""
@@ -423,13 +430,18 @@ def cmd_process(
 # batch sub-command
 # ---------------------------------------------------------------------------
 
+
 @app.command("batch")
 def cmd_batch(
-    input_dir: Annotated[Path, typer.Option("--input-dir", help="Directory containing receipt PDFs.")],
-    output_dir: Annotated[Optional[Path], typer.Option("--output-dir", help="Write extracted JSONs here.")] = None,
+    input_dir: Annotated[
+        Path, typer.Option("--input-dir", help="Directory containing receipt PDFs.")
+    ],
+    output_dir: Annotated[
+        Path | None, typer.Option("--output-dir", help="Write extracted JSONs here.")
+    ] = None,
     verbose: Annotated[bool, VerboseOpt] = False,
     receipt_type: Annotated[str, ReceiptType] = "purchase",
-    db: Annotated[Optional[Path], DbOpt] = None,
+    db: Annotated[Path | None, DbOpt] = None,
     no_db: Annotated[bool, typer.Option("--no-db", help="Disable DB persistence.")] = False,
 ) -> None:
     """Batch-process all PDFs in a directory."""
@@ -452,16 +464,23 @@ def cmd_batch(
 # ustva sub-command
 # ---------------------------------------------------------------------------
 
+
 @app.command("ustva")
 def cmd_ustva(
     quarter: Annotated[int, QuarterOpt] = 1,
     year: Annotated[int, YearOpt] = date.today().year,
-    input_dir: Annotated[Optional[Path], typer.Option("--input-dir", help="Scan & ingest PDFs before reporting.")] = None,
-    output: Annotated[Optional[Path], typer.Option("--output", help="Write JSON report to this path.")] = None,
-    output_dir: Annotated[Optional[Path], typer.Option("--output-dir", help="Auto-named JSON written here.")] = None,
+    input_dir: Annotated[
+        Path | None, typer.Option("--input-dir", help="Scan & ingest PDFs before reporting.")
+    ] = None,
+    output: Annotated[
+        Path | None, typer.Option("--output", help="Write JSON report to this path.")
+    ] = None,
+    output_dir: Annotated[
+        Path | None, typer.Option("--output-dir", help="Auto-named JSON written here.")
+    ] = None,
     verbose: Annotated[bool, VerboseOpt] = False,
     receipt_type: Annotated[str, ReceiptType] = "purchase",
-    db: Annotated[Optional[Path], DbOpt] = None,
+    db: Annotated[Path | None, DbOpt] = None,
 ) -> None:
     """Generate a UStVA (VAT pre-return) report for a fiscal quarter."""
     if verbose:
@@ -490,16 +509,20 @@ def cmd_ustva(
 # serve sub-command
 # ---------------------------------------------------------------------------
 
+
 @app.command("serve")
 def cmd_serve(
     host: Annotated[str, typer.Option("--host", help="Bind address.")] = "127.0.0.1",
     port: Annotated[int, typer.Option("--port", help="Port number.")] = 8000,
-    no_browser: Annotated[bool, typer.Option("--no-browser", help="Do not open the browser.")] = False,
+    no_browser: Annotated[
+        bool, typer.Option("--no-browser", help="Do not open the browser.")
+    ] = False,
     reload: Annotated[bool, typer.Option("--reload", help="Enable hot-reload (dev mode).")] = False,
     log_level: Annotated[str, typer.Option("--log-level", help="Uvicorn log level.")] = "warning",
 ) -> None:
     """Start the finamt web UI server."""
     from finamt.ui.server import launch
+
     launch(
         host=host,
         port=port,
@@ -512,6 +535,7 @@ def cmd_serve(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     app()

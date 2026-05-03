@@ -15,11 +15,10 @@ import logging
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Category keywords aligned with RECEIPT_CATEGORIES in prompts.py.
 # The LLM and the rule-based fallback must agree on category names.
-from .agents.prompts import RECEIPT_CATEGORIES
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -29,84 +28,139 @@ logger.addHandler(logging.NullHandler())
 # ---------------------------------------------------------------------------
 
 # Keyword → receipt category mapping (German terms only — English handled by LLM)
-_CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "material":          ["papier", "rohstoff", "verbrauch", "büromaterial", "druckerpapier"],
-    "equipment":         ["gerät", "drucker", "monitor", "tastatur", "maus", "server", "hardware", "maschine"],
-    "software":          ["software", "lizenz", "abo", "subscription", "app", "cloud", "saas"],
-    "internet":          ["internet", "dsl", "glasfaser", "breitband", "hosting", "domain"],
-    "telecommunication": ["telefon", "handy", "mobilfunk", "sim", "telekom", "vodafone", "o2", "mobilität"],
-    "travel":            ["hotel", "flug", "bahn", "taxi", "mietwagen", "reise", "übernachtung"],
-    "education":         ["kurs", "seminar", "buch", "schulung", "weiterbildung", "studium", "zertifikat"],
-    "utilities":         ["strom", "gas", "wasser", "heizung", "nebenkosten", "entsorgung"],
-    "insurance":         ["versicherung", "haftpflicht", "police", "prämie"],
-    "taxes":             ["steuer", "finanzamt", "steuerberater", "gebühr", "abgabe"],
-    "public_fees":       ["rundfunkbeitrag", "ard", "zdf", "gez", "ihk", "hwk", "berufsgenossenschaft", "pflichtbeitrag", "kammerbeitrag"],
+_CATEGORY_KEYWORDS: dict[str, list[str]] = {
+    "material": ["papier", "rohstoff", "verbrauch", "büromaterial", "druckerpapier"],
+    "equipment": [
+        "gerät",
+        "drucker",
+        "monitor",
+        "tastatur",
+        "maus",
+        "server",
+        "hardware",
+        "maschine",
+    ],
+    "software": ["software", "lizenz", "abo", "subscription", "app", "cloud", "saas"],
+    "internet": ["internet", "dsl", "glasfaser", "breitband", "hosting", "domain"],
+    "telecommunication": [
+        "telefon",
+        "handy",
+        "mobilfunk",
+        "sim",
+        "telekom",
+        "vodafone",
+        "o2",
+        "mobilität",
+    ],
+    "travel": ["hotel", "flug", "bahn", "taxi", "mietwagen", "reise", "übernachtung"],
+    "education": ["kurs", "seminar", "buch", "schulung", "weiterbildung", "studium", "zertifikat"],
+    "utilities": ["strom", "gas", "wasser", "heizung", "nebenkosten", "entsorgung"],
+    "insurance": ["versicherung", "haftpflicht", "police", "prämie"],
+    "taxes": ["steuer", "finanzamt", "steuerberater", "gebühr", "abgabe"],
+    "public_fees": [
+        "rundfunkbeitrag",
+        "ard",
+        "zdf",
+        "gez",
+        "ihk",
+        "hwk",
+        "berufsgenossenschaft",
+        "pflichtbeitrag",
+        "kammerbeitrag",
+    ],
 }
 
 # Keywords that anchor a line as the grand total (checked before max() fallback)
-_TOTAL_KEYWORDS = ["gesamt", "gesamtbetrag", "total", "summe", "endbetrag", "brutto", "rechnungsbetrag"]
+_TOTAL_KEYWORDS = [
+    "gesamt",
+    "gesamtbetrag",
+    "total",
+    "summe",
+    "endbetrag",
+    "brutto",
+    "rechnungsbetrag",
+]
 
 # German month names → month number
-_MONTH_MAP: Dict[str, int] = {
-    "januar": 1,   "january": 1,
-    "februar": 2,  "february": 2,
-    "märz": 3,     "marz": 3,     "march": 3,
+_MONTH_MAP: dict[str, int] = {
+    "januar": 1,
+    "january": 1,
+    "februar": 2,
+    "february": 2,
+    "märz": 3,
+    "marz": 3,
+    "march": 3,
     "april": 4,
-    "mai": 5,      "may": 5,
-    "juni": 6,     "june": 6,
-    "juli": 7,     "july": 7,
+    "mai": 5,
+    "may": 5,
+    "juni": 6,
+    "june": 6,
+    "juli": 7,
+    "july": 7,
     "august": 8,
     "september": 9,
-    "oktober": 10, "october": 10,
+    "oktober": 10,
+    "october": 10,
     "november": 11,
-    "dezember": 12, "december": 12,
+    "dezember": 12,
+    "december": 12,
 }
 
 # Date regexes in (pattern, order) pairs.
 # order: "dmy" | "ymd" so the unpacking is unambiguous.
-_DATE_PATTERNS: List[tuple[str, str]] = [
-    (r'\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b',        "dmy"),  # DD.MM.YYYY
-    (r'\b(\d{1,2})\.(\d{1,2})\.(\d{2})\b',         "dmy"),  # DD.MM.YY
-    (r'\b(\d{4})-(\d{2})-(\d{2})\b',               "ymd"),  # YYYY-MM-DD  ← fixed order
-    (r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b',           "dmy"),  # DD/MM/YYYY
-    (r'\b(\d{1,2})\s+([A-Za-zÄÖÜäöü]+)\s+(\d{4})\b', "dmy"),  # 12 Januar 2023
+_DATE_PATTERNS: list[tuple[str, str]] = [
+    (r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b", "dmy"),  # DD.MM.YYYY
+    (r"\b(\d{1,2})\.(\d{1,2})\.(\d{2})\b", "dmy"),  # DD.MM.YY
+    (r"\b(\d{4})-(\d{2})-(\d{2})\b", "ymd"),  # YYYY-MM-DD  ← fixed order
+    (r"\b(\d{1,2})/(\d{1,2})/(\d{4})\b", "dmy"),  # DD/MM/YYYY
+    (r"\b(\d{1,2})\s+([A-Za-zÄÖÜäöü]+)\s+(\d{4})\b", "dmy"),  # 12 Januar 2023
 ]
 
 # Amount regexes — German locale (period = thousands sep, comma = decimal)
 _AMOUNT_PATTERNS = [
-    r'(\d{1,3}(?:\.\d{3})*,\d{2})\s*€',
-    r'€\s*(\d{1,3}(?:\.\d{3})*,\d{2})',
-    r'EUR\s*(\d{1,3}(?:\.\d{3})*,\d{2})',
-    r'(\d{1,3}(?:\.\d{3})*,\d{2})\s*EUR',
+    r"(\d{1,3}(?:\.\d{3})*,\d{2})\s*€",
+    r"€\s*(\d{1,3}(?:\.\d{3})*,\d{2})",
+    r"EUR\s*(\d{1,3}(?:\.\d{3})*,\d{2})",
+    r"(\d{1,3}(?:\.\d{3})*,\d{2})\s*EUR",
 ]
 
 # VAT line regexes
 _VAT_PATTERNS = [
-    r'(\d{1,2}(?:,\d{1,2})?)\s*%.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*€',
-    r'MwSt\.?\s*(\d{1,2}(?:,\d{1,2})?)\s*%.*?(\d{1,3}(?:\.\d{3})*,\d{2})',
-    r'VAT\s*(\d{1,2}(?:,\d{1,2})?)\s*%.*?(\d{1,3}(?:\.\d{3})*,\d{2})',
+    r"(\d{1,2}(?:,\d{1,2})?)\s*%.*?(\d{1,3}(?:\.\d{3})*,\d{2})\s*€",
+    r"MwSt\.?\s*(\d{1,2}(?:,\d{1,2})?)\s*%.*?(\d{1,3}(?:\.\d{3})*,\d{2})",
+    r"VAT\s*(\d{1,2}(?:,\d{1,2})?)\s*%.*?(\d{1,3}(?:\.\d{3})*,\d{2})",
 ]
 
 # Item line regexes — ordered most-specific first so the quantity×price
 # pattern is tried before the generic description+price fallback.
 _ITEM_PATTERNS = [
-    r'^(\d+(?:,\d+)?)\s*[xX]\s*(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*€?\s*$',
-    r'^(.+?)\s*@\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*=\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*€?\s*$',
-    r'^(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*€?\s*$',
+    r"^(\d+(?:,\d+)?)\s*[xX]\s*(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*€?\s*$",
+    r"^(.+?)\s*@\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*=\s*(\d{1,3}(?:\.\d{3})*,\d{2})\s*€?\s*$",
+    r"^(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\s*€?\s*$",
 ]
 
 # Lines that look like receipt boilerplate rather than company names
-_SKIP_HEADER_WORDS = frozenset([
-    "receipt", "rechnung", "kassenbon", "beleg", "quittung",
-    "datum", "uhrzeit", "kasse", "bon",
-])
+_SKIP_HEADER_WORDS = frozenset(
+    [
+        "receipt",
+        "rechnung",
+        "kassenbon",
+        "beleg",
+        "quittung",
+        "datum",
+        "uhrzeit",
+        "kasse",
+        "bon",
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
 # Helper: German amount string → Decimal
 # ---------------------------------------------------------------------------
 
-def _parse_german_amount(s: str) -> Optional[Decimal]:
+
+def _parse_german_amount(s: str) -> Decimal | None:
     """Convert a German-format amount string (e.g. '1.234,56') to Decimal."""
     try:
         return Decimal(s.replace(".", "").replace(",", "."))
@@ -117,6 +171,7 @@ def _parse_german_amount(s: str) -> Optional[Decimal]:
 # ---------------------------------------------------------------------------
 # DataExtractor
 # ---------------------------------------------------------------------------
+
 
 class DataExtractor:
     """
@@ -130,7 +185,7 @@ class DataExtractor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def extract_company_name(text: str) -> Optional[str]:
+    def extract_company_name(text: str) -> str | None:
         """
         Return the first non-trivial line from the top of the receipt.
 
@@ -155,7 +210,7 @@ class DataExtractor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def extract_date(text: str) -> Optional[datetime]:
+    def extract_date(text: str) -> datetime | None:
         """
         Return the first parseable date found in the text.
 
@@ -194,7 +249,7 @@ class DataExtractor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def extract_amounts(text: str) -> Dict[str, Any]:
+    def extract_amounts(text: str) -> dict[str, Any]:
         """
         Extract monetary amounts from text.
 
@@ -205,8 +260,8 @@ class DataExtractor:
 
         Returns ``{"total": Decimal | None, "all": [Decimal, ...]}``.
         """
-        all_amounts: List[Decimal] = []
-        total_amount: Optional[Decimal] = None
+        all_amounts: list[Decimal] = []
+        total_amount: Decimal | None = None
 
         for line in text.splitlines():
             line_lower = line.lower()
@@ -232,7 +287,7 @@ class DataExtractor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def extract_vat_info(text: str) -> Dict[str, Optional[Decimal]]:
+    def extract_vat_info(text: str) -> dict[str, Decimal | None]:
         """Extract the first VAT percentage + absolute amount found."""
         for pattern in _VAT_PATTERNS:
             for match in re.findall(pattern, text, re.IGNORECASE):
@@ -250,14 +305,14 @@ class DataExtractor:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def extract_items(text: str) -> List[Dict[str, Any]]:
+    def extract_items(text: str) -> list[dict[str, Any]]:
         """
         Parse individual receipt line items.
 
         Returns a list of dicts with keys matching the LLM extraction
         schema so both paths feed ``_build_receipt_data`` identically.
         """
-        items: List[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
 
         for line in text.splitlines():
             line = line.strip()
@@ -270,21 +325,23 @@ class DataExtractor:
                     continue
                 groups = m.groups()
 
-                if len(groups) == 2:                    # description + price
+                if len(groups) == 2:  # description + price
                     description = groups[0].strip()
                     total_price = _parse_german_amount(groups[1])
                     if total_price is None:
                         continue
-                    items.append({
-                        "description": description,
-                        "quantity":    None,
-                        "unit_price":  None,
-                        "total_price": float(total_price),
-                        "category":    DataExtractor._categorize_item(description),
-                        "vat_rate":    None,
-                    })
+                    items.append(
+                        {
+                            "description": description,
+                            "quantity": None,
+                            "unit_price": None,
+                            "total_price": float(total_price),
+                            "category": DataExtractor._categorize_item(description),
+                            "vat_rate": None,
+                        }
+                    )
 
-                elif len(groups) == 3:                  # qty × description = price
+                elif len(groups) == 3:  # qty × description = price
                     try:
                         qty = Decimal(groups[0].replace(",", "."))
                     except InvalidOperation:
@@ -294,14 +351,16 @@ class DataExtractor:
                     if total_price is None:
                         continue
                     unit_price = total_price / qty if qty > 0 else None
-                    items.append({
-                        "description": description,
-                        "quantity":    float(qty),
-                        "unit_price":  float(unit_price) if unit_price else None,
-                        "total_price": float(total_price),
-                        "category":    DataExtractor._categorize_item(description),
-                        "vat_rate":    None,
-                    })
+                    items.append(
+                        {
+                            "description": description,
+                            "quantity": float(qty),
+                            "unit_price": float(unit_price) if unit_price else None,
+                            "total_price": float(total_price),
+                            "category": DataExtractor._categorize_item(description),
+                            "vat_rate": None,
+                        }
+                    )
 
                 break  # matched a pattern — don't try the others
 
@@ -324,6 +383,7 @@ class DataExtractor:
 # ---------------------------------------------------------------------------
 # JSON cleaning
 # ---------------------------------------------------------------------------
+
 
 def clean_json_response(response: str) -> str:
     """
@@ -369,7 +429,7 @@ def clean_json_response(response: str) -> str:
     #   - not already quoted
     #   - followed by optional whitespace and a colon
     fixed = re.sub(
-        r'([{,]\s*)([A-Za-z_]\w*)\s*:',
+        r"([{,]\s*)([A-Za-z_]\w*)\s*:",
         lambda m: f'{m.group(1)}"{m.group(2)}":',
         candidate,
     )
@@ -386,7 +446,8 @@ def clean_json_response(response: str) -> str:
 # Shared parse helpers (used by agent.py)
 # ---------------------------------------------------------------------------
 
-def parse_decimal(value: Any) -> Optional[Decimal]:
+
+def parse_decimal(value: Any) -> Decimal | None:
     """Safely coerce any value to ``Decimal``, returning ``None`` on failure."""
     if value is None:
         return None
@@ -398,24 +459,46 @@ def parse_decimal(value: Any) -> Optional[Decimal]:
 
 _DE_MONTH: dict[str, str] = {
     # abbreviated (3-letter Oracle/SAP style)
-    "JAN": "01", "FEB": "02", "MRZ": "03", "MAR": "03", "APR": "04",
-    "MAI": "05", "JUN": "06", "JUL": "07", "AUG": "08", "SEP": "09",
-    "OKT": "10", "NOV": "11", "DEZ": "12",
+    "JAN": "01",
+    "FEB": "02",
+    "MRZ": "03",
+    "MAR": "03",
+    "APR": "04",
+    "MAI": "05",
+    "JUN": "06",
+    "JUL": "07",
+    "AUG": "08",
+    "SEP": "09",
+    "OKT": "10",
+    "NOV": "11",
+    "DEZ": "12",
     # full German names
-    "JANUAR": "01", "FEBRUAR": "02", "MÄRZ": "03", "MAERZ": "03",
-    "APRIL": "04", "JUNI": "06", "JULI": "07", "AUGUST": "08",
-    "SEPTEMBER": "09", "OKTOBER": "10", "NOVEMBER": "11", "DEZEMBER": "12",
+    "JANUAR": "01",
+    "FEBRUAR": "02",
+    "MÄRZ": "03",
+    "MAERZ": "03",
+    "APRIL": "04",
+    "JUNI": "06",
+    "JULI": "07",
+    "AUGUST": "08",
+    "SEPTEMBER": "09",
+    "OKTOBER": "10",
+    "NOVEMBER": "11",
+    "DEZEMBER": "12",
 }
+
 
 def _normalise_date_str(date_str: str) -> str:
     """Replace German month names/abbreviations with their two-digit number."""
     import re
+
     def _replace(m: re.Match) -> str:
         return _DE_MONTH.get(m.group(0).upper(), m.group(0))
+
     return re.sub(r"[A-ZÄÖÜa-zäöü]+", _replace, date_str)
 
 
-def parse_date(date_str: str) -> Optional[datetime]:
+def parse_date(date_str: str) -> datetime | None:
     """
     Parse an ISO-format date string (``YYYY-MM-DD``) to ``datetime``.
 
@@ -438,8 +521,8 @@ def parse_date(date_str: str) -> Optional[datetime]:
         "%d/%m/%Y",
         "%Y/%m/%d",
         "%d-%m-%Y",
-        "%d-%b-%Y",   # e.g. 30-JUL-2025 (English abbrev, locale-safe on CPython)
-        "%d-%B-%Y",   # e.g. 30-July-2025
+        "%d-%b-%Y",  # e.g. 30-JUL-2025 (English abbrev, locale-safe on CPython)
+        "%d-%B-%Y",  # e.g. 30-July-2025
     ]
     for candidate in candidates:
         for fmt in formats:

@@ -24,16 +24,20 @@ from decimal import Decimal
 import pytest
 
 from finamt.models import (
-    Posting, PostingDirection, PostingType,
-    ReceiptCategory, ReceiptData, ReceiptItem, ReceiptType,
+    Posting,
+    PostingDirection,
+    PostingType,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptType,
 )
 from finamt.storage.sqlite import SQLiteRepository
 from finamt.tax.ustva import generate_ustva
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_purchase(
     *,
@@ -86,6 +90,7 @@ def repo(tmp_path) -> SQLiteRepository:
 # PostingType / PostingDirection validation
 # ---------------------------------------------------------------------------
 
+
 class TestPostingClasses:
     def test_valid_direction_debit(self):
         assert str(PostingDirection("debit")) == "debit"
@@ -99,8 +104,13 @@ class TestPostingClasses:
 
     def test_valid_posting_types(self):
         for t in (
-            "expense", "input_vat", "accounts_payable",
-            "revenue", "output_vat", "accounts_receivable", "private_withdrawal",
+            "expense",
+            "input_vat",
+            "accounts_payable",
+            "revenue",
+            "output_vat",
+            "accounts_receivable",
+            "private_withdrawal",
         ):
             assert str(PostingType(t)) == t
 
@@ -127,6 +137,7 @@ class TestPostingClasses:
 # ---------------------------------------------------------------------------
 # ReceiptData.private_use_share defaults & validation
 # ---------------------------------------------------------------------------
+
 
 class TestPrivateUseShare:
     def test_default_zero(self):
@@ -180,9 +191,7 @@ class TestPrivateUseShare:
         assert d["private_use_share"] == pytest.approx(0.3)
 
     def test_to_dict_contains_business_fields(self):
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0.4"
-        )
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="0.4")
         d = r.to_dict()
         assert d["business_net"] == pytest.approx(60.0)
         assert d["business_vat"] == pytest.approx(11.40)
@@ -191,6 +200,7 @@ class TestPrivateUseShare:
 # ---------------------------------------------------------------------------
 # ReceiptData.generate_postings — no private use
 # ---------------------------------------------------------------------------
+
 
 class TestGeneratePostingsNone:
     def test_purchase_three_postings(self):
@@ -201,23 +211,25 @@ class TestGeneratePostingsNone:
     def test_purchase_balanced(self):
         r = _make_purchase(total_amount="119.00", vat_amount="19.00")
         posts = r.generate_postings()
-        debits  = sum(p.amount for p in posts if str(p.direction) == "debit")
+        debits = sum(p.amount for p in posts if str(p.direction) == "debit")
         credits = sum(p.amount for p in posts if str(p.direction) == "credit")
         assert debits == credits
 
     def test_purchase_debit_expense(self):
         r = _make_purchase(total_amount="119.00", vat_amount="19.00")
         posts = r.generate_postings()
-        expense_debits = [p for p in posts
-                          if str(p.posting_type) == "expense" and str(p.direction) == "debit"]
+        expense_debits = [
+            p for p in posts if str(p.posting_type) == "expense" and str(p.direction) == "debit"
+        ]
         assert len(expense_debits) == 1
         assert expense_debits[0].amount == Decimal("100.00")
 
     def test_purchase_debit_input_vat(self):
         r = _make_purchase(total_amount="119.00", vat_amount="19.00")
         posts = r.generate_postings()
-        vat_debits = [p for p in posts
-                      if str(p.posting_type) == "input_vat" and str(p.direction) == "debit"]
+        vat_debits = [
+            p for p in posts if str(p.posting_type) == "input_vat" and str(p.direction) == "debit"
+        ]
         assert len(vat_debits) == 1
         assert vat_debits[0].amount == Decimal("19.00")
 
@@ -237,7 +249,7 @@ class TestGeneratePostingsNone:
     def test_sale_balanced(self):
         r = _make_sale(total_amount="238.00", vat_amount="38.00")
         posts = r.generate_postings()
-        debits  = sum(p.amount for p in posts if str(p.direction) == "debit")
+        debits = sum(p.amount for p in posts if str(p.direction) == "debit")
         credits = sum(p.amount for p in posts if str(p.direction) == "credit")
         assert debits == credits
 
@@ -274,6 +286,7 @@ class TestGeneratePostingsNone:
 # ReceiptData.generate_postings — with private use
 # ---------------------------------------------------------------------------
 
+
 class TestGeneratePostingsWithPrivateUse:
     """
     Fixture: net=100, vat=19, gross=119, private_use_share=0.40
@@ -296,32 +309,36 @@ class TestGeneratePostingsWithPrivateUse:
 
     def test_balanced(self, receipt_40):
         posts = receipt_40.generate_postings()
-        debits  = sum(p.amount for p in posts if str(p.direction) == "debit")
+        debits = sum(p.amount for p in posts if str(p.direction) == "debit")
         credits = sum(p.amount for p in posts if str(p.direction) == "credit")
         assert debits == credits
 
     def test_expense_debit_full(self, receipt_40):
         posts = receipt_40.generate_postings()
-        debit = next(p for p in posts
-                     if str(p.posting_type) == "expense" and str(p.direction) == "debit")
+        debit = next(
+            p for p in posts if str(p.posting_type) == "expense" and str(p.direction) == "debit"
+        )
         assert debit.amount == Decimal("100.00")
 
     def test_expense_credit_private(self, receipt_40):
         posts = receipt_40.generate_postings()
-        credit = next(p for p in posts
-                      if str(p.posting_type) == "expense" and str(p.direction) == "credit")
+        credit = next(
+            p for p in posts if str(p.posting_type) == "expense" and str(p.direction) == "credit"
+        )
         assert credit.amount == Decimal("40.00")
 
     def test_input_vat_debit_full(self, receipt_40):
         posts = receipt_40.generate_postings()
-        debit = next(p for p in posts
-                     if str(p.posting_type) == "input_vat" and str(p.direction) == "debit")
+        debit = next(
+            p for p in posts if str(p.posting_type) == "input_vat" and str(p.direction) == "debit"
+        )
         assert debit.amount == Decimal("19.00")
 
     def test_input_vat_credit_private(self, receipt_40):
         posts = receipt_40.generate_postings()
-        credit = next(p for p in posts
-                      if str(p.posting_type) == "input_vat" and str(p.direction) == "credit")
+        credit = next(
+            p for p in posts if str(p.posting_type) == "input_vat" and str(p.direction) == "credit"
+        )
         assert credit.amount == Decimal("7.60")
 
     def test_private_withdrawal_debit(self, receipt_40):
@@ -335,7 +352,8 @@ class TestGeneratePostingsWithPrivateUse:
         posts = receipt_40.generate_postings()
         expense_net = sum(
             p.amount if str(p.direction) == "debit" else -p.amount
-            for p in posts if str(p.posting_type) == "expense"
+            for p in posts
+            if str(p.posting_type) == "expense"
         )
         assert expense_net == Decimal("60.00")
 
@@ -344,19 +362,19 @@ class TestGeneratePostingsWithPrivateUse:
         posts = receipt_40.generate_postings()
         vat_net = sum(
             p.amount if str(p.direction) == "debit" else -p.amount
-            for p in posts if str(p.posting_type) == "input_vat"
+            for p in posts
+            if str(p.posting_type) == "input_vat"
         )
         assert vat_net == Decimal("11.40")
 
     def test_fully_private_no_business_expense(self):
         """private_use_share=1 → effective business expense = 0."""
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="1"
-        )
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="1")
         posts = r.generate_postings()
         expense_net = sum(
             p.amount if str(p.direction) == "debit" else -p.amount
-            for p in posts if str(p.posting_type) == "expense"
+            for p in posts
+            if str(p.posting_type) == "expense"
         )
         assert expense_net == Decimal("0.00")
 
@@ -369,6 +387,7 @@ class TestGeneratePostingsWithPrivateUse:
 # ---------------------------------------------------------------------------
 # SQLiteRepository — private_use_share persistence
 # ---------------------------------------------------------------------------
+
 
 class TestDBPrivateUsePersistence:
     def test_save_and_round_trip_zero(self, repo):
@@ -409,6 +428,7 @@ class TestDBPrivateUsePersistence:
 # SQLiteRepository — postings table
 # ---------------------------------------------------------------------------
 
+
 class TestDBPostings:
     def test_postings_created_on_save(self, repo):
         r = _make_purchase(total_amount="119.00", vat_amount="19.00")
@@ -417,9 +437,7 @@ class TestDBPostings:
         assert len(posts) == 3
 
     def test_postings_six_with_private_use(self, repo):
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0.4"
-        )
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="0.4")
         repo.save(r)
         posts = repo.get_postings(r.id)
         assert len(posts) == 6
@@ -432,12 +450,10 @@ class TestDBPostings:
             assert isinstance(p, Posting)
 
     def test_postings_balanced(self, repo):
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0.4"
-        )
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="0.4")
         repo.save(r)
         posts = repo.get_postings(r.id)
-        debits  = sum(p.amount for p in posts if str(p.direction) == "debit")
+        debits = sum(p.amount for p in posts if str(p.direction) == "debit")
         credits = sum(p.amount for p in posts if str(p.direction) == "credit")
         assert debits == credits
 
@@ -478,8 +494,9 @@ class TestDBPostings:
         r = _make_purchase(total_amount="119.00", vat_amount="19.00")
         repo.save(r)
         all_posts = repo.list_all_postings()
-        assert all({"receipt_id", "posting_type", "direction", "amount"} <= d.keys()
-                   for d in all_posts)
+        assert all(
+            {"receipt_id", "posting_type", "direction", "amount"} <= d.keys() for d in all_posts
+        )
 
     def test_get_postings_empty_for_unknown_id(self, repo):
         assert repo.get_postings("nonexistent") == []
@@ -489,42 +506,39 @@ class TestDBPostings:
 # UStVA — private use reduces reclaimable input VAT
 # ---------------------------------------------------------------------------
 
+
 class TestUStVAPrivateUse:
     def test_full_business_full_input_vat(self):
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0"
-        )
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="0")
         report = generate_ustva([r], date(2024, 1, 1), date(2024, 12, 31))
         assert report.total_input_vat == Decimal("19.00")
 
     def test_40pct_private_reduces_input_vat(self):
         """40 % private → only 60 % (=11.40) reclaimable."""
         from datetime import date
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0.4"
-        )
+
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="0.4")
         report = generate_ustva([r], date(2024, 1, 1), date(2024, 12, 31))
         assert report.total_input_vat == Decimal("11.40")
 
     def test_40pct_private_reduces_purchase_net(self):
         from datetime import date
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0.4"
-        )
+
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="0.4")
         report = generate_ustva([r], date(2024, 1, 1), date(2024, 12, 31))
         assert report.total_purchase_net == Decimal("60.00")
 
     def test_fully_private_zero_input_vat(self):
         from datetime import date
-        r = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="1"
-        )
+
+        r = _make_purchase(total_amount="119.00", vat_amount="19.00", private_use_share="1")
         report = generate_ustva([r], date(2024, 1, 1), date(2024, 12, 31))
         assert report.total_input_vat == Decimal("0.00")
 
     def test_sale_output_vat_unaffected_by_private_share(self):
         """Sales output VAT is never reduced by private_use_share."""
         from datetime import date
+
         r = _make_sale(total_amount="119.00", vat_amount="19.00")
         report = generate_ustva([r], date(2024, 1, 1), date(2024, 12, 31))
         assert report.total_output_vat == Decimal("19.00")
@@ -532,14 +546,19 @@ class TestUStVAPrivateUse:
     def test_mixed_receipts_ustva(self):
         """Two purchases with different private shares combine correctly."""
         from datetime import date
+
         # net=100, vat=19, private=0   → business_vat=19.00
         r1 = _make_purchase(
-            total_amount="119.00", vat_amount="19.00", private_use_share="0",
+            total_amount="119.00",
+            vat_amount="19.00",
+            private_use_share="0",
             receipt_date=datetime(2024, 6, 1),
         )
         # net=200, vat=38, private=0.5 → business_vat=19.00
         r2 = _make_purchase(
-            total_amount="238.00", vat_amount="38.00", private_use_share="0.5",
+            total_amount="238.00",
+            vat_amount="38.00",
+            private_use_share="0.5",
             receipt_date=datetime(2024, 6, 1),
         )
         report = generate_ustva([r1, r2], date(2024, 1, 1), date(2024, 12, 31))
@@ -547,6 +566,7 @@ class TestUStVAPrivateUse:
 
     def test_ustva_skips_zero_vat(self):
         from datetime import date
+
         r = _make_purchase(total_amount="100.00", vat_amount="19.00", private_use_share="0")
         r_no_vat = ReceiptData(
             raw_text=f"no-vat {uuid.uuid4()}",

@@ -13,9 +13,13 @@ from decimal import Decimal
 
 import pytest
 
-from finamt.models import ExtractionResult, ReceiptCategory, ReceiptData, ReceiptItem
-from finamt.models import Address, Counterparty, ReceiptType
 from finamt.agents.prompts import RECEIPT_CATEGORIES
+from finamt.models import (
+    ExtractionResult,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptItem,
+)
 
 
 class TestReceiptCategory:
@@ -58,8 +62,14 @@ class TestReceiptItem:
     def test_to_dict_structure(self, sample_item):
         d = sample_item.to_dict()
         assert set(d.keys()) == {
-            "description", "position", "quantity", "unit_price",
-            "total_price", "category", "vat_rate", "vat_amount"
+            "description",
+            "position",
+            "quantity",
+            "unit_price",
+            "total_price",
+            "category",
+            "vat_rate",
+            "vat_amount",
         }
 
     def test_to_dict_decimal_as_float(self, sample_item):
@@ -124,6 +134,7 @@ class TestReceiptData:
         r.total_amount = Decimal("10")
         r.validate()
         assert r.validation_warnings == []
+
     def test_validate_rejects_zero_total(self):
         r = ReceiptData(total_amount=Decimal("0"))
         assert r.validate() is False
@@ -177,7 +188,7 @@ class TestReceiptData:
 
     def test_to_json_ensure_ascii_false(self, sample_receipt):
         raw = sample_receipt.to_json()
-        assert "Bürobedarf" in raw     # not escaped to \uXXXX
+        assert "Bürobedarf" in raw  # not escaped to \uXXXX
 
 
 class TestExtractionResult:

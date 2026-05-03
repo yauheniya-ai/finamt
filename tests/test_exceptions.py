@@ -47,7 +47,7 @@ class TestConstruction:
         assert exc.cause is original
 
     def test_str_with_cause(self):
-        original = IOError("disk full")
+        original = OSError("disk full")
         exc = OCRProcessingError("failed to read PDF", cause=original)
         text = str(exc)
         assert "failed to read PDF" in text

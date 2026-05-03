@@ -126,7 +126,7 @@ class TestModelConfig:
 
     def test_model_config_is_frozen(self):
         mc = Config().get_model_config()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             mc.model = "changed"  # type: ignore[misc]
 
 
@@ -148,7 +148,7 @@ class TestAgentsConfig:
 
     def test_agent_model_config_is_frozen(self):
         ac = AgentsConfig().get_agent_config()
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             ac.model = "changed"  # type: ignore[misc]
 
 

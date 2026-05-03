@@ -6,41 +6,38 @@ Unit tests for pipeline helper functions.
 
 from __future__ import annotations
 
-import pytest
-
 from finamt.agents.pipeline import _strip_taxpayer_fields
-
 
 # ---------------------------------------------------------------------------
 # _strip_taxpayer_fields
 # ---------------------------------------------------------------------------
 
 TAXPAYER = {
-    "name":         "Mustermann GmbH",
-    "vat_id":       "DE123456789",
-    "tax_number":   "29/815/00806",
-    "address":      "Musterstraße 1, 12345 Musterstadt",  # legacy composite, kept for compat
+    "name": "Mustermann GmbH",
+    "vat_id": "DE123456789",
+    "tax_number": "29/815/00806",
+    "address": "Musterstraße 1, 12345 Musterstadt",  # legacy composite, kept for compat
     # Individual address fields (sent by the frontend as separate query params)
-    "street":       "Musterstraße 1",
-    "postcode":     "12345",
-    "city":         "Musterstadt",
-    "state":        "Bayern",
-    "country":      "DE",
+    "street": "Musterstraße 1",
+    "postcode": "12345",
+    "city": "Musterstadt",
+    "state": "Bayern",
+    "country": "DE",
 }
 
 
 def _cp(**kwargs) -> dict:
     """Build a minimal counterparty dict."""
     defaults = {
-        "name":               None,
-        "vat_id":             None,
-        "tax_number":         None,
-        "street_and_number":  None,
+        "name": None,
+        "vat_id": None,
+        "tax_number": None,
+        "street_and_number": None,
         "address_supplement": None,
-        "postcode":           None,
-        "city":               None,
-        "state":              None,
-        "country":            None,
+        "postcode": None,
+        "city": None,
+        "state": None,
+        "country": None,
     }
     defaults.update(kwargs)
     return defaults
@@ -88,7 +85,7 @@ class TestStripTaxpayerFields:
 
     def test_partial_match_not_stripped(self):
         """A substring match must not trigger stripping — exact match only."""
-        cp = _cp(vat_id="DE12345678")   # one digit shorter
+        cp = _cp(vat_id="DE12345678")  # one digit shorter
         result = _strip_taxpayer_fields(cp, TAXPAYER)
         assert result["vat_id"] == "DE12345678"
 

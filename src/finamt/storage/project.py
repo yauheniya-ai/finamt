@@ -34,9 +34,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-FINAMT_HOME   = Path.home() / ".finamt"
-DEFAULT_PROJECT  = "default"
-DB_FILENAME      = "finamt.db"
+FINAMT_HOME = Path.home() / ".finamt"
+DEFAULT_PROJECT = "default"
+DB_FILENAME = "finamt.db"
 
 # Project names: lowercase alphanumeric + hyphens + underscores, 1–64 chars
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -45,11 +45,12 @@ _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 @dataclass(frozen=True)
 class ProjectLayout:
     """All paths belonging to a single project."""
-    name:      str
-    root:      Path   # ~/.finamt/<name>/
-    db_path:   Path   # root/finamt.db
-    pdfs_dir:  Path   # root/pdfs/
-    debug_dir: Path   # root/debug/
+
+    name: str
+    root: Path  # ~/.finamt/<name>/
+    db_path: Path  # root/finamt.db
+    pdfs_dir: Path  # root/pdfs/
+    debug_dir: Path  # root/debug/
 
     def create_dirs(self) -> None:
         """Ensure all project directories exist."""
@@ -80,11 +81,7 @@ def resolve_project(
       2. ``FINAMT_PROJECT`` environment variable (when env_var=True)
       3. ``"default"``
     """
-    name = (
-        project
-        or (os.environ.get("FINAMT_PROJECT") if env_var else None)
-        or DEFAULT_PROJECT
-    )
+    name = project or (os.environ.get("FINAMT_PROJECT") if env_var else None) or DEFAULT_PROJECT
     return _make_layout(name)
 
 
@@ -97,7 +94,7 @@ def layout_from_db_path(db_path: Path) -> ProjectLayout:
     stem as the project name, rooting everything in the db's parent directory.
     """
     db_path = db_path.resolve()
-    parent  = db_path.parent
+    parent = db_path.parent
 
     if parent.parent == FINAMT_HOME and db_path.name == DB_FILENAME:
         name = parent.name
@@ -141,16 +138,18 @@ def list_projects() -> list[ProjectLayout]:
         if not subdir.is_dir():
             continue
         db = subdir / DB_FILENAME
-        layouts.append(ProjectLayout(
-            name=subdir.name,
-            root=subdir,
-            db_path=db,
-            pdfs_dir=subdir / "pdfs",
-            debug_dir=subdir / "debug",
-        ))
+        layouts.append(
+            ProjectLayout(
+                name=subdir.name,
+                root=subdir,
+                db_path=db,
+                pdfs_dir=subdir / "pdfs",
+                debug_dir=subdir / "debug",
+            )
+        )
 
     # default first
-    layouts.sort(key=lambda l: (0 if l.is_default else 1, l.name))
+    layouts.sort(key=lambda p: (0 if p.is_default else 1, p.name))
     return layouts
 
 

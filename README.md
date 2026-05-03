@@ -9,7 +9,6 @@
 <div align="center">
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](https://opensource.org/licenses/MIT)
 [![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 [![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
@@ -404,9 +403,54 @@ Every receipt is tagged with a category and optional subcategory. Categories map
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/my-change`)
 3. Make your changes
-4. Run the test suite: `pytest --cov=src --cov-report=term-missing`
-5. Submit a pull request
+4. Lint and format with Ruff:
+   ```bash
+   ruff check --fix src/ tests/
+   ruff format src/ tests/
+   ```
+5. Run the test suite:
+   ```bash
+   pytest --cov=src --cov-report=term-missing
+   ```
+6. Submit a pull request
 
 ## License
 
 MIT — see [LICENSE](https://raw.githubusercontent.com/yauheniya-ai/finamt/main/LICENSE) for details.
+
+## Third-Party Components and Models
+
+This software depends on external libraries and services, including:
+
+- PaddleOCR (Apache License 2.0)
+- Tesseract OCR (Apache License 2.0)
+- Ollama (MIT License)
+
+finamt uses locally installed language models (e.g. Qwen) via Ollama.
+
+These models are **not distributed** with this software and are subject to their own licenses.
+Users are responsible for complying with the respective terms when downloading and using such models.
+
+## Disclaimer
+
+This software is provided for informational and automation purposes only.
+
+It does **not** constitute tax, legal, or accounting advice.
+
+While finamt is designed to assist with the preparation of German tax-related data (e.g. VAT returns, EÜR, ELSTER submissions), no guarantee is made regarding:
+
+- correctness of extracted data
+- completeness of financial records
+- compliance with applicable tax laws and regulations
+- acceptance by tax authorities
+
+Users are solely responsible for verifying all outputs before submission to any authority.
+
+**Always consult a qualified tax advisor (Steuerberater) for legally binding guidance.**
+
+To the maximum extent permitted by law, Space Octahedron GmbH assumes no liability for:
+
+- errors in OCR or LLM-based extraction
+- incorrect classifications or calculations
+- rejected or incorrect tax filings
+- financial losses or penalties arising from use of this software

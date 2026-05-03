@@ -11,15 +11,13 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-import pytest
-
 from finamt.models import Counterparty, ReceiptCategory, ReceiptData, ReceiptType
 from finamt.tax.ustva import USTVALineItem, USTVAReport, generate_ustva
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _receipt(
     *,
@@ -31,7 +29,7 @@ def _receipt(
     receipt_type: str = "purchase",
 ) -> ReceiptData:
     return ReceiptData(
-        raw_text=f"Test receipt {uuid.uuid4()}",   # unique hash per receipt
+        raw_text=f"Test receipt {uuid.uuid4()}",  # unique hash per receipt
         receipt_type=ReceiptType(receipt_type),
         counterparty=Counterparty(name="Test GmbH"),
         receipt_date=receipt_date,
@@ -43,19 +41,20 @@ def _receipt(
 
 
 Q1_START = date(2024, 1, 1)
-Q1_END   = date(2024, 3, 31)
+Q1_END = date(2024, 3, 31)
 
 
 # ---------------------------------------------------------------------------
 # generate_ustva — basic correctness
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateUstva:
     def test_empty_input_returns_empty_report(self):
         report = generate_ustva([], Q1_START, Q1_END)
-        assert report.total_input_vat  == Decimal("0")
+        assert report.total_input_vat == Decimal("0")
         assert report.total_output_vat == Decimal("0")
-        assert report.net_liability    == Decimal("0")
+        assert report.net_liability == Decimal("0")
         assert report.lines == {}
 
     def test_single_purchase_19pct(self):
@@ -63,18 +62,21 @@ class TestGenerateUstva:
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert "19" in report.lines
         ln = report.lines["19"]
-        assert ln.purchase_vat  == Decimal("19.00")
-        assert ln.purchase_net  == Decimal("100.00")
+        assert ln.purchase_vat == Decimal("19.00")
+        assert ln.purchase_net == Decimal("100.00")
         assert ln.purchase_count == 1
-        assert ln.sale_vat  == Decimal("0")
+        assert ln.sale_vat == Decimal("0")
 
     def test_single_sale_19pct(self):
-        receipts = [_receipt(total_amount="119.00", vat_amount="19.00",
-                             vat_percentage="19", receipt_type="sale")]
+        receipts = [
+            _receipt(
+                total_amount="119.00", vat_amount="19.00", vat_percentage="19", receipt_type="sale"
+            )
+        ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         ln = report.lines["19"]
-        assert ln.sale_vat   == Decimal("19.00")
-        assert ln.sale_net   == Decimal("100.00")
+        assert ln.sale_vat == Decimal("19.00")
+        assert ln.sale_net == Decimal("100.00")
         assert ln.sale_count == 1
         assert ln.purchase_vat == Decimal("0")
 
@@ -87,11 +89,11 @@ class TestGenerateUstva:
     def test_mixed_rates_grouped_separately(self):
         receipts = [
             _receipt(total_amount="119.00", vat_amount="19.00", vat_percentage="19"),
-            _receipt(total_amount="107.00", vat_amount="7.00",  vat_percentage="7"),
+            _receipt(total_amount="107.00", vat_amount="7.00", vat_percentage="7"),
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert "19" in report.lines
-        assert "7"  in report.lines
+        assert "7" in report.lines
 
     def test_multiple_purchases_same_rate_accumulated(self):
         receipts = [
@@ -126,7 +128,7 @@ class TestGenerateUstva:
     def test_total_input_vat_sums_purchases(self):
         receipts = [
             _receipt(total_amount="119.00", vat_amount="19.00", vat_percentage="19"),
-            _receipt(total_amount="107.00", vat_amount="7.00",  vat_percentage="7"),
+            _receipt(total_amount="107.00", vat_amount="7.00", vat_percentage="7"),
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert report.total_input_vat == Decimal("26.00")
@@ -134,7 +136,7 @@ class TestGenerateUstva:
     def test_total_output_vat_sums_sales(self):
         receipts = [
             _receipt(vat_amount="19.00", vat_percentage="19", receipt_type="sale"),
-            _receipt(vat_amount="7.00",  vat_percentage="7",  receipt_type="sale"),
+            _receipt(vat_amount="7.00", vat_percentage="7", receipt_type="sale"),
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert report.total_output_vat == Decimal("26.00")
@@ -143,6 +145,7 @@ class TestGenerateUstva:
 # ---------------------------------------------------------------------------
 # Skipping logic
 # ---------------------------------------------------------------------------
+
 
 class TestSkipping:
     def test_skips_receipt_without_date(self):
@@ -164,9 +167,9 @@ class TestSkipping:
 
     def test_skipped_and_valid_counted_separately(self):
         receipts = [
-            _receipt(receipt_date=None),                     # skipped
-            _receipt(receipt_date=datetime(2023, 6, 1)),     # outside period
-            _receipt(receipt_date=datetime(2024, 2, 1)),     # valid
+            _receipt(receipt_date=None),  # skipped
+            _receipt(receipt_date=datetime(2023, 6, 1)),  # outside period
+            _receipt(receipt_date=datetime(2024, 2, 1)),  # valid
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert report.skipped_count == 2
@@ -174,7 +177,7 @@ class TestSkipping:
 
     def test_period_boundary_inclusive(self):
         receipts = [
-            _receipt(receipt_date=datetime(2024, 1, 1)),   # first day
+            _receipt(receipt_date=datetime(2024, 1, 1)),  # first day
             _receipt(receipt_date=datetime(2024, 3, 31)),  # last day
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
@@ -185,6 +188,7 @@ class TestSkipping:
 # ---------------------------------------------------------------------------
 # datetime vs date regression
 # ---------------------------------------------------------------------------
+
 
 class TestDateHandling:
     def test_datetime_receipt_date_does_not_raise(self):
@@ -206,6 +210,7 @@ class TestDateHandling:
 # ---------------------------------------------------------------------------
 # USTVALineItem
 # ---------------------------------------------------------------------------
+
 
 class TestUSTVALineItem:
     def test_net_liability_is_sale_minus_purchase(self):
@@ -236,8 +241,14 @@ class TestUSTVALineItem:
         )
         d = ln.to_dict()
         assert set(d.keys()) == {
-            "vat_rate", "purchase_net", "purchase_vat", "purchase_count",
-            "sale_net", "sale_vat", "sale_count", "net_liability",
+            "vat_rate",
+            "purchase_net",
+            "purchase_vat",
+            "purchase_count",
+            "sale_net",
+            "sale_vat",
+            "sale_count",
+            "net_liability",
         }
         assert d["purchase_count"] == 1
         assert d["sale_count"] == 2
@@ -247,17 +258,24 @@ class TestUSTVALineItem:
 # USTVAReport
 # ---------------------------------------------------------------------------
 
+
 class TestUSTVAReport:
     def _report(self) -> USTVAReport:
         report = USTVAReport(period_start=Q1_START, period_end=Q1_END)
         report.lines["19"] = USTVALineItem(
             vat_rate=Decimal("19"),
-            purchase_net=Decimal("200.00"), purchase_vat=Decimal("38.00"), purchase_count=2,
-            sale_net=Decimal("100.00"),     sale_vat=Decimal("19.00"),     sale_count=1,
+            purchase_net=Decimal("200.00"),
+            purchase_vat=Decimal("38.00"),
+            purchase_count=2,
+            sale_net=Decimal("100.00"),
+            sale_vat=Decimal("19.00"),
+            sale_count=1,
         )
         report.lines["7"] = USTVALineItem(
             vat_rate=Decimal("7"),
-            purchase_net=Decimal("100.00"), purchase_vat=Decimal("7.00"),  purchase_count=1,
+            purchase_net=Decimal("100.00"),
+            purchase_vat=Decimal("7.00"),
+            purchase_count=1,
         )
         return report
 
@@ -291,15 +309,21 @@ class TestUSTVAReport:
 # Export
 # ---------------------------------------------------------------------------
 
+
 class TestExport:
     def test_to_dict_structure(self):
         receipts = [_receipt()]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         d = report.to_dict()
         assert d["period_start"] == "2024-01-01"
-        assert d["period_end"]   == "2024-03-31"
-        for key in ("total_input_vat", "total_output_vat", "net_liability",
-                    "total_receipts", "lines"):
+        assert d["period_end"] == "2024-03-31"
+        for key in (
+            "total_input_vat",
+            "total_output_vat",
+            "net_liability",
+            "total_receipts",
+            "lines",
+        ):
             assert key in d
 
     def test_to_json_is_valid_json(self):
@@ -321,13 +345,16 @@ class TestExport:
         assert "2024-03-31" in summary
 
     def test_summary_contains_vat_rate(self):
-        report = generate_ustva([_receipt(vat_percentage="19", vat_amount="19.00")], Q1_START, Q1_END)
+        report = generate_ustva(
+            [_receipt(vat_percentage="19", vat_amount="19.00")], Q1_START, Q1_END
+        )
         assert "19" in report.summary()
 
     def test_summary_contains_totals(self):
         report = generate_ustva(
             [_receipt(total_amount="119.00", vat_amount="19.00", vat_percentage="19")],
-            Q1_START, Q1_END,
+            Q1_START,
+            Q1_END,
         )
         summary = report.summary()
         assert "19.00" in summary
@@ -335,14 +362,15 @@ class TestExport:
 
     def test_summary_shows_liability_direction(self):
         purchase = _receipt(vat_amount="10.00", vat_percentage="19")
-        sale     = _receipt(vat_amount="30.00", vat_percentage="19", receipt_type="sale")
-        report   = generate_ustva([purchase, sale], Q1_START, Q1_END)
-        assert "Finanzamt" in report.summary()   # shows direction in German text
+        sale = _receipt(vat_amount="30.00", vat_percentage="19", receipt_type="sale")
+        report = generate_ustva([purchase, sale], Q1_START, Q1_END)
+        assert "Finanzamt" in report.summary()  # shows direction in German text
 
 
 # ---------------------------------------------------------------------------
 # Rounding / normalisation
 # ---------------------------------------------------------------------------
+
 
 class TestRounding:
     def test_vat_amounts_rounded_to_two_decimal_places(self):
@@ -356,7 +384,7 @@ class TestRounding:
         """Decimal('19.0').normalize() == '19' — both map to the same bucket."""
         receipts = [
             _receipt(vat_percentage="19.0", vat_amount="19.00"),
-            _receipt(vat_percentage="19",   vat_amount="19.00"),
+            _receipt(vat_percentage="19", vat_amount="19.00"),
         ]
         report = generate_ustva(receipts, Q1_START, Q1_END)
         assert len(report.lines) == 1

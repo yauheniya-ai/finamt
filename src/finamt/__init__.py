@@ -18,15 +18,22 @@ Typical usage::
 
 from .agents.agent import FinanceAgent
 from .agents.config import Config, ModelConfig, cfg
+from .agents.prompts import RECEIPT_CATEGORIES
 from .exceptions import (
     FinanceAgentError,
     InvalidReceiptError,
     LLMExtractionError,
     OCRProcessingError,
 )
-from .models import ExtractionResult, ReceiptCategory, ReceiptData, ReceiptItem
-from .models import Posting, PostingDirection, PostingType
-from .agents.prompts import RECEIPT_CATEGORIES
+from .models import (
+    ExtractionResult,
+    Posting,
+    PostingDirection,
+    PostingType,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptItem,
+)
 
 __all__ = [
     # Core agent

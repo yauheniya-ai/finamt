@@ -52,13 +52,13 @@ Usage::
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Iterable
 
-from ..models import ReceiptData, ReceiptCategory
+from ..models import ReceiptData
 
 _TWO = Decimal("0.01")
 
@@ -77,25 +77,25 @@ def _to_date(dt: date | datetime) -> date:
 
 # (kz, short_label)
 _EXPENSE_MAPPING: dict[str, tuple[str, str]] = {
-    "material":           ("145", "Waren, Roh-/Hilfsstoffe"),
-    "equipment":          ("140", "Abschreibungen / GWG"),
-    "software":           ("145", "Büromaterial / Software"),
-    "internet":           ("145", "Internet / Hosting"),
-    "telecommunication":  ("145", "Telekommunikation"),
-    "travel":             ("165", "Reisekosten"),
-    "education":          ("183", "Fortbildungskosten"),
-    "utilities":          ("176", "Energie / Nebenkosten"),
-    "insurance":          ("172", "Versicherungen"),
-    "taxes":              ("176", "Steuerberatung / Abgaben"),
-    "other":              ("176", "Sonstige Betriebsausgaben"),
+    "material": ("145", "Waren, Roh-/Hilfsstoffe"),
+    "equipment": ("140", "Abschreibungen / GWG"),
+    "software": ("145", "Büromaterial / Software"),
+    "internet": ("145", "Internet / Hosting"),
+    "telecommunication": ("145", "Telekommunikation"),
+    "travel": ("165", "Reisekosten"),
+    "education": ("183", "Fortbildungskosten"),
+    "utilities": ("176", "Energie / Nebenkosten"),
+    "insurance": ("172", "Versicherungen"),
+    "taxes": ("176", "Steuerberatung / Abgaben"),
+    "other": ("176", "Sonstige Betriebsausgaben"),
 }
 
 _INCOME_MAPPING: dict[str, tuple[str, str]] = {
-    "services":    ("111", "Einnahmen aus Dienstleistungen"),
-    "consulting":  ("111", "Einnahmen aus Beratung"),
-    "products":    ("111", "Einnahmen aus Produktverkauf"),
-    "licensing":   ("111", "Einnahmen aus Lizenzen"),
-    "other":       ("112", "Sonstige Betriebseinnahmen"),
+    "services": ("111", "Einnahmen aus Dienstleistungen"),
+    "consulting": ("111", "Einnahmen aus Beratung"),
+    "products": ("111", "Einnahmen aus Produktverkauf"),
+    "licensing": ("111", "Einnahmen aus Lizenzen"),
+    "other": ("112", "Sonstige Betriebseinnahmen"),
 }
 
 
@@ -103,33 +103,35 @@ _INCOME_MAPPING: dict[str, tuple[str, str]] = {
 # Per-category line
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EURLinie:
     """Aggregated figures for one expense/income category."""
 
-    category:     str
-    kz:           str           # Anlage EÜR Kennzahl
-    label:        str
-    net_amount:   Decimal = field(default_factory=Decimal)
-    vat_amount:   Decimal = field(default_factory=Decimal)
+    category: str
+    kz: str  # Anlage EÜR Kennzahl
+    label: str
+    net_amount: Decimal = field(default_factory=Decimal)
+    vat_amount: Decimal = field(default_factory=Decimal)
     gross_amount: Decimal = field(default_factory=Decimal)
-    count:        int = 0
+    count: int = 0
 
     def to_dict(self) -> dict:
         return {
-            "category":     self.category,
-            "kz":           self.kz,
-            "label":        self.label,
-            "net_amount":   str(self.net_amount),
-            "vat_amount":   str(self.vat_amount),
+            "category": self.category,
+            "kz": self.kz,
+            "label": self.label,
+            "net_amount": str(self.net_amount),
+            "vat_amount": str(self.vat_amount),
             "gross_amount": str(self.gross_amount),
-            "count":        self.count,
+            "count": self.count,
         }
 
 
 # ---------------------------------------------------------------------------
 # EÜR Report
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class EURReport:
@@ -140,10 +142,10 @@ class EURReport:
     ``gewinn < 0``  → loss (deductible against other income)
     """
 
-    year:              int
-    einnahmen_lines:   dict[str, EURLinie] = field(default_factory=dict)
-    ausgaben_lines:    dict[str, EURLinie] = field(default_factory=dict)
-    skipped_count:     int = 0
+    year: int
+    einnahmen_lines: dict[str, EURLinie] = field(default_factory=dict)
+    ausgaben_lines: dict[str, EURLinie] = field(default_factory=dict)
+    skipped_count: int = 0
 
     # ------------------------------------------------------------------
     # Aggregated totals
@@ -199,16 +201,16 @@ class EURReport:
 
     def to_dict(self) -> dict:
         return {
-            "year":                    self.year,
-            "skipped_count":           self.skipped_count,
-            "total_einnahmen_netto":   str(self.total_einnahmen_netto),
-            "total_einnahmen_ust":     str(self.total_einnahmen_ust),
-            "total_ausgaben_netto":    str(self.total_ausgaben_netto),
+            "year": self.year,
+            "skipped_count": self.skipped_count,
+            "total_einnahmen_netto": str(self.total_einnahmen_netto),
+            "total_einnahmen_ust": str(self.total_einnahmen_ust),
+            "total_ausgaben_netto": str(self.total_ausgaben_netto),
             "total_ausgaben_vorsteuer": str(self.total_ausgaben_vorsteuer),
-            "gewinn":                  str(self.gewinn),
-            "kz_totals":               {k: str(v) for k, v in self.kz_totals().items()},
-            "einnahmen":               {k: v.to_dict() for k, v in self.einnahmen_lines.items()},
-            "ausgaben":                {k: v.to_dict() for k, v in self.ausgaben_lines.items()},
+            "gewinn": str(self.gewinn),
+            "kz_totals": {k: str(v) for k, v in self.kz_totals().items()},
+            "einnahmen": {k: v.to_dict() for k, v in self.einnahmen_lines.items()},
+            "ausgaben": {k: v.to_dict() for k, v in self.ausgaben_lines.items()},
         }
 
     def to_json(self, path: str | Path | None = None) -> str:
@@ -219,7 +221,7 @@ class EURReport:
 
     def summary(self) -> str:
         W = 60
-        div  = "─" * W
+        div = "─" * W
 
         def fmt(label: str, amount: Decimal, indent: int = 2) -> str:
             pad = " " * indent
@@ -271,6 +273,7 @@ class EURReport:
 # Generator
 # ---------------------------------------------------------------------------
 
+
 def generate_eur(
     receipts: Iterable[ReceiptData],
     year: int,
@@ -291,7 +294,7 @@ def generate_eur(
     """
     report = EURReport(year=year)
     period_start = date(year, 1, 1)
-    period_end   = date(year, 12, 31)
+    period_end = date(year, 12, 31)
 
     for r in receipts:
         if r.receipt_date is None:
@@ -320,15 +323,15 @@ def generate_eur(
         if cat not in lines:
             lines[cat] = EURLinie(category=cat, kz=kz, label=label)
         ln = lines[cat]
-        ln.net_amount   += net
-        ln.vat_amount   += vat
+        ln.net_amount += net
+        ln.vat_amount += vat
         ln.gross_amount += gross
-        ln.count        += 1
+        ln.count += 1
 
     # Final rounding pass
     for ln in (*report.einnahmen_lines.values(), *report.ausgaben_lines.values()):
-        ln.net_amount   = _r(ln.net_amount)
-        ln.vat_amount   = _r(ln.vat_amount)
+        ln.net_amount = _r(ln.net_amount)
+        ln.vat_amount = _r(ln.vat_amount)
         ln.gross_amount = _r(ln.gross_amount)
 
     return report

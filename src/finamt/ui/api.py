@@ -41,7 +41,7 @@ import tempfile
 import urllib.request
 from datetime import date
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,55 +56,82 @@ try:
     from finamt.agents.agent import FinanceAgent
     from finamt.agents.config import Config
     from finamt.agents.prompts import RECEIPT_CATEGORIES
-    from finamt.storage.sqlite import SQLiteRepository
     from finamt.storage.project import (
-        FINAMT_HOME, layout_from_db_path, list_projects,
-        resolve_project, validate_project_name, DB_FILENAME, DEFAULT_PROJECT,
+        DB_FILENAME,
+        DEFAULT_PROJECT,
+        FINAMT_HOME,
+        layout_from_db_path,
+        list_projects,
+        resolve_project,
+        validate_project_name,
     )
-    from finamt.tax.ustva import generate_ustva
+    from finamt.storage.sqlite import SQLiteRepository
     from finamt.tax.bilanz import generate_jahresabschluss
-    from finamt.tax.ebilanz import build_xbrl, EBilanzConfig
+    from finamt.tax.ebilanz import EBilanzConfig, build_xbrl
+    from finamt.tax.ustva import generate_ustva
+
     _LIB_AVAILABLE = True
     _cfg = Config()
 except ImportError as _import_err:
-    import traceback, sys
+    import sys
+    import traceback
+
     print("\n[finamt] IMPORT ERROR — library failed to load:", file=sys.stderr)
     traceback.print_exc(file=sys.stderr)
     print(file=sys.stderr)
     _LIB_AVAILABLE = False
     _cfg = None  # type: ignore
     RECEIPT_CATEGORIES = [
-        "material", "equipment", "internet", "telecommunication",
-        "software", "education", "travel", "utilities",
-        "insurance", "taxes", "other",
+        "material",
+        "equipment",
+        "internet",
+        "telecommunication",
+        "software",
+        "education",
+        "travel",
+        "utilities",
+        "insurance",
+        "taxes",
+        "other",
     ]
-    FINAMT_HOME     = Path.home() / ".finamt"
-    DB_FILENAME        = "finamt.db"
-    DEFAULT_PROJECT    = "default"
+    FINAMT_HOME = Path.home() / ".finamt"
+    DB_FILENAME = "finamt.db"
+    DEFAULT_PROJECT = "default"
 
-    def list_projects():       return []      # type: ignore
-    def resolve_project(n=None): return None  # type: ignore
-    def validate_project_name(n): return None # type: ignore
-    def layout_from_db_path(p): return None   # type: ignore
+    def list_projects():
+        return []  # type: ignore
+
+    def resolve_project(n=None):
+        return None  # type: ignore
+
+    def validate_project_name(n):
+        return None  # type: ignore
+
+    def layout_from_db_path(p):
+        return None  # type: ignore
+
 
 # Computed once at startup — never relies on sqlite.py's DEFAULT_DB_PATH
 _DEFAULT_LAYOUT = resolve_project(DEFAULT_PROJECT)
-_DEFAULT_DB     = _DEFAULT_LAYOUT.db_path
+_DEFAULT_DB = _DEFAULT_LAYOUT.db_path
 
 ALLOWED_MIME_TYPES = {
-    "image/jpeg", "image/png", "image/webp",
-    "image/tiff", "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/tiff",
+    "application/pdf",
 }
 
 # Maps file extension → MIME type for serving stored originals
 _EXT_MIME: dict[str, str] = {
-    ".pdf":  "application/pdf",
-    ".png":  "image/png",
-    ".jpg":  "image/jpeg",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".webp": "image/webp",
     ".tiff": "image/tiff",
-    ".tif":  "image/tiff",
+    ".tif": "image/tiff",
 }
 # Extensions to probe when looking for a stored receipt file
 _STORED_EXTS = list(_EXT_MIME.keys())
@@ -131,7 +158,8 @@ app.add_middleware(
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _resolve_layout(db: Optional[str], project: Optional[str] = None):
+
+def _resolve_layout(db: str | None, project: str | None = None):
     """
     Resolve a ProjectLayout from either an explicit db path or a project name.
     Priority: explicit db path > project name > "default".
@@ -145,7 +173,7 @@ def _resolve_layout(db: Optional[str], project: Optional[str] = None):
     return resolve_project(project or DEFAULT_PROJECT)
 
 
-def _resolve_db(db: Optional[str]) -> Path:
+def _resolve_db(db: str | None) -> Path:
     """Backward-compat shim — returns the db_path from _resolve_layout."""
     return _resolve_layout(db).db_path
 
@@ -177,7 +205,7 @@ def _require_db(db_path: Path) -> None:
         )
 
 
-def _find_stored_file(receipt_id: str, db_path: Path) -> Optional[Path]:
+def _find_stored_file(receipt_id: str, db_path: Path) -> Path | None:
     """Return the stored original file path regardless of extension, or None."""
     base = _pdf_dir(db_path) / receipt_id
     for ext in _STORED_EXTS:
@@ -194,7 +222,7 @@ def _receipt_to_response(r, db_path: Path) -> dict:
     return d
 
 
-def _project_entry(layout, active_db: Optional[str] = None) -> dict:
+def _project_entry(layout, active_db: str | None = None) -> dict:
     """Serialise a ProjectLayout to a JSON-safe dict."""
     receipt_count = 0
     size_kb = 0.0
@@ -206,19 +234,16 @@ def _project_entry(layout, active_db: Optional[str] = None) -> dict:
                     receipt_count = sum(1 for _ in repo.list_all())
             except Exception:
                 pass
-    is_active = (
-        active_db == str(layout.db_path)
-        or (active_db is None and layout.is_default)
-    )
+    is_active = active_db == str(layout.db_path) or (active_db is None and layout.is_default)
     return {
-        "name":       layout.name,
-        "path":       str(layout.db_path),
-        "root":       str(layout.root),
-        "size_kb":    size_kb,
-        "receipts":   receipt_count,
+        "name": layout.name,
+        "path": str(layout.db_path),
+        "root": str(layout.root),
+        "size_kb": size_kb,
+        "receipts": receipt_count,
         "is_default": layout.is_default,
-        "is_active":  is_active,
-        "exists":     layout.db_path.exists(),
+        "is_active": is_active,
+        "exists": layout.db_path.exists(),
     }
 
 
@@ -226,18 +251,21 @@ def _project_entry(layout, active_db: Optional[str] = None) -> dict:
 # Meta
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health", tags=["meta"])
 def health():
     return {
-        "status":            "ok",
+        "status": "ok",
         "library_available": _LIB_AVAILABLE,
-        "db_path":           str(_DEFAULT_DB),
-        "db_exists":         _DEFAULT_DB.exists(),
+        "db_path": str(_DEFAULT_DB),
+        "db_exists": _DEFAULT_DB.exists(),
     }
 
 
 @app.get("/fx-rate", tags=["meta"])
-def fx_rate(from_currency: str = Query(..., alias="from"), to: str = "EUR", date: Optional[str] = None):
+def fx_rate(
+    from_currency: str = Query(..., alias="from"), to: str = "EUR", date: str | None = None
+):
     """Proxy Frankfurter exchange-rate lookup so the browser avoids CORS issues.
     When `date` (YYYY-MM-DD) is supplied the historical rate for that day is
     returned; otherwise the latest available rate is used."""
@@ -262,11 +290,11 @@ def get_config():
     mc = _cfg.get_model_config()
     return {
         "ollama_base_url": mc.base_url,
-        "model":           mc.model,
-        "max_retries":     mc.max_retries,
+        "model": mc.model,
+        "max_retries": mc.max_retries,
         "request_timeout": mc.timeout,
-        "categories":      RECEIPT_CATEGORIES,
-        "default_db":      str(_DEFAULT_DB),
+        "categories": RECEIPT_CATEGORIES,
+        "default_db": str(_DEFAULT_DB),
     }
 
 
@@ -274,17 +302,18 @@ def get_config():
 # Projects
 # ---------------------------------------------------------------------------
 
+
 @app.get("/projects", tags=["projects"])
-def list_projects_endpoint(active_db: Optional[str] = Query(default=None)):
+def list_projects_endpoint(active_db: str | None = Query(default=None)):
     """
     List all projects under ~/.finamt/.
     Each project is a subdirectory containing finamt.db.
     """
     projects = list_projects()
     return {
-        "projects":    [_project_entry(p, active_db) for p in projects],
+        "projects": [_project_entry(p, active_db) for p in projects],
         "finamt_home": str(FINAMT_HOME),
-        "default_db":  str(_DEFAULT_DB),
+        "default_db": str(_DEFAULT_DB),
     }
 
 
@@ -295,7 +324,7 @@ def create_project(body: dict = Body(...)):
     Body: { "name": "acme-gmbh-2025" }
     """
     name = (body.get("name") or "").strip().lower()
-    err  = validate_project_name(name)
+    err = validate_project_name(name)
     if err:
         raise HTTPException(status_code=400, detail=err)
 
@@ -311,7 +340,7 @@ def create_project(body: dict = Body(...)):
     if _LIB_AVAILABLE:
         try:
             with SQLiteRepository(db_path=layout.db_path):
-                pass   # schema init happens in __init__
+                pass  # schema init happens in __init__
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"DB init failed: {exc}") from exc
 
@@ -333,6 +362,7 @@ def delete_project(name: str, keep_pdfs: bool = Query(default=True)):
         raise HTTPException(status_code=404, detail=f"Project '{name}' not found.")
 
     import shutil
+
     layout.db_path.unlink(missing_ok=True)
     if layout.debug_dir.exists():
         shutil.rmtree(layout.debug_dir, ignore_errors=True)
@@ -347,7 +377,7 @@ def delete_project(name: str, keep_pdfs: bool = Query(default=True)):
 
 # Legacy alias — the frontend used /databases before the project refactor
 @app.get("/databases", tags=["projects"])
-def list_databases(active_db: Optional[str] = Query(default=None)):
+def list_databases(active_db: str | None = Query(default=None)):
     """Legacy alias for GET /projects — kept for backwards compatibility."""
     return list_projects_endpoint(active_db=active_db)
 
@@ -360,7 +390,7 @@ _TAXPAYER_KEY = "taxpayer"
 
 
 @app.get("/taxpayer", tags=["projects"])
-def get_taxpayer(db: Optional[str] = Query(default=None)):
+def get_taxpayer(db: str | None = Query(default=None)):
     """Return the taxpayer profile stored in this project's DB, or null."""
     db_path = _resolve_db(db)
     if not db_path.exists():
@@ -371,7 +401,7 @@ def get_taxpayer(db: Optional[str] = Query(default=None)):
 
 
 @app.put("/taxpayer", tags=["projects"])
-def set_taxpayer(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+def set_taxpayer(body: dict = Body(...), db: str | None = Query(default=None)):
     """Save the taxpayer profile into this project's DB."""
     db_path = _resolve_db(db)
     # Initialise DB if it doesn't exist yet
@@ -382,7 +412,7 @@ def set_taxpayer(body: dict = Body(...), db: Optional[str] = Query(default=None)
 
 
 @app.delete("/taxpayer", status_code=status.HTTP_204_NO_CONTENT, tags=["projects"])
-def delete_taxpayer(db: Optional[str] = Query(default=None)):
+def delete_taxpayer(db: str | None = Query(default=None)):
     """Remove the taxpayer profile from this project's DB."""
     db_path = _resolve_db(db)
     if not db_path.exists():
@@ -399,7 +429,7 @@ _SUBMISSIONS_KEY = "submissions"
 
 
 @app.get("/submissions", tags=["projects"])
-def get_submissions(db: Optional[str] = Query(default=None)):
+def get_submissions(db: str | None = Query(default=None)):
     """Return all recorded submission events for this project."""
     db_path = _resolve_db(db)
     if not db_path.exists():
@@ -410,7 +440,7 @@ def get_submissions(db: Optional[str] = Query(default=None)):
 
 
 @app.post("/submissions", tags=["projects"])
-def add_submission(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+def add_submission(body: dict = Body(...), db: str | None = Query(default=None)):
     """Append a submission record {type, year, submitted_at, note?}."""
     db_path = _resolve_db(db)
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -428,28 +458,35 @@ def add_submission(body: dict = Body(...), db: Optional[str] = Query(default=Non
 
 class ManualReceiptBody(BaseModel):
     """Payload for the manual receipt entry endpoint."""
-    date:            Optional[str]   = None   # ISO-8601 date string
-    vendor:          Optional[str]   = None
-    vendor_verified: bool            = False
-    receipt_type:    str             = "purchase"  # "purchase" | "sale"
-    category:        str             = "other"
-    subcategory:     Optional[str]   = None
-    net_amount:      float           = 0.0
-    vat_percentage:  float           = 0.0
-    description:     Optional[str]   = None
-    currency:        str             = "EUR"
+
+    date: str | None = None  # ISO-8601 date string
+    vendor: str | None = None
+    vendor_verified: bool = False
+    receipt_type: str = "purchase"  # "purchase" | "sale"
+    category: str = "other"
+    subcategory: str | None = None
+    net_amount: float = 0.0
+    vat_percentage: float = 0.0
+    description: str | None = None
+    currency: str = "EUR"
 
 
 @app.post("/receipts", status_code=status.HTTP_201_CREATED, tags=["receipts"])
 def create_manual_receipt(
     body: ManualReceiptBody,
-    db:   Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """Create a receipt record from manually entered data (no file required)."""
-    from finamt.models import ReceiptData, ReceiptType, ReceiptCategory, Counterparty  # type: ignore[import]
+    import uuid as _uuid
     from datetime import datetime as _dt
     from decimal import Decimal as _D
-    import uuid as _uuid
+
+    from finamt.models import (  # type: ignore[import]
+        Counterparty,
+        ReceiptCategory,
+        ReceiptData,
+        ReceiptType,
+    )
 
     # Build a unique raw_text so the SHA-256 id is always distinct
     unique_seed = _uuid.uuid4().hex
@@ -460,8 +497,8 @@ def create_manual_receipt(
     if body.description:
         raw_text += f":{body.description}"
 
-    net   = _D(str(body.net_amount))
-    vat   = _D(str(body.vat_percentage))
+    net = _D(str(body.net_amount))
+    vat = _D(str(body.vat_percentage))
     total = (net * (1 + vat / _D("100"))).quantize(_D("0.01"))
     vat_amount = (total - net).quantize(_D("0.01"))
 
@@ -511,19 +548,23 @@ def create_manual_receipt(
 
 @app.post("/receipts/upload/stream", tags=["receipts"])
 async def upload_receipt_stream(
-    file:                Annotated[UploadFile, File(description="Receipt PDF or image")],
-    receipt_type:        str           = Query(default="purchase", enum=["purchase", "sale"]),
-    db:                  Optional[str] = Query(default=None, description="DB file path"),
-    taxpayer_name:       Optional[str] = Query(default=None, description="Taxpayer's own name"),
-    taxpayer_vat_id:     Optional[str] = Query(default=None, description="Taxpayer's own VAT ID"),
-    taxpayer_tax_number: Optional[str] = Query(default=None, description="Taxpayer's own tax number"),
-    taxpayer_address:    Optional[str] = Query(default=None, description="Taxpayer's own composite address (legacy, unused)"),
-    taxpayer_street:              Optional[str] = Query(default=None, description="Taxpayer's own street & number"),
-    taxpayer_address_supplement: Optional[str] = Query(default=None, description="Taxpayer's own address supplement"),
-    taxpayer_postcode:           Optional[str] = Query(default=None, description="Taxpayer's own postcode"),
-    taxpayer_city:       Optional[str] = Query(default=None, description="Taxpayer's own city"),
-    taxpayer_state:      Optional[str] = Query(default=None, description="Taxpayer's own state/region"),
-    taxpayer_country:    Optional[str] = Query(default=None, description="Taxpayer's own country"),
+    file: Annotated[UploadFile, File(description="Receipt PDF or image")],
+    receipt_type: str = Query(default="purchase", enum=["purchase", "sale"]),
+    db: str | None = Query(default=None, description="DB file path"),
+    taxpayer_name: str | None = Query(default=None, description="Taxpayer's own name"),
+    taxpayer_vat_id: str | None = Query(default=None, description="Taxpayer's own VAT ID"),
+    taxpayer_tax_number: str | None = Query(default=None, description="Taxpayer's own tax number"),
+    taxpayer_address: str | None = Query(
+        default=None, description="Taxpayer's own composite address (legacy, unused)"
+    ),
+    taxpayer_street: str | None = Query(default=None, description="Taxpayer's own street & number"),
+    taxpayer_address_supplement: str | None = Query(
+        default=None, description="Taxpayer's own address supplement"
+    ),
+    taxpayer_postcode: str | None = Query(default=None, description="Taxpayer's own postcode"),
+    taxpayer_city: str | None = Query(default=None, description="Taxpayer's own city"),
+    taxpayer_state: str | None = Query(default=None, description="Taxpayer's own state/region"),
+    taxpayer_country: str | None = Query(default=None, description="Taxpayer's own country"),
 ):
     """Upload a receipt and stream back Server-Sent Events with progress and result.
 
@@ -542,43 +583,55 @@ async def upload_receipt_stream(
 
     from finamt import progress as _progress
 
-    layout  = _resolve_layout(db)
+    layout = _resolve_layout(db)
     db_path = layout.db_path
-    suffix  = Path(file.filename or "receipt").suffix or ".pdf"
+    suffix = Path(file.filename or "receipt").suffix or ".pdf"
 
     file_bytes = await file.read()
 
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
-    _taxpayer_info: Optional[dict] = None
-    if any([taxpayer_name, taxpayer_vat_id, taxpayer_tax_number,
-            taxpayer_address, taxpayer_street, taxpayer_address_supplement,
-            taxpayer_postcode, taxpayer_city, taxpayer_state, taxpayer_country]):
+    _taxpayer_info: dict | None = None
+    if any(
+        [
+            taxpayer_name,
+            taxpayer_vat_id,
+            taxpayer_tax_number,
+            taxpayer_address,
+            taxpayer_street,
+            taxpayer_address_supplement,
+            taxpayer_postcode,
+            taxpayer_city,
+            taxpayer_state,
+            taxpayer_country,
+        ]
+    ):
         _taxpayer_info = {
-            "name":       taxpayer_name       or "",
-            "vat_id":     taxpayer_vat_id     or "",
+            "name": taxpayer_name or "",
+            "vat_id": taxpayer_vat_id or "",
             "tax_number": taxpayer_tax_number or "",
-            "address":    taxpayer_address    or "",
-            "street":              taxpayer_street              or "",
-            "address_supplement": taxpayer_address_supplement  or "",
-            "postcode":           taxpayer_postcode            or "",
-            "city":       taxpayer_city       or "",
-            "state":      taxpayer_state      or "",
-            "country":    taxpayer_country    or "",
+            "address": taxpayer_address or "",
+            "street": taxpayer_street or "",
+            "address_supplement": taxpayer_address_supplement or "",
+            "postcode": taxpayer_postcode or "",
+            "city": taxpayer_city or "",
+            "state": taxpayer_state or "",
+            "country": taxpayer_country or "",
         }
 
     def _run() -> None:
         import tempfile as _tf
+
         with _tf.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(file_bytes)
             tmp_path = Path(tmp.name)
         try:
-            _progress.set_callback(
-                lambda msg: loop.call_soon_threadsafe(queue.put_nowait, msg)
+            _progress.set_callback(lambda msg: loop.call_soon_threadsafe(queue.put_nowait, msg))
+            agent = FinanceAgent(db_path=db_path)
+            result = agent.process_receipt(
+                tmp_path, receipt_type=receipt_type, taxpayer_info=_taxpayer_info
             )
-            agent  = FinanceAgent(db_path=db_path)
-            result = agent.process_receipt(tmp_path, receipt_type=receipt_type, taxpayer_info=_taxpayer_info)
         except Exception as exc:
             _progress.clear_callback()
             tmp_path.unlink(missing_ok=True)
@@ -615,11 +668,11 @@ async def upload_receipt_stream(
             if item is None:
                 break
             if item.startswith("__result__:"):
-                payload = item[len("__result__:"):]
+                payload = item[len("__result__:") :]
                 yield f"event: result\ndata: {payload}\n\n"
                 break
             if item.startswith("__error__:"):
-                payload = item[len("__error__:"):]
+                payload = item[len("__error__:") :]
                 yield f"event: error\ndata: {json.dumps(payload)}\n\n"
                 break
             yield f"event: progress\ndata: {json.dumps(item)}\n\n"
@@ -636,9 +689,9 @@ async def upload_receipt_stream(
 
 @app.post("/receipts/upload", status_code=status.HTTP_201_CREATED, tags=["receipts"])
 async def upload_receipt(
-    file:         Annotated[UploadFile, File(description="Receipt PDF or image")],
-    receipt_type: str           = Query(default="purchase", enum=["purchase", "sale"]),
-    db:           Optional[str] = Query(default=None, description="DB file path"),
+    file: Annotated[UploadFile, File(description="Receipt PDF or image")],
+    receipt_type: str = Query(default="purchase", enum=["purchase", "sale"]),
+    db: str | None = Query(default=None, description="DB file path"),
 ):
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
@@ -648,9 +701,9 @@ async def upload_receipt(
     if not _LIB_AVAILABLE:
         raise HTTPException(status_code=503, detail="finamt library not installed.")
 
-    layout  = _resolve_layout(db)
+    layout = _resolve_layout(db)
     db_path = layout.db_path
-    suffix  = Path(file.filename or "receipt").suffix or ".pdf"
+    suffix = Path(file.filename or "receipt").suffix or ".pdf"
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(await file.read())
@@ -660,7 +713,7 @@ async def upload_receipt(
         # Pass db_path explicitly so FinanceAgent uses this exact layout.
         # layout_from_db_path in agent.py will re-derive the project folder
         # correctly from the path we resolved above.
-        agent  = FinanceAgent(db_path=db_path)
+        agent = FinanceAgent(db_path=db_path)
         result = agent.process_receipt(tmp_path, receipt_type=receipt_type)
     finally:
         tmp_path.unlink(missing_ok=True)
@@ -680,21 +733,22 @@ async def upload_receipt(
 
 @app.get("/receipts", tags=["receipts"])
 def list_receipts(
-    receipt_type: Optional[str] = Query(default=None, alias="type", enum=["purchase", "sale"]),
-    category:     Optional[str] = Query(default=None),
-    quarter:      Optional[int] = Query(default=None, ge=1, le=4),
-    year:         Optional[int] = Query(default=None, ge=2000, le=2100),
-    db:           Optional[str] = Query(default=None),
+    receipt_type: str | None = Query(default=None, alias="type", enum=["purchase", "sale"]),
+    category: str | None = Query(default=None),
+    quarter: int | None = Query(default=None, ge=1, le=4),
+    year: int | None = Query(default=None, ge=2000, le=2100),
+    db: str | None = Query(default=None),
 ):
     db_path = _resolve_db(db)
     if not db_path.exists():
         return {"receipts": [], "total": 0}
     with _repo(db_path) as repo:
         if quarter and year:
-            starts = {1: (1,1), 2: (4,1), 3: (7,1), 4: (10,1)}
-            ends   = {1: (3,31), 2: (6,30), 3: (9,30), 4: (12,31)}
-            ms, ds = starts[quarter]; me, de = ends[quarter]
-            receipts = list(repo.find_by_period(date(year,ms,ds), date(year,me,de)))
+            starts = {1: (1, 1), 2: (4, 1), 3: (7, 1), 4: (10, 1)}
+            ends = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
+            ms, ds = starts[quarter]
+            me, de = ends[quarter]
+            receipts = list(repo.find_by_period(date(year, ms, ds), date(year, me, de)))
         elif receipt_type:
             receipts = list(repo.find_by_type(receipt_type))
         elif category:
@@ -709,12 +763,12 @@ def list_receipts(
 
     return {
         "receipts": [_receipt_to_response(r, db_path) for r in receipts],
-        "total":    len(receipts),
+        "total": len(receipts),
     }
 
 
 @app.get("/receipts/{receipt_id}", tags=["receipts"])
-def get_receipt(receipt_id: str, db: Optional[str] = Query(default=None)):
+def get_receipt(receipt_id: str, db: str | None = Query(default=None)):
     db_path = _resolve_db(db)
     _require_db(db_path)
     with _repo(db_path) as repo:
@@ -725,9 +779,9 @@ def get_receipt(receipt_id: str, db: Optional[str] = Query(default=None)):
 
 
 @app.get("/receipts/{receipt_id}/pdf", tags=["receipts"])
-def get_receipt_pdf(receipt_id: str, db: Optional[str] = Query(default=None)):
+def get_receipt_pdf(receipt_id: str, db: str | None = Query(default=None)):
     db_path = _resolve_db(db)
-    stored  = _find_stored_file(receipt_id, db_path)
+    stored = _find_stored_file(receipt_id, db_path)
     if not stored:
         raise HTTPException(status_code=404, detail="File not found.")
     mime = _EXT_MIME.get(stored.suffix.lower(), "application/octet-stream")
@@ -741,8 +795,8 @@ def get_receipt_pdf(receipt_id: str, db: Optional[str] = Query(default=None)):
 @app.patch("/receipts/{receipt_id}", tags=["receipts"])
 def update_receipt(
     receipt_id: str,
-    fields:     dict,
-    db:         Optional[str] = Query(default=None),
+    fields: dict,
+    db: str | None = Query(default=None),
 ):
     db_path = _resolve_db(db)
     with _repo(db_path) as repo:
@@ -754,7 +808,7 @@ def update_receipt(
 
 
 @app.delete("/receipts/{receipt_id}", status_code=204, tags=["receipts"])
-def delete_receipt(receipt_id: str, db: Optional[str] = Query(default=None)):
+def delete_receipt(receipt_id: str, db: str | None = Query(default=None)):
     db_path = _resolve_db(db)
     with _repo(db_path) as repo:
         if not repo.delete(receipt_id):
@@ -765,7 +819,7 @@ def delete_receipt(receipt_id: str, db: Optional[str] = Query(default=None)):
 def reassign_receipt_counterparty(
     receipt_id: str,
     body: dict = Body(...),
-    db: Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """Find-or-create a counterparty by name/VAT-ID and link *only* this receipt to it.
 
@@ -792,8 +846,9 @@ def reassign_receipt_counterparty(
 # Tax
 # ---------------------------------------------------------------------------
 
+
 @app.get("/counterparties", tags=["counterparties"])
-def list_all_counterparties(db: Optional[str] = Query(default=None)):
+def list_all_counterparties(db: str | None = Query(default=None)):
     """Return every counterparty row (verified and unverified)."""
     db_path = _resolve_db(db)
     if not db_path.exists():
@@ -804,7 +859,7 @@ def list_all_counterparties(db: Optional[str] = Query(default=None)):
 
 
 @app.get("/counterparties/verified", tags=["counterparties"])
-def list_verified_counterparties(db: Optional[str] = Query(default=None)):
+def list_verified_counterparties(db: str | None = Query(default=None)):
     """Return deduplicated verified counterparties (one per VAT-ID or name)."""
     db_path = _resolve_db(db)
     if not db_path.exists():
@@ -815,7 +870,7 @@ def list_verified_counterparties(db: Optional[str] = Query(default=None)):
 
 
 @app.get("/counterparties/{cp_id}/defaults", tags=["counterparties"])
-def get_counterparty_defaults(cp_id: str, db: Optional[str] = Query(default=None)):
+def get_counterparty_defaults(cp_id: str, db: str | None = Query(default=None)):
     """Return the most-used category and subcategory for a given counterparty."""
     db_path = _resolve_db(db)
     if not db_path.exists():
@@ -825,7 +880,7 @@ def get_counterparty_defaults(cp_id: str, db: Optional[str] = Query(default=None
 
 
 @app.delete("/counterparties/{cp_id}", status_code=204, tags=["counterparties"])
-def delete_counterparty(cp_id: str, db: Optional[str] = Query(default=None)):
+def delete_counterparty(cp_id: str, db: str | None = Query(default=None)):
     """Permanently delete a counterparty row."""
     db_path = _resolve_db(db)
     with _repo(db_path) as repo:
@@ -837,7 +892,7 @@ def delete_counterparty(cp_id: str, db: Optional[str] = Query(default=None)):
 def update_counterparty(
     cp_id: str,
     body: dict = Body(...),
-    db: Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """Update name, tax_number, vat_id, verified, and address fields of a counterparty."""
     db_path = _resolve_db(db)
@@ -862,7 +917,7 @@ def update_counterparty(
 def set_counterparty_verified(
     cp_id: str,
     body: dict = Body(...),
-    db: Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """Set verified=true/false on a counterparty."""
     db_path = _resolve_db(db)
@@ -874,15 +929,16 @@ def set_counterparty_verified(
 
 @app.get("/tax/ustva", tags=["tax"])
 def get_ustva(
-    quarter: int           = Query(..., ge=1, le=4),
-    year:    int           = Query(..., ge=2000, le=2100),
-    db:      Optional[str] = Query(default=None),
+    quarter: int = Query(..., ge=1, le=4),
+    year: int = Query(..., ge=2000, le=2100),
+    db: str | None = Query(default=None),
 ):
     db_path = _resolve_db(db)
-    starts  = {1:(1,1),2:(4,1),3:(7,1),4:(10,1)}
-    ends    = {1:(3,31),2:(6,30),3:(9,30),4:(12,31)}
-    ms, ds  = starts[quarter]; me, de = ends[quarter]
-    start, end = date(year,ms,ds), date(year,me,de)
+    starts = {1: (1, 1), 2: (4, 1), 3: (7, 1), 4: (10, 1)}
+    ends = {1: (3, 31), 2: (6, 30), 3: (9, 30), 4: (12, 31)}
+    ms, ds = starts[quarter]
+    me, de = ends[quarter]
+    start, end = date(year, ms, ds), date(year, me, de)
 
     if not db_path.exists():
         return generate_ustva([], start, end).to_dict()
@@ -896,25 +952,26 @@ def get_ustva(
 # E-Bilanz XBRL
 # ---------------------------------------------------------------------------
 
+
 class EBilanzRequest(BaseModel):
-    year:               int
-    steuernummer:       str
-    elster_id:          str = ""   # 13-digit ELSTER number for XBRL context identifier
-    company_name:       str
-    legal_form:         str = "GmbH"
-    fiscal_year_start:  str = ""
-    fiscal_year_end:    str = ""
-    stammkapital:       float = 25000.0
+    year: int
+    steuernummer: str
+    elster_id: str = ""  # 13-digit ELSTER number for XBRL context identifier
+    company_name: str
+    legal_form: str = "GmbH"
+    fiscal_year_start: str = ""
+    fiscal_year_end: str = ""
+    stammkapital: float = 25000.0
     eingezahltes_kapital: float = 12500.0
-    vortrag:            float = 0.0
-    nettomethode:       bool  = True
-    preparer:           str = ""
+    vortrag: float = 0.0
+    nettomethode: bool = True
+    preparer: str = ""
 
 
 @app.post("/tax/ebilanz/xbrl", tags=["tax"])
 def post_ebilanz_xbrl(
     body: EBilanzRequest,
-    db:   Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """
     Generate an E-Bilanz XBRL instance document (§ 5b EStG).
@@ -925,13 +982,13 @@ def post_ebilanz_xbrl(
     if not _LIB_AVAILABLE:
         raise HTTPException(status_code=503, detail="finamt library not available")
 
-    from decimal import Decimal
     from datetime import date as _date
+    from decimal import Decimal
 
-    year     = body.year
-    db_path  = _resolve_db(db)
-    start    = _date(year, 1, 1)
-    end      = _date(year, 12, 31)
+    year = body.year
+    db_path = _resolve_db(db)
+    start = _date(year, 1, 1)
+    end = _date(year, 12, 31)
 
     receipts = []
     if db_path.exists():
@@ -940,13 +997,13 @@ def post_ebilanz_xbrl(
             receipts = list(repo.find_by_period(_date(2000, 1, 1), end))
 
     cfg = EBilanzConfig(
-        steuernummer      = body.steuernummer,
-        elster_id         = body.elster_id,
-        company_name      = body.company_name,
-        legal_form        = body.legal_form,
-        fiscal_year_start = body.fiscal_year_start or str(start),
-        fiscal_year_end   = body.fiscal_year_end   or str(end),
-        preparer          = body.preparer,
+        steuernummer=body.steuernummer,
+        elster_id=body.elster_id,
+        company_name=body.company_name,
+        legal_form=body.legal_form,
+        fiscal_year_start=body.fiscal_year_start or str(start),
+        fiscal_year_end=body.fiscal_year_end or str(end),
+        preparer=body.preparer,
     )
 
     jab = generate_jahresabschluss(
@@ -961,7 +1018,7 @@ def post_ebilanz_xbrl(
     try:
         xml_bytes = build_xbrl(jab, cfg)
     except ImportError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     filename = f"ebilanz_{year}_{body.steuernummer.replace('/', '-')}.xbrl"
     return StreamingResponse(
@@ -973,16 +1030,17 @@ def post_ebilanz_xbrl(
 
 class EBilanzEnvelopeRequest(EBilanzRequest):
     """Minimal request for building the ELSTER envelope (no ERiC / cert needed)."""
+
     bundesland_kz: str = ""
     hersteller_id: str = ""
-    finanzamt_nr:  str = ""
-    use_test:      bool = True
+    finanzamt_nr: str = ""
+    use_test: bool = True
 
 
 @app.post("/tax/ebilanz/envelope", tags=["tax"])
 def post_ebilanz_envelope(
     body: EBilanzEnvelopeRequest,
-    db:   Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """
     Build the E-Bilanz XBRL and wrap it in the ELSTER transmission envelope —
@@ -996,15 +1054,16 @@ def post_ebilanz_envelope(
         raise HTTPException(status_code=503, detail="finamt library not available")
 
     import os as _os
-    from decimal import Decimal
     from datetime import date as _date
-    from finamt.tax.elster import ElsterConfig, EBilanzEnvelopeBuilder
+    from decimal import Decimal
 
-    year    = body.year
-    layout  = _resolve_layout(db)
+    from finamt.tax.elster import EBilanzEnvelopeBuilder, ElsterConfig
+
+    year = body.year
+    layout = _resolve_layout(db)
     db_path = layout.db_path
-    start   = _date(year, 1, 1)
-    end     = _date(year, 12, 31)
+    start = _date(year, 1, 1)
+    end = _date(year, 12, 31)
 
     receipts = []
     if db_path.exists():
@@ -1012,13 +1071,13 @@ def post_ebilanz_envelope(
             receipts = list(repo.find_by_period(_date(2000, 1, 1), end))
 
     cfg = EBilanzConfig(
-        steuernummer      = body.steuernummer,
-        elster_id         = body.elster_id,
-        company_name      = body.company_name,
-        legal_form        = body.legal_form,
-        fiscal_year_start = body.fiscal_year_start or str(start),
-        fiscal_year_end   = body.fiscal_year_end   or str(end),
-        preparer          = body.preparer,
+        steuernummer=body.steuernummer,
+        elster_id=body.elster_id,
+        company_name=body.company_name,
+        legal_form=body.legal_form,
+        fiscal_year_start=body.fiscal_year_start or str(start),
+        fiscal_year_end=body.fiscal_year_end or str(end),
+        preparer=body.preparer,
     )
 
     jab = generate_jahresabschluss(
@@ -1033,15 +1092,13 @@ def post_ebilanz_envelope(
     try:
         xbrl_bytes = build_xbrl(jab, cfg)
     except ImportError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     # ── Resolve bundesland_kz ──────────────────────────────────────────
-    bundesland_kz = (
-        body.bundesland_kz
-        or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
-    )
+    bundesland_kz = body.bundesland_kz or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
     if not bundesland_kz and db_path.exists():
         from finamt.tax.elster import bundesland_kz_from_city as _bkz
+
         with _repo(db_path) as _r:
             _tp = _r.get_metadata("taxpayer") or {}
         for _field in ("state", "city"):
@@ -1052,18 +1109,29 @@ def post_ebilanz_envelope(
     # Last resort: derive from steuernummer prefix
     if not bundesland_kz and len(body.steuernummer) >= 2:
         _prefix_map = {
-            "11": "BE", "12": "BB", "28": "HB", "20": "HH", "06": "HE",
-            "13": "MV", "23": "NI", "10": "SL", "09": "BY", "08": "BW",
-            "05": "NW", "07": "RP", "03": "NI", "04": "HH", "01": "SH",
-            "14": "SN", "15": "ST", "16": "TH",
+            "11": "BE",
+            "12": "BB",
+            "28": "HB",
+            "20": "HH",
+            "06": "HE",
+            "13": "MV",
+            "23": "NI",
+            "10": "SL",
+            "09": "BY",
+            "08": "BW",
+            "05": "NW",
+            "07": "RP",
+            "03": "NI",
+            "04": "HH",
+            "01": "SH",
+            "14": "SN",
+            "15": "ST",
+            "16": "TH",
         }
         bundesland_kz = _prefix_map.get(body.steuernummer[:2], "")
 
     # ── Resolve hersteller_id ──────────────────────────────────────────
-    hersteller_id = (
-        body.hersteller_id
-        or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
-    )
+    hersteller_id = body.hersteller_id or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
     if not hersteller_id and db_path.exists():
         with _repo(db_path) as _r:
             _misc = _r.get_metadata("elster_misc") or {}
@@ -1072,18 +1140,15 @@ def post_ebilanz_envelope(
         hersteller_id = "00000"  # preview placeholder — no ERiC call made
 
     # ── Resolve finanzamt_nr ───────────────────────────────────────────
-    finanzamt_nr = (
-        body.finanzamt_nr
-        or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
-    )
+    finanzamt_nr = body.finanzamt_nr or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
 
     elster_cfg = ElsterConfig(
-        cert_path     = "",
-        cert_password = "",
-        steuernummer  = body.steuernummer,
-        finanzamt_nr  = finanzamt_nr,
-        bundesland_kz = bundesland_kz,
-        hersteller_id = hersteller_id,
+        cert_path="",
+        cert_password="",
+        steuernummer=body.steuernummer,
+        finanzamt_nr=finanzamt_nr,
+        bundesland_kz=bundesland_kz,
+        hersteller_id=hersteller_id,
     )
 
     try:
@@ -1091,7 +1156,7 @@ def post_ebilanz_envelope(
             xbrl_bytes, year=year, use_test=body.use_test
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     filename = f"elster_envelope_{year}_{body.steuernummer.replace('/', '-')}.xml"
     return StreamingResponse(
@@ -1102,24 +1167,24 @@ def post_ebilanz_envelope(
 
 
 @app.get("/tax/ebilanz/settings", tags=["tax"])
-def get_ebilanz_settings(db: Optional[str] = Query(default=None)):
+def get_ebilanz_settings(db: str | None = Query(default=None)):
     """Return all persisted ELSTER settings for this project."""
     layout = _resolve_layout(db)
     if not layout.db_path.exists():
         return {"eric_home": None, "elster_id": None, "cert_pin": None, "hersteller_id": None}
     with _repo(layout.db_path) as repo:
-        eric  = repo.get_metadata("elster_eric_home") or {}
-        misc  = repo.get_metadata("elster_misc") or {}
+        eric = repo.get_metadata("elster_eric_home") or {}
+        misc = repo.get_metadata("elster_misc") or {}
     return {
-        "eric_home":     eric.get("path") or None,
-        "elster_id":     misc.get("elster_id") or None,
-        "cert_pin":      misc.get("cert_pin") or None,
+        "eric_home": eric.get("path") or None,
+        "elster_id": misc.get("elster_id") or None,
+        "cert_pin": misc.get("cert_pin") or None,
         "hersteller_id": misc.get("hersteller_id") or None,
     }
 
 
 @app.post("/tax/ebilanz/settings", status_code=200, tags=["tax"])
-def post_ebilanz_settings(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+def post_ebilanz_settings(body: dict = Body(...), db: str | None = Query(default=None)):
     """Persist ELSTER misc settings (elster_id, cert_pin) in the project DB."""
     layout = _resolve_layout(db)
     layout.create_dirs()
@@ -1136,7 +1201,7 @@ def post_ebilanz_settings(body: dict = Body(...), db: Optional[str] = Query(defa
 
 
 @app.get("/tax/ebilanz/eric-home", tags=["tax"])
-def get_ebilanz_eric_home(db: Optional[str] = Query(default=None)):
+def get_ebilanz_eric_home(db: str | None = Query(default=None)):
     """Return the ERiC lib/ path stored for this project (if any)."""
     layout = _resolve_layout(db)
     if not layout.db_path.exists():
@@ -1148,7 +1213,7 @@ def get_ebilanz_eric_home(db: Optional[str] = Query(default=None)):
 
 
 @app.post("/tax/ebilanz/eric-home", status_code=200, tags=["tax"])
-def post_ebilanz_eric_home(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+def post_ebilanz_eric_home(body: dict = Body(...), db: str | None = Query(default=None)):
     """Persist the ERiC lib/ path in the project database."""
     path = (body or {}).get("eric_home", "").strip()
     if not path:
@@ -1161,27 +1226,28 @@ def post_ebilanz_eric_home(body: dict = Body(...), db: Optional[str] = Query(def
 
 
 @app.get("/tax/ebilanz/cert", tags=["tax"])
-def get_ebilanz_cert(db: Optional[str] = Query(default=None)):
+def get_ebilanz_cert(db: str | None = Query(default=None)):
     """Check whether a stored ELSTER certificate (.pfx) exists for this project."""
     layout = _resolve_layout(db)
-    cert   = layout.root / "elster_cert.pfx"
+    cert = layout.root / "elster_cert.pfx"
     return {"stored": cert.exists(), "path": str(cert) if cert.exists() else None}
 
 
 @app.post("/tax/ebilanz/cert", status_code=200, tags=["tax"])
-def post_ebilanz_cert(body: dict = Body(...), db: Optional[str] = Query(default=None)):
+def post_ebilanz_cert(body: dict = Body(...), db: str | None = Query(default=None)):
     """
     Persist an ELSTER certificate (.pfx) in the project folder
     (~/.finamt/{project}/elster_cert.pfx).  Accepts base64-encoded bytes
     so the browser does not have to perform a multipart upload.
     """
     import base64 as _b64
+
     cert_b64 = (body or {}).get("cert_data_b64", "")
     if not cert_b64:
         raise HTTPException(status_code=400, detail="cert_data_b64 is required")
     layout = _resolve_layout(db)
     layout.create_dirs()
-    raw  = _b64.b64decode(cert_b64)
+    raw = _b64.b64decode(cert_b64)
     dest = layout.root / "elster_cert.pfx"
     dest.write_bytes(raw)
     return {"stored": True, "path": str(dest)}
@@ -1192,25 +1258,26 @@ class EBilanzSubmitRequest(EBilanzRequest):
     Extended E-Bilanz request body that also carries the ERIC / certificate
     parameters needed for transmission.
     """
+
     # ERiC library home dir — defaults to FINAMT_ERIC_HOME env var
-    eric_home:      Optional[str] = None
+    eric_home: str | None = None
     # Certificate — either a server-side path OR base64-encoded bytes from the browser
-    cert_path:      Optional[str] = None
-    cert_data_b64:  Optional[str] = None   # base64 .pfx uploaded by the browser
-    cert_password:  Optional[str] = None
+    cert_path: str | None = None
+    cert_data_b64: str | None = None  # base64 .pfx uploaded by the browser
+    cert_password: str | None = None
     # Steuernummer for ElsterConfig (already in EBilanzRequest as steuernummer)
-    finanzamt_nr:   str = ""
-    bundesland_kz:  str = ""
-    hersteller_id:  str = ""
+    finanzamt_nr: str = ""
+    bundesland_kz: str = ""
+    hersteller_id: str = ""
     # Submission mode
-    use_test:       bool = True
-    validate_only:  bool = False
+    use_test: bool = True
+    validate_only: bool = False
 
 
 @app.post("/tax/ebilanz/submit", tags=["tax"])
 def post_ebilanz_submit(
     body: EBilanzSubmitRequest,
-    db:   Optional[str] = Query(default=None),
+    db: str | None = Query(default=None),
 ):
     """
     Build the E-Bilanz XBRL, wrap it in the ELSTER envelope, and transmit
@@ -1231,30 +1298,27 @@ def post_ebilanz_submit(
     if not _LIB_AVAILABLE:
         raise HTTPException(status_code=503, detail="finamt library not available")
 
-    from decimal import Decimal
     from datetime import date as _date
+    from decimal import Decimal
+
     from finamt.tax.elster import ElsterConfig, ElsterEricClient
 
-    year   = body.year
+    year = body.year
     layout = _resolve_layout(db)
     db_path = layout.db_path
-    start   = _date(year, 1, 1)
-    end     = _date(year, 12, 31)
+    start = _date(year, 1, 1)
+    end = _date(year, 12, 31)
     eric_log_dir = str(layout.root / "eric_logs")
 
     # ── Resolve ERiC home ──────────────────────────────────────────────
-    def _load_stored_eric() -> Optional[str]:
+    def _load_stored_eric() -> str | None:
         if not layout.db_path.exists():
             return None
         with _repo(layout.db_path) as _r:
             _m = _r.get_metadata("elster_eric_home")
         return (_m or {}).get("path") or None
 
-    eric_home = (
-        body.eric_home
-        or _os.environ.get("FINAMT_ERIC_HOME")
-        or _load_stored_eric()
-    )
+    eric_home = body.eric_home or _os.environ.get("FINAMT_ERIC_HOME") or _load_stored_eric()
     # Persist whenever the user supplies a value (so it auto-loads next time)
     if body.eric_home:
         layout.create_dirs()
@@ -1271,28 +1335,14 @@ def post_ebilanz_submit(
 
     # ── Resolve certificate ────────────────────────────────────────────
     import base64 as _b64
+
     stored_cert = layout.root / "elster_cert.pfx"
 
-    cert_path = (
-        body.cert_path
-        or _os.environ.get("FINAMT_ELSTER_CERT_PATH")
-    )
-    cert_password = (
-        body.cert_password
-        or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
-    )
-    finanzamt_nr = (
-        body.finanzamt_nr
-        or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
-    )
-    bundesland_kz = (
-        body.bundesland_kz
-        or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
-    )
-    hersteller_id = (
-        body.hersteller_id
-        or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
-    )
+    cert_path = body.cert_path or _os.environ.get("FINAMT_ELSTER_CERT_PATH")
+    cert_password = body.cert_password or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
+    finanzamt_nr = body.finanzamt_nr or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
+    bundesland_kz = body.bundesland_kz or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
+    hersteller_id = body.hersteller_id or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
     # Fallback: load from stored settings
     if not hersteller_id and db_path.exists():
         with _repo(db_path) as _r:
@@ -1311,6 +1361,7 @@ def post_ebilanz_submit(
     # Last-resort: derive from the taxpayer profile city/state stored in the DB
     if not bundesland_kz and db_path.exists():
         from finamt.tax.elster import bundesland_kz_from_city as _bkz_from_city
+
         with _repo(db_path) as _r:
             _tp = _r.get_metadata("taxpayer") or {}
         for _field in ("state", "city"):
@@ -1346,13 +1397,13 @@ def post_ebilanz_submit(
 
     # ── Build XBRL ───────────────────────────────────────────────────
     cfg_xbrl = EBilanzConfig(
-        steuernummer      = body.steuernummer,
-        elster_id         = body.elster_id,
-        company_name      = body.company_name,
-        legal_form        = body.legal_form,
-        fiscal_year_start = body.fiscal_year_start or str(start),
-        fiscal_year_end   = body.fiscal_year_end   or str(end),
-        preparer          = body.preparer,
+        steuernummer=body.steuernummer,
+        elster_id=body.elster_id,
+        company_name=body.company_name,
+        legal_form=body.legal_form,
+        fiscal_year_start=body.fiscal_year_start or str(start),
+        fiscal_year_end=body.fiscal_year_end or str(end),
+        preparer=body.preparer,
     )
 
     jab = generate_jahresabschluss(
@@ -1367,23 +1418,23 @@ def post_ebilanz_submit(
     try:
         xbrl_bytes = build_xbrl(jab, cfg_xbrl)
     except ImportError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     # ── ElsterConfig for ElsterEricClient ─────────────────────────────
     elster_cfg = ElsterConfig(
-        cert_path     = cert_path,
-        cert_password = cert_password,
-        steuernummer  = body.steuernummer,
-        finanzamt_nr  = finanzamt_nr,
-        bundesland_kz = bundesland_kz,
-        hersteller_id = hersteller_id,
+        cert_path=cert_path,
+        cert_password=cert_password,
+        steuernummer=body.steuernummer,
+        finanzamt_nr=finanzamt_nr,
+        bundesland_kz=bundesland_kz,
+        hersteller_id=hersteller_id,
     )
 
     client = ElsterEricClient(
-        config    = elster_cfg,
-        eric_home = eric_home,
-        use_test  = body.use_test,
-        log_dir   = eric_log_dir,
+        config=elster_cfg,
+        eric_home=eric_home,
+        use_test=body.use_test,
+        log_dir=eric_log_dir,
     )
 
     # ── Validate or submit ────────────────────────────────────────────
@@ -1393,12 +1444,12 @@ def post_ebilanz_submit(
         result = client.submit_ebilanz(xbrl_bytes, year=year)
 
     return {
-        "success":       result.success,
-        "telenummer":    result.telenummer,
-        "error_code":    result.error_code,
+        "success": result.success,
+        "telenummer": result.telenummer,
+        "error_code": result.error_code,
         "error_message": result.error_message,
         "validate_only": body.validate_only,
-        "use_test":      body.use_test,
+        "use_test": body.use_test,
     }
 
 
@@ -1420,6 +1471,7 @@ if STATIC_DIR.exists() and any(STATIC_DIR.iterdir()):
             return FileResponse(file_path)
         return FileResponse(STATIC_DIR / "index.html")
 else:
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_not_built(full_path: str):
         return {"error": "Frontend not built yet."}

@@ -3,15 +3,14 @@ tests/test_project.py
 ~~~~~~~~~~~~~~~~~~~~~~
 Tests for finamt.storage.project — ProjectLayout and resolution helpers.
 """
-from __future__ import annotations
 
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
 from finamt.storage.project import (
-    FINAMT_HOME,
     DEFAULT_PROJECT,
+    FINAMT_HOME,
     ProjectLayout,
     layout_from_db_path,
     list_projects,
@@ -19,10 +18,10 @@ from finamt.storage.project import (
     validate_project_name,
 )
 
-
 # ---------------------------------------------------------------------------
 # resolve_project
 # ---------------------------------------------------------------------------
+
 
 class TestResolveProject:
     def test_no_args_returns_default(self):
@@ -54,6 +53,7 @@ class TestResolveProject:
 # ---------------------------------------------------------------------------
 # ProjectLayout properties
 # ---------------------------------------------------------------------------
+
 
 class TestProjectLayout:
     def _layout(self, name="myproject"):
@@ -105,11 +105,13 @@ class TestProjectLayout:
 # layout_from_db_path
 # ---------------------------------------------------------------------------
 
+
 class TestLayoutFromDbPath:
     def test_standard_path_extracts_project_name(self, tmp_path, monkeypatch):
         """~/.finamt/<name>/finamt.db should resolve to project name == <name>"""
         # Monkeypatch FINAMT_HOME to tmp_path
         import finamt.storage.project as proj_mod
+
         monkeypatch.setattr(proj_mod, "FINAMT_HOME", tmp_path)
         db = tmp_path / "myproject" / "finamt.db"
         db.parent.mkdir(parents=True)
@@ -128,6 +130,7 @@ class TestLayoutFromDbPath:
 # ---------------------------------------------------------------------------
 # validate_project_name
 # ---------------------------------------------------------------------------
+
 
 class TestValidateProjectName:
     @pytest.mark.parametrize("name", ["default", "my-project", "acme2025", "a", "a_b"])
@@ -149,26 +152,30 @@ class TestValidateProjectName:
 # list_projects
 # ---------------------------------------------------------------------------
 
+
 class TestListProjects:
     def test_empty_when_no_home(self, tmp_path, monkeypatch):
         import finamt.storage.project as proj_mod
+
         monkeypatch.setattr(proj_mod, "FINAMT_HOME", tmp_path / "nonexistent")
         assert list_projects() == []
 
     def test_lists_project_subdirs(self, tmp_path, monkeypatch):
         import finamt.storage.project as proj_mod
+
         monkeypatch.setattr(proj_mod, "FINAMT_HOME", tmp_path)
         (tmp_path / "default").mkdir()
         (tmp_path / "proj-a").mkdir()
         (tmp_path / "proj-b").mkdir()
         layouts = list_projects()
-        names = [l.name for l in layouts]
+        names = [p.name for p in layouts]
         assert names[0] == "default"
         assert "proj-a" in names
         assert "proj-b" in names
 
     def test_default_sorted_first(self, tmp_path, monkeypatch):
         import finamt.storage.project as proj_mod
+
         monkeypatch.setattr(proj_mod, "FINAMT_HOME", tmp_path)
         for name in ("zzz", "aaa", "default"):
             (tmp_path / name).mkdir()
@@ -177,8 +184,9 @@ class TestListProjects:
 
     def test_files_not_included(self, tmp_path, monkeypatch):
         import finamt.storage.project as proj_mod
+
         monkeypatch.setattr(proj_mod, "FINAMT_HOME", tmp_path)
         (tmp_path / "proj").mkdir()
         (tmp_path / "some-file.txt").touch()
         layouts = list_projects()
-        assert all(l.name != "some-file.txt" for l in layouts)
+        assert all(p.name != "some-file.txt" for p in layouts)

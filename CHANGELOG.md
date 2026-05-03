@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.17.2 (2026-05-03)
+
+### Tooling / code quality
+
+- **Linting: Black + flake8 → Ruff** — dev dependencies replaced with `ruff>=0.4`; `[tool.ruff]` config added to `pyproject.toml` (rules: E, W, F, I, UP, B, C4; `line-length = 100`).
+- **30 lint errors fixed** across `src/` and `tests/`: unused imports (F401), trailing whitespace (W291), ambiguous variable names (E741), unused variables (F841), missing `from exc` on re-raises (B904), over-broad `pytest.raises(Exception)` (B017), `dict()` → `{}` literal (C408), and minor B007/B008 issues.
+
 ## Version 0.17.1 (2026-04-26)
 
 ### New features / improvements

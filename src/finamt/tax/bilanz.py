@@ -55,11 +55,11 @@ Usage::
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
-from typing import Iterable
 
 from ..models import ReceiptData
 
@@ -78,6 +78,7 @@ def _to_date(dt: date | datetime) -> date:
 # ---------------------------------------------------------------------------
 # Bilanz
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Bilanz:
@@ -106,30 +107,30 @@ class Bilanz:
     year: int
 
     # --- Aktiva ---
-    anlagevermögen:         Decimal = _ZERO   # Konto 0xxx (SKR04)
-    vorräte:                Decimal = _ZERO   # Konto 1xxx
-    forderungen:            Decimal = _ZERO   # Konto 1200 (not auto-derived)
-    kassenbestand:          Decimal = _ZERO   # Konto 1600/1800
-    ausstehende_einlagen:   Decimal = _ZERO   # Konto 0200 (§ 272 I HGB)
-    aktive_rap:             Decimal = _ZERO   # Konto 0980
+    anlagevermögen: Decimal = _ZERO  # Konto 0xxx (SKR04)
+    vorräte: Decimal = _ZERO  # Konto 1xxx
+    forderungen: Decimal = _ZERO  # Konto 1200 (not auto-derived)
+    kassenbestand: Decimal = _ZERO  # Konto 1600/1800
+    ausstehende_einlagen: Decimal = _ZERO  # Konto 0200 (§ 272 I HGB)
+    aktive_rap: Decimal = _ZERO  # Konto 0980
 
     # --- Passiva ---
-    stammkapital:               Decimal = _ZERO   # Konto 2900
-    kapitalrücklage:            Decimal = _ZERO   # Konto 2910
-    jahresergebnis:             Decimal = _ZERO   # computed
-    gewinnvortrag:              Decimal = _ZERO   # from prior year
+    stammkapital: Decimal = _ZERO  # Konto 2900
+    kapitalrücklage: Decimal = _ZERO  # Konto 2910
+    jahresergebnis: Decimal = _ZERO  # computed
+    gewinnvortrag: Decimal = _ZERO  # from prior year
     # § 272 Abs. 1 S. 2 HGB — Nettomethode: non-called-up outstanding contributions
     # deducted from equity on the Passiva side (leaves Aktiva = Kassenbestand only).
     # With Bruttomethode (nettomethode=False) this stays _ZERO; instead
     # ausstehende_einlagen appears on the Aktiva side.
     nicht_eingeforderte_einlagen: Decimal = _ZERO  # Konto 2901 deduction
-    rückstellungen:             Decimal = _ZERO   # not auto-derived
-    verbindlichkeiten:          Decimal = _ZERO   # approx. from outstanding purchases
+    rückstellungen: Decimal = _ZERO  # not auto-derived
+    verbindlichkeiten: Decimal = _ZERO  # approx. from outstanding purchases
     # Net cash from tax_settlement / capital_movement receipts for the reporting year.
     # Positive = net refund / inflow (e.g. VAT refund from Finanzamt).
     # Shown as a separate Passiva line to keep the balance sheet balanced while
     # keeping these flows OUT of the GuV.
-    steuerpositionen:           Decimal = _ZERO
+    steuerpositionen: Decimal = _ZERO
 
     @property
     def summe_aktiva(self) -> Decimal:
@@ -146,7 +147,7 @@ class Bilanz:
     def summe_eigenkapital(self) -> Decimal:
         return _r(
             self.stammkapital
-            - self.nicht_eingeforderte_einlagen   # § 272 I S.2 HGB deduction
+            - self.nicht_eingeforderte_einlagen  # § 272 I S.2 HGB deduction
             + self.kapitalrücklage
             + self.jahresergebnis
             + self.gewinnvortrag
@@ -167,25 +168,27 @@ class Bilanz:
 
     def to_dict(self) -> dict:
         return {
-            "year":                  self.year,
+            "year": self.year,
             "aktiva": {
-                "anlagevermögen":        str(self.anlagevermögen),
-                "vorräte":               str(self.vorräte),
-                "forderungen":           str(self.forderungen),
-                "kassenbestand":         str(self.kassenbestand),
-                "ausstehende_einlagen":  str(self.ausstehende_einlagen),
-                "aktive_rap":            str(self.aktive_rap),
-                "summe_aktiva":          str(self.summe_aktiva),
+                "anlagevermögen": str(self.anlagevermögen),
+                "vorräte": str(self.vorräte),
+                "forderungen": str(self.forderungen),
+                "kassenbestand": str(self.kassenbestand),
+                "ausstehende_einlagen": str(self.ausstehende_einlagen),
+                "aktive_rap": str(self.aktive_rap),
+                "summe_aktiva": str(self.summe_aktiva),
             },
             "passiva": {
-                "stammkapital":                  str(self.stammkapital),
-                "kapitalrücklage":               str(self.kapitalrücklage),
-                "nicht_eingeforderte_einlagen":  str(self.nicht_eingeforderte_einlagen),
-                "jahresergebnis":                str(self.jahresergebnis),
-                "gewinnvortrag":                 str(self.gewinnvortrag),
-                "summe_eigenkapital":            str(self.summe_eigenkapital),
-                "rückstellungen":                str(self.rückstellungen),
-                "verbindlichkeiten":             str(self.verbindlichkeiten),                "steuerpositionen":             str(self.steuerpositionen),                "summe_passiva":                 str(self.summe_passiva),
+                "stammkapital": str(self.stammkapital),
+                "kapitalrücklage": str(self.kapitalrücklage),
+                "nicht_eingeforderte_einlagen": str(self.nicht_eingeforderte_einlagen),
+                "jahresergebnis": str(self.jahresergebnis),
+                "gewinnvortrag": str(self.gewinnvortrag),
+                "summe_eigenkapital": str(self.summe_eigenkapital),
+                "rückstellungen": str(self.rückstellungen),
+                "verbindlichkeiten": str(self.verbindlichkeiten),
+                "steuerpositionen": str(self.steuerpositionen),
+                "summe_passiva": str(self.summe_passiva),
             },
             "bilanz_ausgeglichen": self.bilanz_ausgeglichen,
         }
@@ -194,6 +197,7 @@ class Bilanz:
 # ---------------------------------------------------------------------------
 # Gewinn- und Verlustrechnung (GuV)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class GuV:
@@ -207,15 +211,15 @@ class GuV:
     year: int
 
     # Erträge (revenue)
-    umsatzerlöse:               Decimal = _ZERO   # Kz: sale invoices, net
-    sonstige_betriebserlöse:    Decimal = _ZERO   # other income not in sales
+    umsatzerlöse: Decimal = _ZERO  # Kz: sale invoices, net
+    sonstige_betriebserlöse: Decimal = _ZERO  # other income not in sales
 
     # Aufwendungen (expenses)
-    materialaufwand:            Decimal = _ZERO   # material + equipment purchases
-    personalaufwand:            Decimal = _ZERO   # salaries (not in receipts)
-    abschreibungen:             Decimal = _ZERO   # not auto-derived (requires AfA table)
-    sonstige_betriebsausgaben:  Decimal = _ZERO   # all other expense categories
-    zinsaufwendungen:           Decimal = _ZERO   # interest (not in receipts)
+    materialaufwand: Decimal = _ZERO  # material + equipment purchases
+    personalaufwand: Decimal = _ZERO  # salaries (not in receipts)
+    abschreibungen: Decimal = _ZERO  # not auto-derived (requires AfA table)
+    sonstige_betriebsausgaben: Decimal = _ZERO  # all other expense categories
+    zinsaufwendungen: Decimal = _ZERO  # interest (not in receipts)
 
     @property
     def gesamtleistung(self) -> Decimal:
@@ -238,17 +242,17 @@ class GuV:
 
     def to_dict(self) -> dict:
         return {
-            "year":                     self.year,
-            "umsatzerlöse":             str(self.umsatzerlöse),
-            "sonstige_betriebserlöse":  str(self.sonstige_betriebserlöse),
-            "gesamtleistung":           str(self.gesamtleistung),
-            "materialaufwand":          str(self.materialaufwand),
-            "personalaufwand":          str(self.personalaufwand),
-            "abschreibungen":           str(self.abschreibungen),
+            "year": self.year,
+            "umsatzerlöse": str(self.umsatzerlöse),
+            "sonstige_betriebserlöse": str(self.sonstige_betriebserlöse),
+            "gesamtleistung": str(self.gesamtleistung),
+            "materialaufwand": str(self.materialaufwand),
+            "personalaufwand": str(self.personalaufwand),
+            "abschreibungen": str(self.abschreibungen),
             "sonstige_betriebsausgaben": str(self.sonstige_betriebsausgaben),
-            "zinsaufwendungen":         str(self.zinsaufwendungen),
-            "gesamtaufwand":            str(self.gesamtaufwand),
-            "jahresergebnis":           str(self.jahresergebnis),
+            "zinsaufwendungen": str(self.zinsaufwendungen),
+            "gesamtaufwand": str(self.gesamtaufwand),
+            "jahresergebnis": str(self.jahresergebnis),
         }
 
 
@@ -256,18 +260,19 @@ class GuV:
 # Jahresabschluss
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Jahresabschluss:
     """Combined Bilanz + GuV for one fiscal year."""
 
-    bilanz:         Bilanz
-    guv:            GuV
-    skipped_count:  int = 0
+    bilanz: Bilanz
+    guv: GuV
+    skipped_count: int = 0
 
     def to_dict(self) -> dict:
         return {
-            "bilanz":        self.bilanz.to_dict(),
-            "guv":           self.guv.to_dict(),
+            "bilanz": self.bilanz.to_dict(),
+            "guv": self.guv.to_dict(),
             "skipped_count": self.skipped_count,
         }
 
@@ -285,50 +290,68 @@ class Jahresabschluss:
         def row(label: str, amount: Decimal, indent: int = 2) -> str:
             return f"{'  ' * indent}{label:<44} {amount:>10.2f} EUR"
 
-        lines = [
-            "=" * W,
-            f"  JAHRESABSCHLUSS {b.year}  (vereinfacht, § 267a HGB)",
-            "=" * W,
-            "",
-            "  ── GEWINN- UND VERLUSTRECHNUNG ──────────────────────",
-            row("Umsatzerlöse",                    g.umsatzerlöse),
-            row("Sonstige Betriebserlöse",         g.sonstige_betriebserlöse),
-            row("= Gesamtleistung",                g.gesamtleistung),
-            row("- Materialaufwand",               g.materialaufwand),
-            row("- Personalaufwand",               g.personalaufwand),
-            row("- Abschreibungen",                g.abschreibungen),
-            row("- Sonstige Betriebsausgaben",     g.sonstige_betriebsausgaben),
-            row("- Zinsaufwendungen",              g.zinsaufwendungen),
-            "  " + "─" * (W - 2),
-            row("= JAHRESERGEBNIS", g.jahresergebnis),
-            "",
-            "  ── BILANZ (AKTIVA) ──────────────────────────────────",
-            row("A. Anlagevermögen",               b.anlagevermögen),
-            row("B. Umlaufvermögen", _ZERO),
-            row("   I.   Vorräte",                 b.vorräte, indent=3),
-            row("   II.  Forderungen",             b.forderungen, indent=3),
-            row("   III. Kassenbestand (approx.)", b.kassenbestand, indent=3),
-            row("C. Ausstehende Einlagen",         b.ausstehende_einlagen),
-            "  " + "─" * (W - 2),
-            row("SUMME AKTIVA",                    b.summe_aktiva),
-            "",
-            "  ── BILANZ (PASSIVA) ─────────────────────────────────",
-            row("A. Eigenkapital", _ZERO),
-            row("   I.  Gezeichnetes Kapital",             b.stammkapital, indent=3),
-        ] + ([row("   ./. nicht eingeforderte Einlagen",   -b.nicht_eingeforderte_einlagen, indent=3)]
-              if b.nicht_eingeforderte_einlagen else []) + [
-            row("   II. Kapitalrücklage",                  b.kapitalrücklage, indent=3),
-            row("   III.Jahresergebnis",                   b.jahresergebnis, indent=3),
-            row("   IV. Gewinn-/Verlustvortrag",           b.gewinnvortrag, indent=3),
-            row("   = Summe Eigenkapital",                 b.summe_eigenkapital, indent=3),
-            row("B. Rückstellungen",               b.rückstellungen),
-            row("C. Verbindlichkeiten",            b.verbindlichkeiten),
-        ] + ([row("D. Steuererstattungen/-zahlungen", b.steuerpositionen)]
-              if b.steuerpositionen else []) + [
-            "  " + "─" * (W - 2),
-            row("SUMME PASSIVA",                   b.summe_passiva),
-            "",
-        ]
+        lines = (
+            [
+                "=" * W,
+                f"  JAHRESABSCHLUSS {b.year}  (vereinfacht, § 267a HGB)",
+                "=" * W,
+                "",
+                "  ── GEWINN- UND VERLUSTRECHNUNG ──────────────────────",
+                row("Umsatzerlöse", g.umsatzerlöse),
+                row("Sonstige Betriebserlöse", g.sonstige_betriebserlöse),
+                row("= Gesamtleistung", g.gesamtleistung),
+                row("- Materialaufwand", g.materialaufwand),
+                row("- Personalaufwand", g.personalaufwand),
+                row("- Abschreibungen", g.abschreibungen),
+                row("- Sonstige Betriebsausgaben", g.sonstige_betriebsausgaben),
+                row("- Zinsaufwendungen", g.zinsaufwendungen),
+                "  " + "─" * (W - 2),
+                row("= JAHRESERGEBNIS", g.jahresergebnis),
+                "",
+                "  ── BILANZ (AKTIVA) ──────────────────────────────────",
+                row("A. Anlagevermögen", b.anlagevermögen),
+                row("B. Umlaufvermögen", _ZERO),
+                row("   I.   Vorräte", b.vorräte, indent=3),
+                row("   II.  Forderungen", b.forderungen, indent=3),
+                row("   III. Kassenbestand (approx.)", b.kassenbestand, indent=3),
+                row("C. Ausstehende Einlagen", b.ausstehende_einlagen),
+                "  " + "─" * (W - 2),
+                row("SUMME AKTIVA", b.summe_aktiva),
+                "",
+                "  ── BILANZ (PASSIVA) ─────────────────────────────────",
+                row("A. Eigenkapital", _ZERO),
+                row("   I.  Gezeichnetes Kapital", b.stammkapital, indent=3),
+            ]
+            + (
+                [
+                    row(
+                        "   ./. nicht eingeforderte Einlagen",
+                        -b.nicht_eingeforderte_einlagen,
+                        indent=3,
+                    )
+                ]
+                if b.nicht_eingeforderte_einlagen
+                else []
+            )
+            + [
+                row("   II. Kapitalrücklage", b.kapitalrücklage, indent=3),
+                row("   III.Jahresergebnis", b.jahresergebnis, indent=3),
+                row("   IV. Gewinn-/Verlustvortrag", b.gewinnvortrag, indent=3),
+                row("   = Summe Eigenkapital", b.summe_eigenkapital, indent=3),
+                row("B. Rückstellungen", b.rückstellungen),
+                row("C. Verbindlichkeiten", b.verbindlichkeiten),
+            ]
+            + (
+                [row("D. Steuererstattungen/-zahlungen", b.steuerpositionen)]
+                if b.steuerpositionen
+                else []
+            )
+            + [
+                "  " + "─" * (W - 2),
+                row("SUMME PASSIVA", b.summe_passiva),
+                "",
+            ]
+        )
         if b.bilanz_ausgeglichen:
             lines.append("  ✓  Bilanz ausgeglichen")
         else:
@@ -350,11 +373,11 @@ class Jahresabschluss:
 # Generator
 # ---------------------------------------------------------------------------
 
-_MATERIAL_CATS  = {"material", "equipment"}
-_INCOME_CATS    = {"services", "consulting", "products", "licensing"}
+_MATERIAL_CATS = {"material", "equipment"}
+_INCOME_CATS = {"services", "consulting", "products", "licensing"}
 # Categories that represent cash flows only (no P&L impact).
 # These must NOT appear in the GuV; their cash effect IS tracked separately.
-_CASHFLOW_ONLY  = {"tax_settlement", "capital_movement"}
+_CASHFLOW_ONLY = {"tax_settlement", "capital_movement"}
 
 
 def generate_jahresabschluss(
@@ -402,12 +425,12 @@ def generate_jahresabschluss(
     -------
     Jahresabschluss
     """
-    guv   = GuV(year=year)
+    guv = GuV(year=year)
     skipped = 0
     cashflow_net: Decimal = _ZERO  # net cash from tax_settlement/capital_movement in reporting year
 
     period_start = date(year, 1, 1)
-    period_end   = date(year, 12, 31)
+    period_end = date(year, 12, 31)
 
     for r in receipts:
         if r.receipt_date is None:
@@ -420,8 +443,8 @@ def generate_jahresabschluss(
         # Mirror frontend fallback: net_amount ?? (total_amount - vat_amount)
         net_amount = r.net_amount
         if not net_amount:
-            total  = getattr(r, "total_amount", None)
-            vat    = getattr(r, "vat_amount",   None) or _ZERO
+            total = getattr(r, "total_amount", None)
+            vat = getattr(r, "vat_amount", None) or _ZERO
             if total:
                 net_amount = _r(total - vat)
         if not net_amount:
@@ -438,19 +461,21 @@ def generate_jahresabschluss(
 
         if r.is_purchase:
             if cat in _MATERIAL_CATS:
-                guv.materialaufwand        += net
+                guv.materialaufwand += net
             else:
                 guv.sonstige_betriebsausgaben += net
         else:
             if cat in _INCOME_CATS:
-                guv.umsatzerlöse           += net
+                guv.umsatzerlöse += net
             else:
                 guv.sonstige_betriebserlöse += net
 
     # Final rounding
     for attr in (
-        "umsatzerlöse", "sonstige_betriebserlöse",
-        "materialaufwand", "sonstige_betriebsausgaben",
+        "umsatzerlöse",
+        "sonstige_betriebserlöse",
+        "materialaufwand",
+        "sonstige_betriebsausgaben",
     ):
         setattr(guv, attr, _r(getattr(guv, attr)))
 
@@ -479,19 +504,19 @@ def generate_jahresabschluss(
     # § 272 Abs. 1 HGB — outstanding contributions (Ausstehende Einlagen):
     #   Nettomethode (default, § 272 I S. 2):  deducted from equity on Passiva.
     #   Bruttomethode              (§ 272 I S. 1):  shown as asset on Aktiva.
-    aktiva_ausstehend  = _ZERO     if nettomethode else ausstehende
+    aktiva_ausstehend = _ZERO if nettomethode else ausstehende
     nicht_eingefordert = ausstehende if nettomethode else _ZERO
 
     bilanz = Bilanz(
         year=year,
-        kassenbestand                = max(kassenbestand, _ZERO),
-        ausstehende_einlagen         = aktiva_ausstehend,
-        stammkapital                 = stammkapital,
-        nicht_eingeforderte_einlagen = nicht_eingefordert,
-        jahresergebnis               = guv.jahresergebnis,
-        gewinnvortrag                = vortrag_gewinnverlust,
-        rückstellungen               = rückstellungen,
-        steuerpositionen             = cashflow_net,
+        kassenbestand=max(kassenbestand, _ZERO),
+        ausstehende_einlagen=aktiva_ausstehend,
+        stammkapital=stammkapital,
+        nicht_eingeforderte_einlagen=nicht_eingefordert,
+        jahresergebnis=guv.jahresergebnis,
+        gewinnvortrag=vortrag_gewinnverlust,
+        rückstellungen=rückstellungen,
+        steuerpositionen=cashflow_net,
     )
 
     return Jahresabschluss(bilanz=bilanz, guv=guv, skipped_count=skipped)

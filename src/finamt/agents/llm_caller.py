@@ -11,7 +11,6 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Optional
 
 import requests
 
@@ -26,7 +25,9 @@ def _regex_fallback(raw: str, expected_keys: list[str]) -> dict:
     """
     result: dict = {}
     for key in expected_keys:
-        pattern = rf'"{re.escape(key)}"\s*:\s*("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|null|true|false|\[.*?\])'
+        pattern = (
+            rf'"{re.escape(key)}"\s*:\s*("(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|null|true|false|\[.*?\])'
+        )
         m = re.search(pattern, raw, re.DOTALL)
         if m:
             try:
@@ -37,12 +38,12 @@ def _regex_fallback(raw: str, expected_keys: list[str]) -> dict:
 
 
 def call_llm(
-    prompt:        str,
-    cfg:           AgentModelConfig,
-    agent_name:    str,
+    prompt: str,
+    cfg: AgentModelConfig,
+    agent_name: str,
     expected_keys: list[str],
-    debug_dir:     Optional[Path] = None,
-) -> Optional[dict]:
+    debug_dir: Path | None = None,
+) -> dict | None:
     """
     Send prompt to Ollama, parse JSON response, return dict or None.
 
@@ -61,13 +62,13 @@ def call_llm(
             resp = requests.post(
                 f"{cfg.base_url}/api/generate",
                 json={
-                    "model":  cfg.model,
+                    "model": cfg.model,
                     "prompt": prompt,
                     "stream": False,
                     "options": {
                         "temperature": cfg.temperature,
-                        "top_p":       cfg.top_p,
-                        "num_ctx":     cfg.num_ctx,
+                        "top_p": cfg.top_p,
+                        "num_ctx": cfg.num_ctx,
                     },
                 },
                 timeout=cfg.timeout,
@@ -91,7 +92,7 @@ def call_llm(
         return None
 
     # ── Parse ──────────────────────────────────────────────────────────────
-    parsed: Optional[dict] = None
+    parsed: dict | None = None
 
     # 1. Standard path via clean_json_response
     try:

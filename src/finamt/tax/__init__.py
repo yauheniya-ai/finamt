@@ -11,6 +11,6 @@ Planned:
   - ``anlage_n`` — Anlage N (employment income)
 """
 
-from .ustva import USTVAReport, USTVALineItem, generate_ustva
+from .ustva import USTVALineItem, USTVAReport, generate_ustva
 
 __all__ = ["USTVAReport", "USTVALineItem", "generate_ustva"]

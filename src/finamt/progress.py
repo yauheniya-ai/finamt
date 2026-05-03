@@ -34,7 +34,7 @@ Usage in the API layer::
 from __future__ import annotations
 
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
 
 _local = threading.local()
 
@@ -52,7 +52,7 @@ def clear_callback() -> None:
 def emit(msg: str, flush: bool = True) -> None:
     """Print *msg* to stdout and forward it to any registered callback."""
     print(msg, flush=flush)
-    cb: Optional[Callable[[str], None]] = getattr(_local, "callback", None)
+    cb: Callable[[str], None] | None = getattr(_local, "callback", None)
     if cb is not None:
         try:
             cb(msg)

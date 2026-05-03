@@ -28,10 +28,10 @@ from finamt.utils import (
     parse_decimal,
 )
 
-
 # ---------------------------------------------------------------------------
 # extract_company_name
 # ---------------------------------------------------------------------------
+
 
 class TestExtractCompanyName:
     def test_returns_first_meaningful_line(self):
@@ -66,6 +66,7 @@ class TestExtractCompanyName:
 # ---------------------------------------------------------------------------
 # extract_date — regression: YYYY-MM-DD was unpacked day/month/year incorrectly
 # ---------------------------------------------------------------------------
+
 
 class TestExtractDate:
     def test_german_format_ddmmyyyy(self):
@@ -114,6 +115,7 @@ class TestExtractDate:
 # extract_amounts — regression: max() was unreliable; keyword anchoring added
 # ---------------------------------------------------------------------------
 
+
 class TestExtractAmounts:
     def test_finds_amount_with_euro_sign(self):
         result = DataExtractor.extract_amounts("Total: 12,99 €")
@@ -131,7 +133,7 @@ class TestExtractAmounts:
         text = (
             "Druckerpapier  50,00 €\n"
             "Monitor       899,00 €\n"
-            "Gesamtbetrag  949,00 €"   # correct total — not the max subtotal
+            "Gesamtbetrag  949,00 €"  # correct total — not the max subtotal
         )
         result = DataExtractor.extract_amounts(text)
         assert result["total"] == Decimal("949.00")
@@ -155,6 +157,7 @@ class TestExtractAmounts:
 # extract_vat_info
 # ---------------------------------------------------------------------------
 
+
 class TestExtractVatInfo:
     def test_extracts_percentage_and_amount(self):
         text = "MwSt. 19% enthaltene Steuer 3,41 €"
@@ -175,6 +178,7 @@ class TestExtractVatInfo:
 # ---------------------------------------------------------------------------
 # extract_items
 # ---------------------------------------------------------------------------
+
 
 class TestExtractItems:
     def test_simple_description_price(self):
@@ -212,11 +216,13 @@ class TestExtractItems:
 
     def test_item_categories_are_valid(self):
         """All heuristically assigned categories must be valid ReceiptCategory values."""
-        text = "\n".join([
-            "Software-Lizenz 99,00 €",
-            "Hotel Berlin   189,00 €",
-            "Druckerpapier   12,99 €",
-        ])
+        text = "\n".join(
+            [
+                "Software-Lizenz 99,00 €",
+                "Hotel Berlin   189,00 €",
+                "Druckerpapier   12,99 €",
+            ]
+        )
         items = DataExtractor.extract_items(text)
         for item in items:
             assert item["category"] in RECEIPT_CATEGORIES
@@ -226,18 +232,22 @@ class TestExtractItems:
 # _categorize_item
 # ---------------------------------------------------------------------------
 
+
 class TestCategorizeItem:
-    @pytest.mark.parametrize("description,expected", [
-        ("Microsoft 365 Lizenz", "software"),
-        ("Flug Berlin München",   "travel"),
-        ("Hotel Mitte Berlin",    "travel"),
-        ("Strom Abrechnung",      "utilities"),
-        ("Python Kurs Online",    "education"),
-        ("Haftpflicht Police",    "insurance"),
-        ("Finanzamt Gebühren",    "taxes"),
-        ("Drucker HP LaserJet",   "equipment"),
-        ("Völlig unbekannt",      "other"),
-    ])
+    @pytest.mark.parametrize(
+        "description,expected",
+        [
+            ("Microsoft 365 Lizenz", "software"),
+            ("Flug Berlin München", "travel"),
+            ("Hotel Mitte Berlin", "travel"),
+            ("Strom Abrechnung", "utilities"),
+            ("Python Kurs Online", "education"),
+            ("Haftpflicht Police", "insurance"),
+            ("Finanzamt Gebühren", "taxes"),
+            ("Drucker HP LaserJet", "equipment"),
+            ("Völlig unbekannt", "other"),
+        ],
+    )
     def test_category_mapping(self, description, expected):
         result = DataExtractor._categorize_item(description)
         assert result == expected
@@ -252,14 +262,15 @@ class TestCategorizeItem:
 # clean_json_response
 # ---------------------------------------------------------------------------
 
+
 class TestCleanJsonResponse:
     def test_strips_markdown_fence(self):
-        raw = "```json\n{\"key\": \"value\"}\n```"
+        raw = '```json\n{"key": "value"}\n```'
         result = clean_json_response(raw)
         assert json.loads(result) == {"key": "value"}
 
     def test_strips_plain_fence(self):
-        raw = "```\n{\"key\": \"value\"}\n```"
+        raw = '```\n{"key": "value"}\n```'
         result = clean_json_response(raw)
         assert json.loads(result) == {"key": "value"}
 
@@ -313,6 +324,7 @@ class TestCleanJsonResponse:
 # parse_decimal
 # ---------------------------------------------------------------------------
 
+
 class TestParseDecimal:
     def test_integer_string(self):
         assert parse_decimal("42") == Decimal("42")
@@ -343,6 +355,7 @@ class TestParseDecimal:
 # ---------------------------------------------------------------------------
 # parse_date
 # ---------------------------------------------------------------------------
+
 
 class TestParseDate:
     def test_iso_format(self):

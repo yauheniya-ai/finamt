@@ -73,13 +73,13 @@ Usage::
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
 
 try:
     from lxml import etree as _ET
+
     _LXML_AVAILABLE = True
 except ImportError:
     _LXML_AVAILABLE = False
@@ -91,25 +91,25 @@ from .bilanz import Jahresabschluss
 # Namespace URIs
 # ---------------------------------------------------------------------------
 
-NS_XBRLI    = "http://www.xbrl.org/2003/instance"
-NS_GAAP     = "http://www.xbrl.de/taxonomies/de-gaap-ci-2025-04-01"
-NS_GCD      = "http://www.xbrl.de/taxonomies/de-gcd-2025-04-01"
-NS_ISO4217  = "http://www.xbrl.org/2003/iso4217"
-NS_XBRLDI   = "http://xbrl.org/2006/xbrldi"
-NS_XSI      = "http://www.w3.org/2001/XMLSchema-instance"
-NS_LINK     = "http://www.xbrl.org/2003/linkbase"
-NS_XLINK    = "http://www.w3.org/1999/xlink"
+NS_XBRLI = "http://www.xbrl.org/2003/instance"
+NS_GAAP = "http://www.xbrl.de/taxonomies/de-gaap-ci-2025-04-01"
+NS_GCD = "http://www.xbrl.de/taxonomies/de-gcd-2025-04-01"
+NS_ISO4217 = "http://www.xbrl.org/2003/iso4217"
+NS_XBRLDI = "http://xbrl.org/2006/xbrldi"
+NS_XSI = "http://www.w3.org/2001/XMLSchema-instance"
+NS_LINK = "http://www.xbrl.org/2003/linkbase"
+NS_XLINK = "http://www.w3.org/1999/xlink"
 
 NSMAP = {
-    None:       NS_XBRLI,
-    "xbrli":    NS_XBRLI,
+    None: NS_XBRLI,
+    "xbrli": NS_XBRLI,
     "de-gaap-ci": NS_GAAP,
-    "de-gcd":   NS_GCD,
-    "iso4217":  NS_ISO4217,
-    "xbrldi":   NS_XBRLDI,
-    "xsi":      NS_XSI,
-    "link":     NS_LINK,
-    "xlink":    NS_XLINK,
+    "de-gcd": NS_GCD,
+    "iso4217": NS_ISO4217,
+    "xbrldi": NS_XBRLDI,
+    "xsi": NS_XSI,
+    "link": NS_LINK,
+    "xlink": NS_XLINK,
 }
 
 # Schema location for MicroBilG (§ 267a HGB Kleinstkapitalgesellschaft)
@@ -126,6 +126,7 @@ SCHEMA_LOCATION = (
 # Config
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EBilanzConfig:
     """
@@ -133,20 +134,22 @@ class EBilanzConfig:
 
     All fields map directly to the GCD module of the HGB XBRL taxonomy.
     """
-    steuernummer:       str               # e.g. "21/815/08150" — from Finanzamt notice
-    company_name:       str               # registered company name
-    legal_form:         str = "GmbH"      # "GmbH" | "UG (haftungsbeschränkt)" | ...
-    elster_id:          str = ""          # optional override for XBRL context identifier
-    fiscal_year_start:  str = ""          # ISO date "YYYY-MM-DD"
-    fiscal_year_end:    str = ""          # ISO date "YYYY-MM-DD"
+
+    steuernummer: str  # e.g. "21/815/08150" — from Finanzamt notice
+    company_name: str  # registered company name
+    legal_form: str = "GmbH"  # "GmbH" | "UG (haftungsbeschränkt)" | ...
+    elster_id: str = ""  # optional override for XBRL context identifier
+    fiscal_year_start: str = ""  # ISO date "YYYY-MM-DD"
+    fiscal_year_end: str = ""  # ISO date "YYYY-MM-DD"
     # Optional: filing metadata
-    preparer:           str = ""          # name of the person preparing the filing
-    comment:            str = ""          # free-text comment embedded in the instance
+    preparer: str = ""  # name of the person preparing the filing
+    comment: str = ""  # free-text comment embedded in the instance
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _eur(value: Decimal) -> str:
     """Format a Decimal as a plain decimal string with exactly 2 fractional digits."""
@@ -157,7 +160,7 @@ def _tag(ns: str, local: str) -> str:
     return f"{{{ns}}}{local}"
 
 
-def _sub(parent, ns: str, local: str, text: str | None = None, **attribs) -> "_ET.Element":
+def _sub(parent, ns: str, local: str, text: str | None = None, **attribs) -> _ET.Element:
     el = _ET.SubElement(parent, _tag(ns, local), **attribs)
     if text is not None:
         el.text = text
@@ -172,7 +175,7 @@ def _fact(
     context_ref: str,
     unit_ref: str = "EUR",
     decimals: str = "2",
-) -> "_ET.Element":
+) -> _ET.Element:
     """Append a numeric XBRL fact to *root*."""
     el = _ET.SubElement(root, _tag(ns, concept))
     el.set("contextRef", context_ref)
@@ -188,7 +191,7 @@ def _str_fact(
     concept: str,
     value: str,
     context_ref: str,
-) -> "_ET.Element":
+) -> _ET.Element:
     """Append a string XBRL fact (no unitRef / decimals)."""
     el = _ET.SubElement(root, _tag(ns, concept))
     el.set("contextRef", context_ref)
@@ -200,6 +203,7 @@ def _str_fact(
 # Context / unit builders
 # ---------------------------------------------------------------------------
 
+
 def _add_context(root, ctx_id: str, start: str, end: str, steuernummer: str) -> None:
     """
     Add a duration context (Berichtszeitraum) to the XBRL instance.
@@ -210,22 +214,24 @@ def _add_context(root, ctx_id: str, start: str, end: str, steuernummer: str) -> 
     """
     ctx = _ET.SubElement(root, _tag(NS_XBRLI, "context"), id=ctx_id)
     entity = _ET.SubElement(ctx, _tag(NS_XBRLI, "entity"))
-    ident  = _ET.SubElement(
-        entity, _tag(NS_XBRLI, "identifier"),
+    ident = _ET.SubElement(
+        entity,
+        _tag(NS_XBRLI, "identifier"),
         scheme="http://www.rzf.fin-nrw.de/",
     )
     ident.text = steuernummer
     period = _ET.SubElement(ctx, _tag(NS_XBRLI, "period"))
     _ET.SubElement(period, _tag(NS_XBRLI, "startDate")).text = start
-    _ET.SubElement(period, _tag(NS_XBRLI, "endDate")).text   = end
+    _ET.SubElement(period, _tag(NS_XBRLI, "endDate")).text = end
 
 
 def _add_instant_context(root, ctx_id: str, instant: str, steuernummer: str) -> None:
     """Add a point-in-time context (balance sheet date) to the XBRL instance."""
     ctx = _ET.SubElement(root, _tag(NS_XBRLI, "context"), id=ctx_id)
     entity = _ET.SubElement(ctx, _tag(NS_XBRLI, "entity"))
-    ident  = _ET.SubElement(
-        entity, _tag(NS_XBRLI, "identifier"),
+    ident = _ET.SubElement(
+        entity,
+        _tag(NS_XBRLI, "identifier"),
         scheme="http://www.rzf.fin-nrw.de/",
     )
     ident.text = steuernummer
@@ -241,6 +247,7 @@ def _add_unit_eur(root) -> None:
 # ---------------------------------------------------------------------------
 # Main builder
 # ---------------------------------------------------------------------------
+
 
 def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     """
@@ -262,8 +269,7 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     """
     if not _LXML_AVAILABLE:
         raise ImportError(
-            "lxml is required for E-Bilanz generation.  "
-            "Install it with: pip install lxml"
+            "lxml is required for E-Bilanz generation.  Install it with: pip install lxml"
         )
 
     b = jab.bilanz
@@ -272,15 +278,15 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
 
     # Derive dates from config or fall back to calendar year
     fy_start = cfg.fiscal_year_start or f"{year}-01-01"
-    fy_end   = cfg.fiscal_year_end   or f"{year}-12-31"
+    fy_end = cfg.fiscal_year_end or f"{year}-12-31"
 
     # Use 13-digit ELSTER identifier if provided, otherwise fall back to slash-format
     entity_id = cfg.steuernummer
 
     # Context IDs
-    CTX_DURATION = f"D-{year}"          # GuV (from / to)
-    CTX_END      = f"I-{year}-12-31"    # Bilanz (instant = balance sheet date)
-    CTX_GCD      = f"GCD-{year}"        # GCD master data (same duration)
+    CTX_DURATION = f"D-{year}"  # GuV (from / to)
+    CTX_END = f"I-{year}-12-31"  # Bilanz (instant = balance sheet date)
+    CTX_GCD = f"GCD-{year}"  # GCD master data (same duration)
 
     # ----------------------------------------------------------------
     # Root element
@@ -316,27 +322,29 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # ----------------------------------------------------------------
     # GCD module — company master data
     # ----------------------------------------------------------------
-    _str_fact(root, NS_GCD, "genInfo.company.id.name",               cfg.company_name, CTX_GCD)
+    _str_fact(root, NS_GCD, "genInfo.company.id.name", cfg.company_name, CTX_GCD)
 
     # legalStatus is an XBRL tuple — parent element has no contextRef or text value.
     # The tuple contains an enum child item (xbrli:item, periodType=duration) that
     # indicates the current legal form. The child item does need a contextRef.
     _LEGAL_FORM_CODES = {
-        "GmbH":                   "GMBH",
+        "GmbH": "GMBH",
         "UG (haftungsbeschränkt)": "UG",
-        "AG":                     "AG",
-        "GbR":                    "GBR",
-        "OHG":                    "OHG",
-        "KG":                     "KG",
+        "AG": "AG",
+        "GbR": "GBR",
+        "OHG": "OHG",
+        "KG": "KG",
     }
     code = _LEGAL_FORM_CODES.get(cfg.legal_form, "GMBH")
     ls_tuple = _ET.SubElement(root, _tag(NS_GCD, "genInfo.company.id.legalStatus"))
-    child = _ET.SubElement(ls_tuple, _tag(NS_GCD, f"genInfo.company.id.legalStatus.legalStatus.{code}"))
+    child = _ET.SubElement(
+        ls_tuple, _tag(NS_GCD, f"genInfo.company.id.legalStatus.legalStatus.{code}")
+    )
     child.set("contextRef", CTX_GCD)
 
     # Fiscal year dates (correct GCD v6 concept paths)
     _str_fact(root, NS_GCD, "genInfo.report.period.fiscalYearBegin", fy_start, CTX_GCD)
-    _str_fact(root, NS_GCD, "genInfo.report.period.fiscalYearEnd",   fy_end,   CTX_GCD)
+    _str_fact(root, NS_GCD, "genInfo.report.period.fiscalYearEnd", fy_end, CTX_GCD)
 
     # ----------------------------------------------------------------
     # GAAP module — Bilanz (Aktiva) — instant context
@@ -352,13 +360,13 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # For a Kleinstkapitalgesellschaft with no inventory / receivables tracked,
     # we report the full current assets as cash equivalent.
     ca = b.kassenbestand + b.vorräte + b.forderungen
-    _fact(root, NS_GAAP, "bs.ass.currAss",               ca,              CTX_END)
+    _fact(root, NS_GAAP, "bs.ass.currAss", ca, CTX_END)
     # cashEquiv is a Summenmussfeld (sum field) in the taxonomy — its value may
     # not be imported directly by some tools.  Report the leaf concept
     # cashEquiv.bank (Bankguthaben) alongside the parent so that
     # (a) the calculation check passes (cashEquiv = cashEquiv.bank) and
     # (b) import tools that require a leaf concept can find it.
-    _fact(root, NS_GAAP, "bs.ass.currAss.cashEquiv",      b.kassenbestand, CTX_END)
+    _fact(root, NS_GAAP, "bs.ass.currAss.cashEquiv", b.kassenbestand, CTX_END)
     _fact(root, NS_GAAP, "bs.ass.currAss.cashEquiv.bank", b.kassenbestand, CTX_END)
 
     # C. Ausstehende Einlagen (Bruttomethode only — if nettomethode=True this is 0)
@@ -368,8 +376,8 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # ----------------------------------------------------------------
     # GAAP module — Bilanz (Passiva / Eigenkapital) — instant context
     # ----------------------------------------------------------------
-    _fact(root, NS_GAAP, "bs.eqLiab",          b.summe_passiva,    CTX_END)
-    _fact(root, NS_GAAP, "bs.eqLiab.equity",   b.summe_eigenkapital, CTX_END)
+    _fact(root, NS_GAAP, "bs.eqLiab", b.summe_passiva, CTX_END)
+    _fact(root, NS_GAAP, "bs.eqLiab.equity", b.summe_eigenkapital, CTX_END)
 
     # I.  Gezeichnetes Kapital (Stammkapital)
     _fact(root, NS_GAAP, "bs.eqLiab.equity.subscribed", b.stammkapital, CTX_END)
@@ -379,7 +387,8 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
         # Convention: reported as a *positive* value — the calculation linkbase
         # has weight="-1" for unpaidCap, so it is deducted automatically.
         _fact(
-            root, NS_GAAP,
+            root,
+            NS_GAAP,
             "bs.eqLiab.equity.subscribed.unpaidCap",
             b.nicht_eingeforderte_einlagen,
             CTX_END,
@@ -392,7 +401,8 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # III. Gewinn-/Verlustvortrag
     if b.gewinnvortrag:
         _fact(
-            root, NS_GAAP,
+            root,
+            NS_GAAP,
             "bs.eqLiab.equity.profitLoss",
             b.gewinnvortrag,
             CTX_END,
@@ -416,7 +426,7 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     _fact(root, NS_GAAP, "ismi.netIncome", g.jahresergebnis, CTX_DURATION)
 
     # Revenue lines
-    _fact(root, NS_GAAP, "ismi.netIncome.netSales",      g.umsatzerlöse,            CTX_DURATION)
+    _fact(root, NS_GAAP, "ismi.netIncome.netSales", g.umsatzerlöse, CTX_DURATION)
     _fact(root, NS_GAAP, "ismi.netIncome.otherOpRevenue", g.sonstige_betriebserlöse, CTX_DURATION)
 
     # Expense lines — XBRL convention for MicroBilG: reported as *positive* values.
@@ -424,11 +434,11 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # subtract them from net income automatically.  Storing negative values here would
     # cause a double-negation and fail calculation validation.
     if g.materialaufwand:
-        _fact(root, NS_GAAP, "ismi.netIncome.materialServices", g.materialaufwand,          CTX_DURATION)
+        _fact(root, NS_GAAP, "ismi.netIncome.materialServices", g.materialaufwand, CTX_DURATION)
     if g.personalaufwand:
-        _fact(root, NS_GAAP, "ismi.netIncome.staff",             g.personalaufwand,          CTX_DURATION)
+        _fact(root, NS_GAAP, "ismi.netIncome.staff", g.personalaufwand, CTX_DURATION)
     if g.abschreibungen:
-        _fact(root, NS_GAAP, "ismi.netIncome.deprAmort",         g.abschreibungen,           CTX_DURATION)
+        _fact(root, NS_GAAP, "ismi.netIncome.deprAmort", g.abschreibungen, CTX_DURATION)
     # MicroBilG has no separate interest-expense concept; fold Zinsaufwendungen
     # into sonstige Aufwendungen (ismi.netIncome.otherCost).
     _other_cost = (g.sonstige_betriebsausgaben or 0) + (g.zinsaufwendungen or 0)
@@ -438,7 +448,6 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
     # ----------------------------------------------------------------
     # Serialise
     # ----------------------------------------------------------------
-    tree = _ET.ElementTree(root)
     return _ET.tostring(
         root,
         pretty_print=True,
@@ -450,6 +459,7 @@ def build_xbrl(jab: Jahresabschluss, cfg: EBilanzConfig) -> bytes:
 # ---------------------------------------------------------------------------
 # Convenience: write to file
 # ---------------------------------------------------------------------------
+
 
 def write_xbrl(
     jab: Jahresabschluss,

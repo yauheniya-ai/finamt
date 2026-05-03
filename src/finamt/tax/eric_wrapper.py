@@ -30,17 +30,23 @@ Plugins are expected in <ERIC_HOME>/plugins/.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
-import logging
-from contextlib import contextmanager
 from ctypes import (
-    CDLL, CFUNCTYPE, Structure, POINTER,
-    byref, cast, string_at,
-    c_char, c_char_p, c_int, c_uint32, c_void_p,
+    CDLL,
+    CFUNCTYPE,
+    POINTER,
+    Structure,
+    byref,
+    c_char,
+    c_char_p,
+    c_int,
+    c_uint32,
+    c_void_p,
+    string_at,
 )
 from pathlib import Path
-from typing import Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -48,9 +54,9 @@ logger = logging.getLogger(__name__)
 # Bearbeitungsflags
 # ---------------------------------------------------------------------------
 
-ERIC_VALIDIERE      = 1 << 1   # validate only
-ERIC_SENDE          = 1 << 2   # transmit to ELSTER server
-ERIC_DRUCKE         = 1 << 5   # generate PDF print
+ERIC_VALIDIERE = 1 << 1  # validate only
+ERIC_SENDE = 1 << 2  # transmit to ELSTER server
+ERIC_DRUCKE = 1 << 5  # generate PDF print
 ERIC_PRUEFE_HINWEISE = 1 << 7  # treat warnings as errors
 
 # ---------------------------------------------------------------------------
@@ -90,12 +96,12 @@ def _lib_name(name: str) -> str:
 # Callback function types (CFUNCTYPE works on macOS/Linux; WINFUNCTYPE on Windows)
 _FuncType = CFUNCTYPE  # platform check done at import time
 
-EricLogCallback         = _FuncType(None, c_char_p, c_int, c_char_p, c_void_p)
+EricLogCallback = _FuncType(None, c_char_p, c_int, c_char_p, c_void_p)
 EricFortschrittCallback = _FuncType(None, c_uint32, c_uint32, c_uint32, c_void_p)
-EricPdfCallback         = _FuncType(c_int, c_char_p, c_void_p, c_uint32, c_void_p)
+EricPdfCallback = _FuncType(c_int, c_char_p, c_void_p, c_uint32, c_void_p)
 
 EricZertifikatHandle = c_uint32
-EricTransferHandle   = c_uint32
+EricTransferHandle = c_uint32
 
 
 class _EricRueckgabepufferHandle(c_void_p):
@@ -104,27 +110,28 @@ class _EricRueckgabepufferHandle(c_void_p):
 
 class _eric_druck_parameter_t(Structure):
     _fields_ = [
-        ("version",                c_uint32),
-        ("vorschau",               c_uint32),
-        ("duplexDruck",            c_uint32),
-        ("pdfName",                c_char_p),
-        ("fussText",               c_char_p),
-        ("pdfCallback",            EricPdfCallback),
+        ("version", c_uint32),
+        ("vorschau", c_uint32),
+        ("duplexDruck", c_uint32),
+        ("pdfName", c_char_p),
+        ("fussText", c_char_p),
+        ("pdfCallback", EricPdfCallback),
         ("pdfCallbackBenutzerdaten", c_void_p),
     ]
 
 
 class _eric_verschluesselungs_parameter_t(Structure):
     _fields_ = [
-        ("version",          c_uint32),
+        ("version", c_uint32),
         ("zertifikatHandle", EricZertifikatHandle),
-        ("pin",              c_char_p),
+        ("pin", c_char_p),
     ]
 
 
 # ---------------------------------------------------------------------------
 # Library loader
 # ---------------------------------------------------------------------------
+
 
 def _load_library(home_dir: str) -> CDLL:
     lib_path = os.path.join(home_dir, _lib_name("ericapi"))
@@ -182,6 +189,7 @@ def _load_library(home_dir: str) -> CDLL:
 # Core session
 # ---------------------------------------------------------------------------
 
+
 class EricError(Exception):
     def __init__(self, code: int, message: str = ""):
         self.code = code
@@ -200,17 +208,17 @@ class EricSession:
         Optional path for ERiC log files.  Pass None to disable.
     """
 
-    def __init__(self, eric_home: str, log_dir: Optional[str] = None) -> None:
-        self._home    = str(Path(eric_home).resolve())
+    def __init__(self, eric_home: str, log_dir: str | None = None) -> None:
+        self._home = str(Path(eric_home).resolve())
         self._log_dir = str(Path(log_dir).resolve()) if log_dir else None
-        self._lib: Optional[CDLL] = None
-        self._log_cb  = None  # keep alive
+        self._lib: CDLL | None = None
+        self._log_cb = None  # keep alive
 
     # ------------------------------------------------------------------
     # context manager
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "EricSession":
+    def __enter__(self) -> EricSession:
         self._lib = _load_library(self._home)
         if self._log_dir:
             Path(self._log_dir).mkdir(parents=True, exist_ok=True)
@@ -257,10 +265,10 @@ class EricSession:
         xml_bytes: bytes,
         datenart_version: str,
         flags: int,
-        crypto_params: Optional[_eric_verschluesselungs_parameter_t] = None,
-        response_buffer: Optional[_EricRueckgabepufferHandle] = None,
-        server_buffer: Optional[_EricRueckgabepufferHandle] = None,
-    ) -> tuple[int, Optional[int]]:
+        crypto_params: _eric_verschluesselungs_parameter_t | None = None,
+        response_buffer: _EricRueckgabepufferHandle | None = None,
+        server_buffer: _EricRueckgabepufferHandle | None = None,
+    ) -> tuple[int, int | None]:
         """
         Call EricBearbeiteVorgang.
 
@@ -268,10 +276,10 @@ class EricSession:
         -------
         (eric_return_code, transfer_handle_or_None)
         """
-        th     = EricTransferHandle(0)
+        th = EricTransferHandle(0)
         th_ref = byref(th) if (flags & ERIC_SENDE) else None
 
-        cp_ref: Optional[POINTER] = None
+        cp_ref: POINTER | None = None
         if crypto_params is not None:
             cp_ref = byref(crypto_params)
 
@@ -279,7 +287,7 @@ class EricSession:
             _enc(xml_bytes if isinstance(xml_bytes, bytes) else xml_bytes.encode()),
             _enc(datenart_version),
             c_uint32(flags),
-            None,        # druck_parameter — not used for E-Bilanz
+            None,  # druck_parameter — not used for E-Bilanz
             cp_ref,
             th_ref,
             response_buffer,
@@ -298,18 +306,18 @@ class EricSession:
     def get_error_messages_from_response(self, xml_answer: bytes) -> dict:
         """Parse ELSTER server response XML for error/transfer-ticket info."""
         ticket_buf = self._buf_create()
-        rc_th_buf  = self._buf_create()
+        rc_th_buf = self._buf_create()
         err_th_buf = self._buf_create()
-        ndh_buf    = self._buf_create()
+        ndh_buf = self._buf_create()
         try:
             self._lib.EricGetErrormessagesFromXMLAnswer(
                 _enc(xml_answer), ticket_buf, rc_th_buf, err_th_buf, ndh_buf
             )
             return {
                 "transfer_ticket": self._buf_read(ticket_buf).decode(_ENCODING, errors="replace"),
-                "return_code_th":  self._buf_read(rc_th_buf).decode(_ENCODING, errors="replace"),
-                "error_text_th":   self._buf_read(err_th_buf).decode(_ENCODING, errors="replace"),
-                "ndh_xml":         self._buf_read(ndh_buf).decode(_ENCODING, errors="replace"),
+                "return_code_th": self._buf_read(rc_th_buf).decode(_ENCODING, errors="replace"),
+                "error_text_th": self._buf_read(err_th_buf).decode(_ENCODING, errors="replace"),
+                "ndh_xml": self._buf_read(ndh_buf).decode(_ENCODING, errors="replace"),
             }
         finally:
             for b in (ticket_buf, rc_th_buf, err_th_buf, ndh_buf):
@@ -323,11 +331,9 @@ class EricSession:
         -------
         (handle, pin_support_info)
         """
-        h_token      = EricZertifikatHandle(0)
-        pin_support  = c_uint32(0)
-        rc = self._lib.EricGetHandleToCertificate(
-            byref(h_token), byref(pin_support), _enc(path)
-        )
+        h_token = EricZertifikatHandle(0)
+        pin_support = c_uint32(0)
+        rc = self._lib.EricGetHandleToCertificate(byref(h_token), byref(pin_support), _enc(path))
         if rc != 0:
             raise EricError(rc, f"Cannot load certificate: {path}")
         return h_token.value, pin_support.value
@@ -339,9 +345,9 @@ class EricSession:
         self, handle: int, pin: str
     ) -> _eric_verschluesselungs_parameter_t:
         p = _eric_verschluesselungs_parameter_t()
-        p.version          = 3
+        p.version = 3
         p.zertifikatHandle = EricZertifikatHandle(handle)
-        p.pin              = _enc(pin)
+        p.pin = _enc(pin)
         return p
 
 
@@ -349,14 +355,15 @@ class EricSession:
 # Context manager helpers
 # ---------------------------------------------------------------------------
 
+
 class EricBuffer:
     """RAII wrapper for an EricRueckgabepuffer."""
 
     def __init__(self, session: EricSession) -> None:
         self._session = session
-        self._handle: Optional[_EricRueckgabepufferHandle] = None
+        self._handle: _EricRueckgabepufferHandle | None = None
 
-    def __enter__(self) -> "EricBuffer":
+    def __enter__(self) -> EricBuffer:
         self._handle = self._session._buf_create()
         return self
 
@@ -379,15 +386,17 @@ class EricCertificate:
 
     def __init__(self, session: EricSession, path: str, pin: str) -> None:
         self._session = session
-        self._path    = path
-        self._pin     = pin
-        self._handle: Optional[int] = None
-        self.verschluesselungs_parameter: Optional[_eric_verschluesselungs_parameter_t] = None
+        self._path = path
+        self._pin = pin
+        self._handle: int | None = None
+        self.verschluesselungs_parameter: _eric_verschluesselungs_parameter_t | None = None
 
-    def __enter__(self) -> "EricCertificate":
+    def __enter__(self) -> EricCertificate:
         h, _ = self._session.load_certificate(self._path, self._pin)
         self._handle = h
-        self.verschluesselungs_parameter = self._session.make_verschluesselungs_parameter(h, self._pin)
+        self.verschluesselungs_parameter = self._session.make_verschluesselungs_parameter(
+            h, self._pin
+        )
         return self
 
     def __exit__(self, *_) -> None:

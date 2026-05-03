@@ -6,8 +6,6 @@ Tests for finamt.agents.prompts — category list and 4 prompt builders.
 
 from __future__ import annotations
 
-import pytest
-
 from finamt.agents.prompts import (
     RECEIPT_CATEGORIES,
     build_agent1_prompt,
@@ -24,10 +22,26 @@ class TestReceiptCategories:
 
     def test_contains_expected_categories(self):
         expected = {
-            "services", "products", "material", "equipment", "software",
-            "licensing", "telecommunication", "travel", "car", "education",
-            "utilities", "insurance", "financial", "office", "marketing",
-            "donations", "public_fees", "tax_settlement", "capital_movement", "other",
+            "services",
+            "products",
+            "material",
+            "equipment",
+            "software",
+            "licensing",
+            "telecommunication",
+            "travel",
+            "car",
+            "education",
+            "utilities",
+            "insurance",
+            "financial",
+            "office",
+            "marketing",
+            "donations",
+            "public_fees",
+            "tax_settlement",
+            "capital_movement",
+            "other",
         }
         assert expected == set(RECEIPT_CATEGORIES)
 
@@ -91,7 +105,16 @@ class TestAgent2Prompt:
 
     def test_required_json_keys_present(self):
         p = build_agent2_prompt("text", "purchase")
-        for key in ("name", "vat_id", "tax_number", "street_and_number", "postcode", "city", "state", "country"):
+        for key in (
+            "name",
+            "vat_id",
+            "tax_number",
+            "street_and_number",
+            "postcode",
+            "city",
+            "state",
+            "country",
+        ):
             assert key in p
 
     def test_receipt_text_injected(self):

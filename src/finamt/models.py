@@ -26,11 +26,9 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, List
+from decimal import ROUND_HALF_UP, Decimal
 
 from .agents.prompts import RECEIPT_CATEGORIES
-
 
 # ---------------------------------------------------------------------------
 # Posting helpers
@@ -51,7 +49,7 @@ class PostingDirection(str):
 
     _VALID = {"debit", "credit"}
 
-    def __new__(cls, value: str) -> "PostingDirection":
+    def __new__(cls, value: str) -> PostingDirection:
         v = str(value).strip().lower()
         if v not in cls._VALID:
             raise ValueError(f"PostingDirection must be 'debit' or 'credit', got {value!r}")
@@ -81,7 +79,7 @@ class PostingType(str):
         "private_withdrawal",
     }
 
-    def __new__(cls, value: str) -> "PostingType":
+    def __new__(cls, value: str) -> PostingType:
         v = str(value).strip().lower()
         if v not in cls._VALID:
             raise ValueError(f"Unknown PostingType: {value!r}")
@@ -113,25 +111,26 @@ class Posting:
     description  : human-readable general-ledger label
     """
 
-    receipt_id:   str
+    receipt_id: str
     posting_type: PostingType
-    direction:    PostingDirection
-    amount:       Decimal
-    description:  str = ""
+    direction: PostingDirection
+    amount: Decimal
+    description: str = ""
 
     def to_dict(self) -> dict:
         return {
-            "receipt_id":   self.receipt_id,
+            "receipt_id": self.receipt_id,
             "posting_type": str(self.posting_type),
-            "direction":    str(self.direction),
-            "amount":       float(self.amount),
-            "description":  self.description,
+            "direction": str(self.direction),
+            "amount": float(self.amount),
+            "description": self.description,
         }
 
 
 # ---------------------------------------------------------------------------
 # ReceiptCategory  (unchanged)
 # ---------------------------------------------------------------------------
+
 
 class ReceiptCategory(str):
     """
@@ -143,20 +142,21 @@ class ReceiptCategory(str):
 
     VALID: frozenset = frozenset(RECEIPT_CATEGORIES)
 
-    def __new__(cls, value: str = "other") -> "ReceiptCategory":
+    def __new__(cls, value: str = "other") -> ReceiptCategory:
         normalised = str(value).strip().lower()
         if normalised not in RECEIPT_CATEGORIES:
             normalised = "other"
         return super().__new__(cls, normalised)
 
     @classmethod
-    def other(cls) -> "ReceiptCategory":
+    def other(cls) -> ReceiptCategory:
         return cls("other")
 
 
 # ---------------------------------------------------------------------------
 # ReceiptType
 # ---------------------------------------------------------------------------
+
 
 class ReceiptType(str):
     """
@@ -171,24 +171,25 @@ class ReceiptType(str):
 
     _VALID = {"purchase", "sale"}
 
-    def __new__(cls, value: str = "purchase") -> "ReceiptType":
+    def __new__(cls, value: str = "purchase") -> ReceiptType:
         normalised = str(value).strip().lower()
         if normalised not in cls._VALID:
             normalised = "purchase"
         return super().__new__(cls, normalised)
 
     @classmethod
-    def purchase(cls) -> "ReceiptType":
+    def purchase(cls) -> ReceiptType:
         return cls("purchase")
 
     @classmethod
-    def sale(cls) -> "ReceiptType":
+    def sale(cls) -> ReceiptType:
         return cls("sale")
 
 
 # ---------------------------------------------------------------------------
 # Address
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Address:
@@ -200,12 +201,12 @@ class Address:
     campus, suite) that appears separately from the street and number.
     """
 
-    street_and_number:  Optional[str] = None
-    address_supplement: Optional[str] = None
-    postcode:           Optional[str] = None
-    city:               Optional[str] = None
-    state:              Optional[str] = None
-    country:            Optional[str] = None
+    street_and_number: str | None = None
+    address_supplement: str | None = None
+    postcode: str | None = None
+    city: str | None = None
+    state: str | None = None
+    country: str | None = None
 
     def __str__(self) -> str:
         """Return a compact one-line representation for display."""
@@ -224,33 +225,34 @@ class Address:
 
     def to_dict(self) -> dict:
         return {
-            "street_and_number":  self.street_and_number,
+            "street_and_number": self.street_and_number,
             "address_supplement": self.address_supplement,
-            "postcode":           self.postcode,
-            "city":               self.city,
-            "state":              self.state,
-            "country":            self.country,
+            "postcode": self.postcode,
+            "city": self.city,
+            "state": self.state,
+            "country": self.country,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Address":
+    def from_dict(cls, d: dict) -> Address:
         return cls(
-            street_and_number=  d.get("street_and_number"),
-            address_supplement= d.get("address_supplement"),
-            postcode=           d.get("postcode"),
-            city=               d.get("city"),
-            state=              d.get("state"),
-            country=            d.get("country"),
+            street_and_number=d.get("street_and_number"),
+            address_supplement=d.get("address_supplement"),
+            postcode=d.get("postcode"),
+            city=d.get("city"),
+            state=d.get("state"),
+            country=d.get("country"),
         )
 
     @classmethod
-    def empty(cls) -> "Address":
+    def empty(cls) -> Address:
         return cls()
 
 
 # ---------------------------------------------------------------------------
 # Counterparty
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class Counterparty:
@@ -262,21 +264,21 @@ class Counterparty:
     if their ``name`` matches case-insensitively.
     """
 
-    id:          str = field(default_factory=lambda: str(uuid.uuid4()))
-    name:        Optional[str] = None
-    address:     Address = field(default_factory=Address.empty)
-    tax_number:  Optional[str] = None   # German Steuernummer
-    vat_id:      Optional[str] = None   # EU USt-IdNr e.g. DE123456789
-    verified:    bool = False
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    name: str | None = None
+    address: Address = field(default_factory=Address.empty)
+    tax_number: str | None = None  # German Steuernummer
+    vat_id: str | None = None  # EU USt-IdNr e.g. DE123456789
+    verified: bool = False
 
     def to_dict(self) -> dict:
         return {
-            "id":           self.id,
-            "name":         self.name,
-            "address":      self.address.to_dict(),
-            "tax_number":   self.tax_number,
-            "vat_id":       self.vat_id,
-            "verified":     self.verified,
+            "id": self.id,
+            "name": self.name,
+            "address": self.address.to_dict(),
+            "tax_number": self.tax_number,
+            "vat_id": self.vat_id,
+            "verified": self.verified,
         }
 
 
@@ -284,35 +286,37 @@ class Counterparty:
 # ReceiptItem  (unchanged structure)
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ReceiptItem:
     """A single line item within a receipt."""
 
     description: str = ""
-    position:    Optional[int] = None
-    quantity:    Optional[Decimal] = None
-    unit_price:  Optional[Decimal] = None
-    total_price: Optional[Decimal] = None
-    vat_rate:    Optional[Decimal] = None
-    vat_amount:  Optional[Decimal] = None
-    category:    ReceiptCategory = field(default_factory=ReceiptCategory.other)
+    position: int | None = None
+    quantity: Decimal | None = None
+    unit_price: Decimal | None = None
+    total_price: Decimal | None = None
+    vat_rate: Decimal | None = None
+    vat_amount: Decimal | None = None
+    category: ReceiptCategory = field(default_factory=ReceiptCategory.other)
 
     def to_dict(self) -> dict:
         return {
-            "position":    self.position,
+            "position": self.position,
             "description": self.description,
-            "quantity":    float(self.quantity)    if self.quantity    is not None else None,
-            "unit_price":  float(self.unit_price)  if self.unit_price  is not None else None,
+            "quantity": float(self.quantity) if self.quantity is not None else None,
+            "unit_price": float(self.unit_price) if self.unit_price is not None else None,
             "total_price": float(self.total_price) if self.total_price is not None else None,
-            "vat_rate":    float(self.vat_rate)    if self.vat_rate    is not None else None,
-            "vat_amount":  float(self.vat_amount)  if self.vat_amount  is not None else None,
-            "category":    str(self.category),
+            "vat_rate": float(self.vat_rate) if self.vat_rate is not None else None,
+            "vat_amount": float(self.vat_amount) if self.vat_amount is not None else None,
+            "category": str(self.category),
         }
 
 
 # ---------------------------------------------------------------------------
 # ReceiptData
 # ---------------------------------------------------------------------------
+
 
 def _content_hash(raw_text: str) -> str:
     """SHA-256 of normalised OCR text — used as the stable receipt ID."""
@@ -334,26 +338,26 @@ class ReceiptData:
     - ``"sale"``      → Umsatzsteuer (output tax, you remit)
     """
 
-    raw_text:         str = ""
-    id:               str = field(init=False)   # set in __post_init__
+    raw_text: str = ""
+    id: str = field(init=False)  # set in __post_init__
 
-    receipt_type:     ReceiptType = field(default_factory=ReceiptType.purchase)
-    counterparty:     Optional[Counterparty] = None
+    receipt_type: ReceiptType = field(default_factory=ReceiptType.purchase)
+    counterparty: Counterparty | None = None
 
-    receipt_number:   Optional[str] = None
-    receipt_date:     Optional[datetime] = None
-    total_amount:     Optional[Decimal] = None
-    vat_percentage:   Optional[Decimal] = None
-    vat_amount:       Optional[Decimal] = None
-    currency:         str = "EUR"
-    category:         ReceiptCategory = field(default_factory=ReceiptCategory.other)
-    subcategory:      Optional[str] = None
-    description:      str = ""                # free-text notes / memo
-    items:            List[ReceiptItem] = field(default_factory=list)
-    vat_splits:       List[dict] = field(default_factory=list)
+    receipt_number: str | None = None
+    receipt_date: datetime | None = None
+    total_amount: Decimal | None = None
+    vat_percentage: Decimal | None = None
+    vat_amount: Decimal | None = None
+    currency: str = "EUR"
+    category: ReceiptCategory = field(default_factory=ReceiptCategory.other)
+    subcategory: str | None = None
+    description: str = ""  # free-text notes / memo
+    items: list[ReceiptItem] = field(default_factory=list)
+    vat_splits: list[dict] = field(default_factory=list)
     # Populated by validate(); empty = clean, non-empty = user-visible warnings.
     # Receipts are always saved regardless — the user decides to correct or delete.
-    validation_warnings: List[str] = field(default_factory=list)
+    validation_warnings: list[str] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Private-use handling
@@ -369,7 +373,7 @@ class ReceiptData:
     # Import VAT assessed by customs (EUSt-Bescheid) on goods imported from
     # non-EU countries.  Stored separately from the invoice VAT so it can be
     # reported on the correct ELSTER line (Voranmeldung: 62; Jahreserklärung: 124).
-    einfuhr_vat: Optional[Decimal] = None
+    einfuhr_vat: Decimal | None = None
 
     def __post_init__(self) -> None:
         self.id = _content_hash(self.raw_text)
@@ -379,12 +383,12 @@ class ReceiptData:
     # ------------------------------------------------------------------
 
     @property
-    def vendor(self) -> Optional[str]:
+    def vendor(self) -> str | None:
         """Backward-compatible alias for counterparty.name."""
         return self.counterparty.name if self.counterparty else None
 
     @property
-    def net_amount(self) -> Optional[Decimal]:
+    def net_amount(self) -> Decimal | None:
         # Correct gross-to-net: NETTO = BRUTTO ÷ (1 + MwSt./100)
         # This is the only correct formula when total_amount is a gross (VAT-inclusive) figure.
         if self.total_amount is not None and self.vat_percentage is not None:
@@ -407,7 +411,7 @@ class ReceiptData:
     # Private-use postings
     # ------------------------------------------------------------------
 
-    def generate_postings(self) -> List["Posting"]:
+    def generate_postings(self) -> list[Posting]:
         """
         Generate a balanced list of double-entry postings for this receipt.
 
@@ -444,46 +448,96 @@ class ReceiptData:
             return []
 
         gross = _r2(self.total_amount)
-        net   = _r2(self.net_amount)
-        vat   = _r2(gross - net)   # derived from gross−net, consistent with net_amount formula
-        p     = Decimal(str(self.private_use_share))
-        rid   = self.id
+        net = _r2(self.net_amount)
+        vat = _r2(gross - net)  # derived from gross−net, consistent with net_amount formula
+        p = Decimal(str(self.private_use_share))
+        rid = self.id
 
-        postings: List[Posting] = []
+        postings: list[Posting] = []
 
         if self.is_purchase:
             postings += [
-                Posting(rid, PostingType("expense"),          PostingDirection("debit"),  net,   "Betriebsausgabe (gesamt)"),
-                Posting(rid, PostingType("input_vat"),        PostingDirection("debit"),  vat,   "Vorsteuer (gesamt)"),
-                Posting(rid, PostingType("accounts_payable"), PostingDirection("credit"), gross, "Verbindlichkeit Lieferant"),
+                Posting(
+                    rid,
+                    PostingType("expense"),
+                    PostingDirection("debit"),
+                    net,
+                    "Betriebsausgabe (gesamt)",
+                ),
+                Posting(
+                    rid,
+                    PostingType("input_vat"),
+                    PostingDirection("debit"),
+                    vat,
+                    "Vorsteuer (gesamt)",
+                ),
+                Posting(
+                    rid,
+                    PostingType("accounts_payable"),
+                    PostingDirection("credit"),
+                    gross,
+                    "Verbindlichkeit Lieferant",
+                ),
             ]
             if p > Decimal("0"):
-                priv_net   = _r2(net   * p)
-                priv_vat   = _r2(vat   * p)
+                priv_net = _r2(net * p)
+                priv_vat = _r2(vat * p)
                 priv_gross = _r2(gross * p)
                 postings += [
-                    Posting(rid, PostingType("expense"),            PostingDirection("credit"), priv_net,   "Privatanteil Korrektur (Netto)"),
-                    Posting(rid, PostingType("input_vat"),          PostingDirection("credit"), priv_vat,   "Privatanteil Vorsteuerkorrektur"),
-                    Posting(rid, PostingType("private_withdrawal"),  PostingDirection("debit"),  priv_gross, "Privatentnahme / geldwerter Vorteil"),
+                    Posting(
+                        rid,
+                        PostingType("expense"),
+                        PostingDirection("credit"),
+                        priv_net,
+                        "Privatanteil Korrektur (Netto)",
+                    ),
+                    Posting(
+                        rid,
+                        PostingType("input_vat"),
+                        PostingDirection("credit"),
+                        priv_vat,
+                        "Privatanteil Vorsteuerkorrektur",
+                    ),
+                    Posting(
+                        rid,
+                        PostingType("private_withdrawal"),
+                        PostingDirection("debit"),
+                        priv_gross,
+                        "Privatentnahme / geldwerter Vorteil",
+                    ),
                 ]
         else:  # sale
             postings += [
-                Posting(rid, PostingType("accounts_receivable"), PostingDirection("debit"),  gross, "Forderung Kunde"),
-                Posting(rid, PostingType("revenue"),             PostingDirection("credit"), net,   "Betriebseinnahme (netto)"),
-                Posting(rid, PostingType("output_vat"),          PostingDirection("credit"), vat,   "Umsatzsteuer"),
+                Posting(
+                    rid,
+                    PostingType("accounts_receivable"),
+                    PostingDirection("debit"),
+                    gross,
+                    "Forderung Kunde",
+                ),
+                Posting(
+                    rid,
+                    PostingType("revenue"),
+                    PostingDirection("credit"),
+                    net,
+                    "Betriebseinnahme (netto)",
+                ),
+                Posting(
+                    rid, PostingType("output_vat"), PostingDirection("credit"), vat, "Umsatzsteuer"
+                ),
             ]
 
         return postings
 
     @property
-    def business_net(self) -> Optional[Decimal]:
+    def business_net(self) -> Decimal | None:
         """Net amount attributable to the business (after private-use deduction)."""
         if self.net_amount is None:
             return None
         return _r2(self.net_amount * (Decimal("1") - Decimal(str(self.private_use_share))))
 
     @property
-    def business_vat(self) -> Optional[Decimal]:
+    def business_vat(self) -> Decimal | None:
         """Reclaimable / remittable VAT for the business portion only."""
         if self.total_amount is None or self.net_amount is None:
             return None
@@ -505,7 +559,7 @@ class ReceiptData:
         caller must not block on a False return.  Warnings are stored in the
         DB and shown to the user, who decides to correct or delete.
         """
-        warnings: List[str] = []
+        warnings: list[str] = []
         if self.receipt_date and self.receipt_date > datetime.now():
             warnings.append(f"Future date: {self.receipt_date.date().isoformat()}")
         if self.total_amount is not None and self.total_amount <= 0:
@@ -517,9 +571,7 @@ class ReceiptData:
             and self.vat_amount is not None
             and self.vat_amount > self.total_amount
         ):
-            warnings.append(
-                f"VAT amount ({self.vat_amount}) exceeds total ({self.total_amount})"
-            )
+            warnings.append(f"VAT amount ({self.vat_amount}) exceeds total ({self.total_amount})")
         if not (Decimal("0") <= Decimal(str(self.private_use_share)) <= Decimal("1")):
             warnings.append(f"Private use share out of range: {self.private_use_share}")
         self.validation_warnings = warnings
@@ -531,28 +583,32 @@ class ReceiptData:
 
     def to_dict(self) -> dict:
         return {
-            "id":               self.id,
-            "receipt_type":     str(self.receipt_type),
-            "vendor":           self.vendor,  # convenience alias for counterparty.name
-            "counterparty":     self.counterparty.to_dict() if self.counterparty else None,
-            "receipt_number":   self.receipt_number,
-            "receipt_date":     self.receipt_date.date().isoformat() if self.receipt_date else None,
-            "total_amount":     float(self.total_amount)     if self.total_amount     is not None else None,
-            "vat_percentage":   float(self.vat_percentage)   if self.vat_percentage   is not None else None,
-            "vat_amount":       float(self.vat_amount)       if self.vat_amount       is not None else None,
-            "net_amount":       float(self.net_amount)       if self.net_amount       is not None else None,
+            "id": self.id,
+            "receipt_type": str(self.receipt_type),
+            "vendor": self.vendor,  # convenience alias for counterparty.name
+            "counterparty": self.counterparty.to_dict() if self.counterparty else None,
+            "receipt_number": self.receipt_number,
+            "receipt_date": self.receipt_date.date().isoformat() if self.receipt_date else None,
+            "total_amount": float(self.total_amount) if self.total_amount is not None else None,
+            "vat_percentage": float(self.vat_percentage)
+            if self.vat_percentage is not None
+            else None,
+            "vat_amount": float(self.vat_amount) if self.vat_amount is not None else None,
+            "net_amount": float(self.net_amount) if self.net_amount is not None else None,
             "private_use_share": float(self.private_use_share),
-            "business_net":     float(self.business_net)     if self.business_net     is not None else None,
-            "business_vat":     float(self.business_vat)     if self.business_vat     is not None else None,
-            "currency":         self.currency,
-            "category":         str(self.category),
-            "subcategory":      self.subcategory,
-            "description":      self.description or None,
-            "items":            [item.to_dict() for item in self.items],
-            "vat_splits":       getattr(self, "vat_splits", []),
+            "business_net": float(self.business_net) if self.business_net is not None else None,
+            "business_vat": float(self.business_vat) if self.business_vat is not None else None,
+            "currency": self.currency,
+            "category": str(self.category),
+            "subcategory": self.subcategory,
+            "description": self.description or None,
+            "items": [item.to_dict() for item in self.items],
+            "vat_splits": getattr(self, "vat_splits", []),
             "validation_warnings": getattr(self, "validation_warnings", []),
-            "created_at":       getattr(self, "created_at", None),
-            "einfuhr_vat":      float(self.einfuhr_vat) if getattr(self, "einfuhr_vat", None) is not None else None,
+            "created_at": getattr(self, "created_at", None),
+            "einfuhr_vat": float(self.einfuhr_vat)
+            if getattr(self, "einfuhr_vat", None) is not None
+            else None,
         }
 
     def to_json(self) -> str:
@@ -562,6 +618,7 @@ class ReceiptData:
 # ---------------------------------------------------------------------------
 # ExtractionResult
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ExtractionResult:
@@ -573,20 +630,19 @@ class ExtractionResult:
     ``existing_id`` for the ID of the original.
     """
 
-    success:         bool
-    data:            Optional[ReceiptData] = None
-    error_message:   Optional[str] = None
-    processing_time: Optional[float] = None
-    duplicate:       bool = False
-    existing_id:     Optional[str] = None   # set when duplicate=True
+    success: bool
+    data: ReceiptData | None = None
+    error_message: str | None = None
+    processing_time: float | None = None
+    duplicate: bool = False
+    existing_id: str | None = None  # set when duplicate=True
 
     def to_dict(self) -> dict:
         return {
-            "success":         self.success,
-            "duplicate":       self.duplicate,
-            "existing_id":     self.existing_id,
-            "data":            self.data.to_dict() if self.data else None,
-            "error_message":   self.error_message,
+            "success": self.success,
+            "duplicate": self.duplicate,
+            "existing_id": self.existing_id,
+            "data": self.data.to_dict() if self.data else None,
+            "error_message": self.error_message,
             "processing_time": round(self.processing_time, 3) if self.processing_time else None,
         }
-    

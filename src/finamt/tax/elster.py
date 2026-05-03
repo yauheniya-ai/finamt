@@ -69,11 +69,9 @@ import logging
 import os
 import random
 from base64 import b64encode
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_DOWN
+from dataclasses import dataclass
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
-from typing import Literal
 
 # ---------------------------------------------------------------------------
 # Optional imports — only needed for actual signing / submission
@@ -81,20 +79,23 @@ from typing import Literal
 
 try:
     from lxml import etree
+
     _LXML_AVAILABLE = True
 except ImportError:
     _LXML_AVAILABLE = False
 
 try:
-    from cryptography.hazmat.primitives.serialization import pkcs12
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+    from cryptography.hazmat.primitives.serialization import pkcs12
+
     _CRYPTO_AVAILABLE = True
 except ImportError:
     _CRYPTO_AVAILABLE = False
 
 try:
     import requests as _requests
+
     _REQUESTS_AVAILABLE = True
 except ImportError:
     _REQUESTS_AVAILABLE = False
@@ -108,7 +109,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 ELSTER_URL_PRODUCTION = "https://www.elster.de/ekona/upload/elster"
-ELSTER_URL_TEST       = "https://www.elster.de/ekona/upload/elstertest"
+ELSTER_URL_TEST = "https://www.elster.de/ekona/upload/elstertest"
 
 # Testmerker — signals the Finanzamt that this is a test submission
 TESTMERKER = "700000004"
@@ -117,15 +118,27 @@ TESTMERKER = "700000004"
 NS = "http://www.elster.de/elsterxml/schema/v11"
 
 # Product identification sent to ELSTER
-PRODUKT_NAME    = "finamt"
+PRODUKT_NAME = "finamt"
 PRODUKT_VERSION = "0.1"
 
 # Länderkennzeichen (2-digit numeric) → ELSTER <Ziel> code for TransferHeader
 _BUNDESLAND_ZIEL: dict[str, str] = {
-    "01": "SH", "02": "HH", "03": "NI", "04": "HB",
-    "05": "NW", "06": "HE", "07": "RP", "08": "BW",
-    "09": "BY", "10": "SL", "11": "BE", "12": "BB",
-    "13": "MV", "14": "SN", "15": "ST", "16": "TH",
+    "01": "SH",
+    "02": "HH",
+    "03": "NI",
+    "04": "HB",
+    "05": "NW",
+    "06": "HE",
+    "07": "RP",
+    "08": "BW",
+    "09": "BY",
+    "10": "SL",
+    "11": "BE",
+    "12": "BB",
+    "13": "MV",
+    "14": "SN",
+    "15": "ST",
+    "16": "TH",
     # also accept 2-letter values passed directly
 }
 
@@ -148,40 +161,40 @@ def _bundesland_ziel(bundesland_kz: str) -> str:
 # city/state name → Länderkennzeichen (lower-cased for matching)
 _CITY_TO_KZ: dict[str, str] = {
     # Stadtstaaten
-    "berlin":            "11",
-    "hamburg":           "02",
-    "bremen":            "04",
-    "bremerhaven":       "04",
+    "berlin": "11",
+    "hamburg": "02",
+    "bremen": "04",
+    "bremerhaven": "04",
     # Flächenländer – capitals + common aliases
-    "kiel":              "01",  # Schleswig-Holstein
-    "schleswig-holstein":"01",
-    "niedersachsen":     "03",
-    "hannover":          "03",
-    "nordrhein-westfalen":"05",
-    "düsseldorf":        "05",
-    "köln":              "05",
-    "hessen":            "06",
-    "wiesbaden":         "06",
-    "frankfurt":         "06",
-    "rheinland-pfalz":   "07",
-    "mainz":             "07",
+    "kiel": "01",  # Schleswig-Holstein
+    "schleswig-holstein": "01",
+    "niedersachsen": "03",
+    "hannover": "03",
+    "nordrhein-westfalen": "05",
+    "düsseldorf": "05",
+    "köln": "05",
+    "hessen": "06",
+    "wiesbaden": "06",
+    "frankfurt": "06",
+    "rheinland-pfalz": "07",
+    "mainz": "07",
     "baden-württemberg": "08",
-    "stuttgart":         "08",
-    "bayern":            "09",
-    "munich":            "09",
-    "münchen":           "09",
-    "saarland":          "10",
-    "saarbrücken":       "10",
-    "brandenburg":       "12",
-    "potsdam":           "12",
+    "stuttgart": "08",
+    "bayern": "09",
+    "munich": "09",
+    "münchen": "09",
+    "saarland": "10",
+    "saarbrücken": "10",
+    "brandenburg": "12",
+    "potsdam": "12",
     "mecklenburg-vorpommern": "13",
-    "schwerin":          "13",
-    "sachsen":           "14",
-    "dresden":           "14",
-    "sachsen-anhalt":    "15",
-    "magdeburg":         "15",
-    "thüringen":         "16",
-    "erfurt":            "16",
+    "schwerin": "13",
+    "sachsen": "14",
+    "dresden": "14",
+    "sachsen-anhalt": "15",
+    "magdeburg": "15",
+    "thüringen": "16",
+    "erfurt": "16",
 }
 
 
@@ -196,6 +209,7 @@ def bundesland_kz_from_city(city: str) -> str:
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ElsterConfig:
@@ -222,23 +236,23 @@ class ElsterConfig:
         E.g. "21" for Bayern, "30" for Berlin, "22" for Brandenburg.
     """
 
-    cert_path:      str | Path
-    cert_password:  str
-    steuernummer:   str
-    finanzamt_nr:   str
-    bundesland_kz:  str
-    hersteller_id:  str = ""  # register at https://www.elster.de/eportal/softwareentwickler
+    cert_path: str | Path
+    cert_password: str
+    steuernummer: str
+    finanzamt_nr: str
+    bundesland_kz: str
+    hersteller_id: str = ""  # register at https://www.elster.de/eportal/softwareentwickler
 
     @classmethod
-    def from_env(cls) -> "ElsterConfig":
+    def from_env(cls) -> ElsterConfig:
         """Load config from environment variables."""
         return cls(
-            cert_path     = os.environ["FINAMT_ELSTER_CERT_PATH"],
-            cert_password = os.environ["FINAMT_ELSTER_CERT_PASSWORD"],
-            steuernummer  = os.environ["FINAMT_ELSTER_STEUERNUMMER"],
-            finanzamt_nr  = os.environ["FINAMT_ELSTER_FINANZAMT_NR"],
-            bundesland_kz = os.environ["FINAMT_ELSTER_BUNDESLAND_KZ"],
-            hersteller_id = os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", ""),
+            cert_path=os.environ["FINAMT_ELSTER_CERT_PATH"],
+            cert_password=os.environ["FINAMT_ELSTER_CERT_PASSWORD"],
+            steuernummer=os.environ["FINAMT_ELSTER_STEUERNUMMER"],
+            finanzamt_nr=os.environ["FINAMT_ELSTER_FINANZAMT_NR"],
+            bundesland_kz=os.environ["FINAMT_ELSTER_BUNDESLAND_KZ"],
+            hersteller_id=os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", ""),
         )
 
 
@@ -246,13 +260,14 @@ class ElsterConfig:
 # Submission result
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SubmissionResult:
-    success:        bool
-    telenummer:     str | None = None    # ELSTER transfer ticket number
-    error_code:     str | None = None
-    error_message:  str | None = None
-    raw_response:   str | None = None
+    success: bool
+    telenummer: str | None = None  # ELSTER transfer ticket number
+    error_code: str | None = None
+    error_message: str | None = None
+    raw_response: str | None = None
 
     def __str__(self) -> str:
         if self.success:
@@ -263,6 +278,7 @@ class SubmissionResult:
 # ---------------------------------------------------------------------------
 # Steuernummer normalisation
 # ---------------------------------------------------------------------------
+
 
 def normalise_steuernummer(raw: str, bundesland_kz: str) -> str:
     """
@@ -281,7 +297,7 @@ def normalise_steuernummer(raw: str, bundesland_kz: str) -> str:
         return digits
     # Strip leading Länderkennzeichen if already present
     if digits.startswith(bundesland_kz):
-        digits = digits[len(bundesland_kz):]
+        digits = digits[len(bundesland_kz) :]
     # Pad to 11 digits (local format), then prepend Länderkennzeichen
     digits = digits.zfill(11)
     return bundesland_kz + digits
@@ -290,6 +306,7 @@ def normalise_steuernummer(raw: str, bundesland_kz: str) -> str:
 # ---------------------------------------------------------------------------
 # UStVA Kennzahlen mapping
 # ---------------------------------------------------------------------------
+
 
 def _ustva_kennzahlen(report: USTVAReport) -> dict[str, str]:
     """
@@ -300,6 +317,7 @@ def _ustva_kennzahlen(report: USTVAReport) -> dict[str, str]:
 
     ⚠  Verify these mappings against the current official UStVA form on www.elster.de.
     """
+
     def whole(d: Decimal) -> str:
         """Round down to whole euros, return as string without decimal point."""
         return str(int(d.quantize(Decimal("1"), rounding=ROUND_DOWN)))
@@ -312,11 +330,11 @@ def _ustva_kennzahlen(report: USTVAReport) -> dict[str, str]:
     # Standard tax rates
     ln19 = report.line_19
     if ln19 and ln19.sale_net > 0:
-        kz["Kz81"] = whole(ln19.sale_net)      # Umsätze 19 % — Bemessungsgrundlage
+        kz["Kz81"] = whole(ln19.sale_net)  # Umsätze 19 % — Bemessungsgrundlage
 
     ln7 = report.line_7
     if ln7 and ln7.sale_net > 0:
-        kz["Kz86"] = whole(ln7.sale_net)       # Umsätze 7 % — Bemessungsgrundlage
+        kz["Kz86"] = whole(ln7.sale_net)  # Umsätze 7 % — Bemessungsgrundlage
 
     # Other rates (Kz 35 / Kz 36)
     for rate_key, ln in report.lines.items():
@@ -339,6 +357,7 @@ def _ustva_kennzahlen(report: USTVAReport) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # XML Builder
 # ---------------------------------------------------------------------------
+
 
 class ElsterXMLBuilder:
     """
@@ -393,8 +412,8 @@ class ElsterXMLBuilder:
         use_test:
             True → include Testmerker (test submission, not legally binding).
         """
-        ticket    = _make_ticket()
-        steuernr  = normalise_steuernummer(self.config.steuernummer, self.config.bundesland_kz)
+        ticket = _make_ticket()
+        steuernr = normalise_steuernummer(self.config.steuernummer, self.config.bundesland_kz)
         if len(steuernr) != 13:
             raise ValueError(
                 f"Cannot normalise Steuernummer '{self.config.steuernummer}' to 13 digits. "
@@ -402,11 +421,10 @@ class ElsterXMLBuilder:
                 "13-digit ELSTER form directly (e.g. '1137053950531')."
             )
         # Derive bundesland_kz from the normalised steuernummer prefix if not given
-        bund_kz   = self.config.bundesland_kz or steuernr[:2]
+        bund_kz = self.config.bundesland_kz or steuernr[:2]
         # BUFA = first 4 digits of the 13-digit normalised steuernummer
-        fa_nr     = self.config.finanzamt_nr or steuernr[:4]
-        kz        = _ustva_kennzahlen(report)
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%d%H%M%S")
+        fa_nr = self.config.finanzamt_nr or steuernr[:4]
+        kz = _ustva_kennzahlen(report)
 
         # Helper: Clark-notation tag in the ELSTER namespace
         def _t(tag: str) -> str:
@@ -416,45 +434,44 @@ class ElsterXMLBuilder:
 
         # ── TransferHeader ────────────────────────────────────────────
         th = etree.SubElement(root, _t("TransferHeader"), version="11")
-        etree.SubElement(th, _t("Verfahren")).text  = "ElsterAnmeldung"
-        etree.SubElement(th, _t("DatenArt")).text   = "UStVA"
-        etree.SubElement(th, _t("Vorgang")).text    = "send-Auth"
+        etree.SubElement(th, _t("Verfahren")).text = "ElsterAnmeldung"
+        etree.SubElement(th, _t("DatenArt")).text = "UStVA"
+        etree.SubElement(th, _t("Vorgang")).text = "send-Auth"
         etree.SubElement(th, _t("TransferTicket")).text = ticket
         if use_test:
             etree.SubElement(th, _t("Testmerker")).text = TESTMERKER
-        emp_th = etree.SubElement(th, _t("Empfaenger"), id="L")   # L = Landesfinanzbehörde
+        emp_th = etree.SubElement(th, _t("Empfaenger"), id="L")  # L = Landesfinanzbehörde
         etree.SubElement(emp_th, _t("Ziel")).text = _bundesland_ziel(bund_kz)
         etree.SubElement(th, _t("HerstellerID")).text = self.config.hersteller_id
         etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
         datei = etree.SubElement(th, _t("Datei"))
         etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
-        etree.SubElement(datei, _t("Kompression")).text      = "GZIP"
+        etree.SubElement(datei, _t("Kompression")).text = "GZIP"
         etree.SubElement(datei, _t("TransportSchluessel"))
 
         # ── DatenTeil ─────────────────────────────────────────────────
-        dt    = etree.SubElement(root, _t("DatenTeil"))
-        ndb   = etree.SubElement(dt,   _t("Nutzdatenblock"))
+        dt = etree.SubElement(root, _t("DatenTeil"))
+        ndb = etree.SubElement(dt, _t("Nutzdatenblock"))
 
         # NutzdatenHeader
         ndh = etree.SubElement(ndb, _t("NutzdatenHeader"), version="11")
         etree.SubElement(ndh, _t("NutzdatenTicket")).text = ticket
         etree.SubElement(ndh, _t("Empfaenger"), id="F").text = fa_nr
         herst = etree.SubElement(ndh, _t("Hersteller"))
-        etree.SubElement(herst, _t("ProduktName")).text    = PRODUKT_NAME
+        etree.SubElement(herst, _t("ProduktName")).text = PRODUKT_NAME
         etree.SubElement(herst, _t("ProduktVersion")).text = PRODUKT_VERSION
 
         # Nutzdaten — UStVA payload
-        nd    = etree.SubElement(ndb, _t("Nutzdaten"))
-        anm   = etree.SubElement(nd,  _t("Anmeldungssteuern"),
-                                  art="UStVA", version=f"{year}01")
-        sf    = etree.SubElement(anm, _t("Steuerfall"))
-        ustva = etree.SubElement(sf,  _t("Umsatzsteuervoranmeldung"))
+        nd = etree.SubElement(ndb, _t("Nutzdaten"))
+        anm = etree.SubElement(nd, _t("Anmeldungssteuern"), art="UStVA", version=f"{year}01")
+        sf = etree.SubElement(anm, _t("Steuerfall"))
+        ustva = etree.SubElement(sf, _t("Umsatzsteuervoranmeldung"))
 
-        etree.SubElement(ustva, _t("Jahr")).text     = str(year)
+        etree.SubElement(ustva, _t("Jahr")).text = str(year)
         etree.SubElement(ustva, _t("Zeitraum")).text = str(period).zfill(2)
         etree.SubElement(ustva, _t("Steuernummer")).text = steuernr
-        etree.SubElement(ustva, _t("Kz09")).text    = self.config.finanzamt_nr
-        etree.SubElement(ustva, _t("Kz10")).text    = "1" if is_berichtigung else "0"
+        etree.SubElement(ustva, _t("Kz09")).text = self.config.finanzamt_nr
+        etree.SubElement(ustva, _t("Kz10")).text = "1" if is_berichtigung else "0"
 
         # Write Kennzahlen
         for kz_name, kz_value in kz.items():
@@ -466,6 +483,7 @@ class ElsterXMLBuilder:
 # ---------------------------------------------------------------------------
 # Signer
 # ---------------------------------------------------------------------------
+
 
 class ElsterSigner:
     """
@@ -495,8 +513,8 @@ class ElsterSigner:
         private_key, certificate, _ = pkcs12.load_key_and_certificates(
             pfx_data, config.cert_password.encode()
         )
-        self._private_key  = private_key
-        self._certificate  = certificate
+        self._private_key = private_key
+        self._certificate = certificate
 
     def sign(self, xml_bytes: bytes) -> bytes:
         """
@@ -538,8 +556,8 @@ class ElsterSigner:
             if nodes:
                 nodes[0].text = value
 
-        fill("DigestValue",     digest_b64)
-        fill("SignatureValue",  sig_b64)
+        fill("DigestValue", digest_b64)
+        fill("SignatureValue", sig_b64)
         fill("X509Certificate", cert_b64)
 
         return etree.tostring(tree, xml_declaration=True, encoding="UTF-8", pretty_print=True)
@@ -548,6 +566,7 @@ class ElsterSigner:
 # ---------------------------------------------------------------------------
 # HTTP Client
 # ---------------------------------------------------------------------------
+
 
 class ElsterClient:
     """
@@ -568,17 +587,17 @@ class ElsterClient:
                 "requests is required for ELSTER submission. "
                 "Install with: pip install finamt[elster]"
             )
-        self.config    = config
-        self.use_test  = use_test
-        self._builder  = ElsterXMLBuilder(config)
-        self._signer   = ElsterSigner(config)
-        self._url      = ELSTER_URL_TEST if use_test else ELSTER_URL_PRODUCTION
+        self.config = config
+        self.use_test = use_test
+        self._builder = ElsterXMLBuilder(config)
+        self._signer = ElsterSigner(config)
+        self._url = ELSTER_URL_TEST if use_test else ELSTER_URL_PRODUCTION
 
         if not use_test:
             import warnings
+
             warnings.warn(
-                "ElsterClient is in PRODUCTION mode. "
-                "Submissions are legally binding.",
+                "ElsterClient is in PRODUCTION mode. Submissions are legally binding.",
                 stacklevel=2,
             )
 
@@ -608,7 +627,9 @@ class ElsterClient:
         """
         # 1. Build XML
         xml_unsigned = self._builder.build_ustva(
-            report, year, period,
+            report,
+            year,
+            period,
             is_berichtigung=is_berichtigung,
             use_test=self.use_test,
         )
@@ -657,9 +678,11 @@ class ElsterClient:
             # Fallback: basic string search
             if "<Telenummer>" in raw:
                 start = raw.index("<Telenummer>") + len("<Telenummer>")
-                end   = raw.index("</Telenummer>")
+                end = raw.index("</Telenummer>")
                 return SubmissionResult(success=True, telenummer=raw[start:end], raw_response=raw)
-            return SubmissionResult(success=False, error_message="Unbekannte Antwort", raw_response=raw)
+            return SubmissionResult(
+                success=False, error_message="Unbekannte Antwort", raw_response=raw
+            )
 
         try:
             tree = etree.fromstring(raw.encode())
@@ -675,9 +698,9 @@ class ElsterClient:
             nodes = tree.xpath(f"//*[local-name()='{xpath}']")
             return nodes[0].text if nodes else None
 
-        telenummer  = text("Telenummer")
-        error_code  = text("Code")
-        error_msg   = text("Meldung")
+        telenummer = text("Telenummer")
+        error_code = text("Code")
+        error_msg = text("Meldung")
 
         if telenummer:
             return SubmissionResult(success=True, telenummer=telenummer, raw_response=raw)
@@ -706,7 +729,9 @@ class ElsterClient:
         Useful for manual review before filing.
         """
         xml_unsigned = self._builder.build_ustva(
-            report, year, period,
+            report,
+            year,
+            period,
             is_berichtigung=is_berichtigung,
             use_test=self.use_test,
         )
@@ -719,6 +744,7 @@ class ElsterClient:
 # ---------------------------------------------------------------------------
 # E-Bilanz envelope builder (XBRL wrapped in ELSTER v12)
 # ---------------------------------------------------------------------------
+
 
 class EBilanzEnvelopeBuilder:
     """
@@ -738,8 +764,7 @@ class EBilanzEnvelopeBuilder:
     def __init__(self, config: ElsterConfig) -> None:
         if not _LXML_AVAILABLE:
             raise ImportError(
-                "lxml is required for E-Bilanz envelope building. "
-                "Install with: pip install lxml"
+                "lxml is required for E-Bilanz envelope building. Install with: pip install lxml"
             )
         self.config = config
 
@@ -765,7 +790,7 @@ class EBilanzEnvelopeBuilder:
         -------
         UTF-8 bytes of the full Elster XML envelope ready for ERiC.
         """
-        ticket   = _make_ticket()
+        ticket = _make_ticket()
         steuernr = normalise_steuernummer(self.config.steuernummer, self.config.bundesland_kz)
         if len(steuernr) != 13:
             raise ValueError(
@@ -774,9 +799,9 @@ class EBilanzEnvelopeBuilder:
                 "13-digit ELSTER form directly (e.g. '1137053950531')."
             )
         # Derive bundesland_kz from the normalised steuernummer prefix if not given
-        bund_kz  = self.config.bundesland_kz or steuernr[:2]
+        bund_kz = self.config.bundesland_kz or steuernr[:2]
         # BUFA = first 4 digits of the 13-digit normalised steuernummer
-        fa_nr    = self.config.finanzamt_nr or steuernr[:4]
+        fa_nr = self.config.finanzamt_nr or steuernr[:4]
 
         # Helper: Clark-notation tag in the ELSTER namespace
         def _t(tag: str) -> str:
@@ -786,9 +811,9 @@ class EBilanzEnvelopeBuilder:
 
         # ── TransferHeader ────────────────────────────────────────────
         th = etree.SubElement(root, _t("TransferHeader"), version="11")
-        etree.SubElement(th, _t("Verfahren")).text   = "ElsterBilanz"
-        etree.SubElement(th, _t("DatenArt")).text    = "Bilanz"
-        etree.SubElement(th, _t("Vorgang")).text     = "send-Auth"
+        etree.SubElement(th, _t("Verfahren")).text = "ElsterBilanz"
+        etree.SubElement(th, _t("DatenArt")).text = "Bilanz"
+        etree.SubElement(th, _t("Vorgang")).text = "send-Auth"
         etree.SubElement(th, _t("TransferTicket")).text = ticket
         if use_test:
             etree.SubElement(th, _t("Testmerker")).text = TESTMERKER
@@ -798,19 +823,19 @@ class EBilanzEnvelopeBuilder:
         etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
         datei = etree.SubElement(th, _t("Datei"))
         etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
-        etree.SubElement(datei, _t("Kompression")).text      = "GZIP"
+        etree.SubElement(datei, _t("Kompression")).text = "GZIP"
         etree.SubElement(datei, _t("TransportSchluessel"))
 
         # ── DatenTeil ─────────────────────────────────────────────────
-        dt  = etree.SubElement(root, _t("DatenTeil"))
-        ndb = etree.SubElement(dt,   _t("Nutzdatenblock"))
+        dt = etree.SubElement(root, _t("DatenTeil"))
+        ndb = etree.SubElement(dt, _t("Nutzdatenblock"))
 
         # NutzdatenHeader
         ndh = etree.SubElement(ndb, _t("NutzdatenHeader"), version="11")
         etree.SubElement(ndh, _t("NutzdatenTicket")).text = ticket
         etree.SubElement(ndh, _t("Empfaenger"), id="F").text = fa_nr
         herst = etree.SubElement(ndh, _t("Hersteller"))
-        etree.SubElement(herst, _t("ProduktName")).text    = PRODUKT_NAME
+        etree.SubElement(herst, _t("ProduktName")).text = PRODUKT_NAME
         etree.SubElement(herst, _t("ProduktVersion")).text = PRODUKT_VERSION
 
         # Nutzdaten — XBRL content embedded as child XML
@@ -827,6 +852,7 @@ class EBilanzEnvelopeBuilder:
 # ---------------------------------------------------------------------------
 # ERiC-based ELSTER client (E-Bilanz)
 # ---------------------------------------------------------------------------
+
 
 class ElsterEricClient:
     """
@@ -870,17 +896,17 @@ class ElsterEricClient:
         use_test: bool = True,
         log_dir: str | None = None,
     ) -> None:
-        self.config   = config
+        self.config = config
         self.eric_home = eric_home
-        self.use_test  = use_test
-        self.log_dir   = log_dir  # None means ERiC writes no log file
-        self._builder  = EBilanzEnvelopeBuilder(config)
+        self.use_test = use_test
+        self.log_dir = log_dir  # None means ERiC writes no log file
+        self._builder = EBilanzEnvelopeBuilder(config)
 
         if not use_test:
             import warnings
+
             warnings.warn(
-                "ElsterEricClient is in PRODUCTION mode. "
-                "Submissions are legally binding.",
+                "ElsterEricClient is in PRODUCTION mode. Submissions are legally binding.",
                 stacklevel=2,
             )
 
@@ -918,15 +944,17 @@ class ElsterEricClient:
 
     def _run(self, xbrl_bytes: bytes, year: int, send: bool) -> SubmissionResult:
         from .eric_wrapper import (
-            EricSession, EricBuffer, EricCertificate,
-            ERIC_VALIDIERE, ERIC_SENDE, EricError,
+            ERIC_SENDE,
+            ERIC_VALIDIERE,
+            EricBuffer,
+            EricCertificate,
+            EricError,
+            EricSession,
         )
 
         # 1. Build the ELSTER envelope
         try:
-            envelope_xml = self._builder.build(
-                xbrl_bytes, year=year, use_test=self.use_test
-            )
+            envelope_xml = self._builder.build(xbrl_bytes, year=year, use_test=self.use_test)
         except Exception as exc:
             return SubmissionResult(
                 success=False,
@@ -947,7 +975,9 @@ class ElsterEricClient:
         try:
             with EricSession(self.eric_home, log_dir=self.log_dir) as eric:
                 with EricBuffer(eric) as resp_buf, EricBuffer(eric) as srv_buf:
-                    with EricCertificate(eric, str(self.config.cert_path), self.config.cert_password) as cert:
+                    with EricCertificate(
+                        eric, str(self.config.cert_path), self.config.cert_password
+                    ) as cert:
                         rc, _th = eric.bearbeite_vorgang(
                             xml_bytes=envelope_xml,
                             datenart_version=EBilanzEnvelopeBuilder.DATENART_VERSION,
@@ -957,7 +987,7 @@ class ElsterEricClient:
                             server_buffer=srv_buf.handle(),
                         )
                         response_xml = resp_buf.content()
-                        server_xml   = srv_buf.content()
+                        server_xml = srv_buf.content()
                         if rc != 0:
                             # Retrieve human-readable text while session is still open
                             eric_text = eric.get_error_text(rc)
@@ -971,8 +1001,11 @@ class ElsterEricClient:
                                     pass
                             logger.error(
                                 "ERiC rc=%d  eric_text=%r  response_xml=%s",
-                                rc, eric_text,
-                                response_xml.decode("utf-8", errors="replace") if response_xml else "<empty>",
+                                rc,
+                                eric_text,
+                                response_xml.decode("utf-8", errors="replace")
+                                if response_xml
+                                else "<empty>",
                             )
 
         except EricError as exc:
@@ -1002,7 +1035,9 @@ class ElsterEricClient:
                 error_code=str(rc),
                 error_message=err_msg,
                 raw_response=(
-                    (response_xml or b"") + (b"\n" if response_xml and server_xml else b"") + (server_xml or b"")
+                    (response_xml or b"")
+                    + (b"\n" if response_xml and server_xml else b"")
+                    + (server_xml or b"")
                 ).decode("utf-8", errors="replace"),
             )
 
@@ -1026,7 +1061,7 @@ class ElsterEricClient:
                 return raw[s:e]
             return None
         try:
-            tree  = etree.fromstring(xml_bytes)
+            tree = etree.fromstring(xml_bytes)
             nodes = tree.xpath("//*[local-name()='Telenummer']")
             return nodes[0].text if nodes else None
         except Exception:
@@ -1060,7 +1095,7 @@ class ElsterEricClient:
                     # Also look for FachlicheFehlerId + RegelName for context
                     ids = tree.xpath("//*[local-name()='FachlicheFehlerId']/text()")
                     names = tree.xpath("//*[local-name()='RegelName']/text()")
-                    for fid, rn in zip(ids, names):
+                    for fid, rn in zip(ids, names, strict=False):
                         parts.append(f"[{rn} / FehlerID {fid}]")
                 except Exception:
                     if response_xml:

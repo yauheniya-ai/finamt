@@ -11,13 +11,14 @@ import logging
 import os
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeout
-from finamt import progress as _progress
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as _FuturesTimeout
 from pathlib import Path
-from typing import Optional, Union
 
 import fitz  # PyMuPDF
 from PIL import Image
+
+from finamt import progress as _progress
 
 from .agents.config import Config
 from .exceptions import OCRProcessingError
@@ -31,11 +32,12 @@ logger = logging.getLogger(__name__)
 def _ts() -> str:
     return time.strftime("[%H:%M:%S]")
 
+
 # ---------------------------------------------------------------------------
 # PaddleOCR singleton — model loads once, reused for all receipts
 # ---------------------------------------------------------------------------
 _paddle_ocr_instance = None
-_paddle_ocr_error: Optional[str] = None
+_paddle_ocr_error: str | None = None
 
 
 def _get_paddle_ocr():
@@ -48,13 +50,13 @@ def _get_paddle_ocr():
 
     try:
         from paddleocr import PaddleOCR
+
         # lang='german' covers full Latin alphabet; handles German/English mix
         _paddle_ocr_instance = PaddleOCR(use_textline_orientation=True, lang="german")
         return _paddle_ocr_instance, None
     except ImportError as e:
         _paddle_ocr_error = (
-            f"PaddleOCR import failed — {e}. "
-            "Install with: pip install paddleocr paddlepaddle"
+            f"PaddleOCR import failed — {e}. Install with: pip install paddleocr paddlepaddle"
         )
         return None, _paddle_ocr_error
     except Exception as e:
@@ -79,7 +81,7 @@ def _extract_texts_from_paddle_result(result) -> list[str]:
 class OCRProcessor:
     """Extract plain text from PDF receipts via OCR."""
 
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config()
         self._configure_tesseract()
 
@@ -92,6 +94,7 @@ class OCRProcessor:
         if self.config.tesseract_cmd != "tesseract":
             try:
                 import pytesseract
+
                 pytesseract.pytesseract.tesseract_cmd = self.config.tesseract_cmd
             except ImportError:
                 pass
@@ -100,7 +103,7 @@ class OCRProcessor:
     # Public API
     # ------------------------------------------------------------------
 
-    def extract_text_from_pdf(self, pdf_path: Union[str, Path, bytes]) -> str:
+    def extract_text_from_pdf(self, pdf_path: str | Path | bytes) -> str:
         """
         Extract text from every page of a PDF.
 
@@ -122,9 +125,7 @@ class OCRProcessor:
             else:
                 pdf_doc = fitz.open(str(pdf_path))
         except Exception as exc:
-            raise OCRProcessingError(
-                f"Could not open PDF: {pdf_path}", cause=exc
-            ) from exc
+            raise OCRProcessingError(f"Could not open PDF: {pdf_path}", cause=exc) from exc
 
         pages_text: list[str] = []
         try:
@@ -141,7 +142,7 @@ class OCRProcessor:
                     ocr_text = self._ocr_page(page)
                     pages_text.append(ocr_text)
         finally:
-            pdf_doc.close()   # always release the file handle
+            pdf_doc.close()  # always release the file handle
 
         return "\n".join(pages_text).strip()
 
@@ -199,13 +200,17 @@ class OCRProcessor:
                     return "\n".join(lines)
                 logger.debug("PaddleOCR returned no text, trying Tesseract")
             except _FuturesTimeout:
-                _progress.emit(f"    {_ts()} → PaddleOCR timed out ({self.config.ocr_timeout}s) — Tesseract fallback")
+                _progress.emit(
+                    f"    {_ts()} → PaddleOCR timed out ({self.config.ocr_timeout}s) — Tesseract fallback"
+                )
                 logger.warning(
                     "PaddleOCR timed out after %ds — falling back to Tesseract",
                     self.config.ocr_timeout,
                 )
             except Exception as exc:
-                _progress.emit(f"    {_ts()} → PaddleOCR failed ({type(exc).__name__}) — Tesseract fallback")
+                _progress.emit(
+                    f"    {_ts()} → PaddleOCR failed ({type(exc).__name__}) — Tesseract fallback"
+                )
                 logger.warning("PaddleOCR error: %s: %s", type(exc).__name__, exc)
         else:
             _progress.emit(f"    {_ts()} → PaddleOCR unavailable — Tesseract fallback")

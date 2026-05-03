@@ -12,20 +12,16 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
-from pathlib import Path
-from unittest.mock import MagicMock, patch, call
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from finamt.agents.agent import FinanceAgent
-from finamt.agents.config import Config, AgentsConfig
-from finamt.exceptions import InvalidReceiptError, OCRProcessingError
-from finamt.models import ReceiptData
-
+from finamt.agents.config import AgentsConfig
+from finamt.exceptions import OCRProcessingError
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_agent(ocr_text: str = "") -> tuple[FinanceAgent, MagicMock]:
     """Return (agent, mock_ocr) with OCR pre-configured to return ocr_text."""
@@ -54,6 +50,7 @@ def _four_responses(a1, a2, a3, a4):
 # Initialisation
 # ---------------------------------------------------------------------------
 
+
 class TestInit:
     def test_default_agents_config_used(self):
         with patch("finamt.agents.agent.OCRProcessor"):
@@ -68,6 +65,7 @@ class TestInit:
 
     def test_no_basicconfig_called(self):
         import logging
+
         root = logging.getLogger()
         original_handlers = list(root.handlers)
         with patch("finamt.agents.agent.OCRProcessor"):
@@ -78,6 +76,7 @@ class TestInit:
 # ---------------------------------------------------------------------------
 # process_receipt — success paths
 # ---------------------------------------------------------------------------
+
 
 class TestProcessReceiptSuccess:
     def test_successful_4agent_extraction(
@@ -134,6 +133,7 @@ class TestProcessReceiptSuccess:
             )
             result = agent.process_receipt("receipt.pdf")
         from datetime import datetime
+
         assert result.data.receipt_date == datetime(2024, 3, 15)
 
     def test_category_normalised(
@@ -153,13 +153,13 @@ class TestProcessReceiptSuccess:
         bad_a1 = {"receipt_number": None, "receipt_date": "2024-03-15", "category": "flying_cars"}
         agent, _ = _make_agent("text")
         with patch("finamt.agents.llm_caller.requests.post") as mock_post:
-            mock_post.side_effect = _four_responses(bad_a1, agent2_response, agent3_response, agent4_response)
+            mock_post.side_effect = _four_responses(
+                bad_a1, agent2_response, agent3_response, agent4_response
+            )
             result = agent.process_receipt("receipt.pdf")
         assert str(result.data.category) == "other"
 
-    def test_no_items_in_agent4_response(
-        self, agent1_response, agent2_response, agent3_response
-    ):
+    def test_no_items_in_agent4_response(self, agent1_response, agent2_response, agent3_response):
         a4_empty = {"items": []}
         agent, _ = _make_agent("text")
         with patch("finamt.agents.llm_caller.requests.post") as mock_post:
@@ -173,6 +173,7 @@ class TestProcessReceiptSuccess:
 # ---------------------------------------------------------------------------
 # process_receipt — failure paths
 # ---------------------------------------------------------------------------
+
 
 class TestProcessReceiptFailures:
     def test_empty_ocr_text_returns_failure(self):
@@ -204,9 +205,11 @@ class TestProcessReceiptFailures:
     def test_llm_connection_error_still_produces_result(self):
         """LLM failure → all agents return None → ReceiptData with nulls built anyway."""
         import requests as req
+
         agent, _ = _make_agent("Müller GmbH\nGesamt 49,99 €")
-        with patch("finamt.agents.llm_caller.requests.post",
-                   side_effect=req.exceptions.ConnectionError):
+        with patch(
+            "finamt.agents.llm_caller.requests.post", side_effect=req.exceptions.ConnectionError
+        ):
             result = agent.process_receipt("receipt.pdf")
         # No unhandled exception — result is either success or graceful failure
         assert isinstance(result.success, bool)
@@ -215,6 +218,7 @@ class TestProcessReceiptFailures:
 # ---------------------------------------------------------------------------
 # batch_process
 # ---------------------------------------------------------------------------
+
 
 class TestBatchProcess:
     def test_returns_result_for_each_input(
@@ -228,10 +232,9 @@ class TestBatchProcess:
         agent, _ = _make_agent("Gesamt 10,00 €")
 
         with patch("finamt.agents.llm_caller.requests.post") as mock_post:
-            mock_post.side_effect = (
-                _four_responses(agent1_response, agent2_response, agent3_response, agent4_response)
-                + _four_responses(agent1_response, agent2_response, agent3_response, agent4_response)
-            )
+            mock_post.side_effect = _four_responses(
+                agent1_response, agent2_response, agent3_response, agent4_response
+            ) + _four_responses(agent1_response, agent2_response, agent3_response, agent4_response)
             results = agent.batch_process([pdf1, pdf2])
 
         assert len(results) == 2
@@ -277,6 +280,7 @@ class TestBatchProcess:
 # __init__ branches — explicit db_path and db_path=None with project
 # ---------------------------------------------------------------------------
 
+
 class TestInitBranches:
     def test_explicit_db_path_string(self, tmp_path):
         """db_path as string (not _UNSET) → layout inferred from path."""
@@ -309,6 +313,7 @@ class TestInitBranches:
 # ---------------------------------------------------------------------------
 # process_receipt — bytes input and PDF copying
 # ---------------------------------------------------------------------------
+
 
 class TestProcessReceiptExtra:
     def test_bytes_input_works(
@@ -361,13 +366,17 @@ class TestProcessReceiptExtra:
 # __version__ sanity check
 # ---------------------------------------------------------------------------
 
+
 class TestVersion:
     def test_version_is_string(self):
         from finamt.__version__ import __version__
+
         assert isinstance(__version__, str)
         assert len(__version__) > 0
 
     def test_version_follows_semver_pattern(self):
         import re
+
         from finamt.__version__ import __version__
+
         assert re.match(r"^\d+\.\d+\.\d+", __version__)

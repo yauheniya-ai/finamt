@@ -24,12 +24,16 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+
 from finamt import progress as _progress
-from typing import Optional, Union
 
 from ..models import (
-    Address, Counterparty,
-    ReceiptCategory, ReceiptData, ReceiptItem, ReceiptType,
+    Address,
+    Counterparty,
+    ReceiptCategory,
+    ReceiptData,
+    ReceiptItem,
+    ReceiptType,
 )
 from ..utils import parse_date, parse_decimal
 from .config import AgentsConfig
@@ -52,7 +56,8 @@ def _ts() -> str:
 # Field validators — null-safe type coercions
 # ---------------------------------------------------------------------------
 
-def _str_or_none(v) -> Optional[str]:
+
+def _str_or_none(v) -> str | None:
     if v is None:
         return None
     s = str(v).strip()
@@ -62,7 +67,7 @@ def _str_or_none(v) -> Optional[str]:
     return s or None
 
 
-def _float_or_none(v) -> Optional[float]:
+def _float_or_none(v) -> float | None:
     if v is None:
         return None
     try:
@@ -71,7 +76,7 @@ def _float_or_none(v) -> Optional[float]:
         return None
 
 
-def _validate_agent1(raw: Optional[dict]) -> dict:
+def _validate_agent1(raw: dict | None) -> dict:
     if not raw:
         return {}
     result: dict = {}
@@ -89,18 +94,27 @@ def _validate_agent1(raw: Optional[dict]) -> dict:
     return result
 
 
-def _validate_agent2(raw: Optional[dict]) -> dict:
+def _validate_agent2(raw: dict | None) -> dict:
     if not raw:
         return {}
     result: dict = {}
-    for key in ("name", "vat_id", "tax_number", "street_and_number",
-                "address_supplement", "postcode", "city", "state", "country"):
+    for key in (
+        "name",
+        "vat_id",
+        "tax_number",
+        "street_and_number",
+        "address_supplement",
+        "postcode",
+        "city",
+        "state",
+        "country",
+    ):
         if v := _str_or_none(raw.get(key)):
             result[key] = v
     return result
 
 
-def _validate_agent3(raw: Optional[dict]) -> dict:
+def _validate_agent3(raw: dict | None) -> dict:
     if not raw:
         return {}
     result: dict = {}
@@ -124,7 +138,7 @@ def _validate_agent3(raw: Optional[dict]) -> dict:
     return result
 
 
-def _validate_agent4(raw: Optional[dict]) -> list:
+def _validate_agent4(raw: dict | None) -> list:
     if not raw:
         return []
     items = raw.get("items") or []
@@ -139,12 +153,14 @@ def _validate_agent4(raw: Optional[dict]) -> list:
         # Skip completely empty rows
         if not desc and total is None:
             continue
-        result.append({
-            "description": desc,
-            "total_price": total,
-            "vat_rate":    vat_rate if (vat_rate is not None and 0 <= vat_rate <= 100) else None,
-            "vat_amount":  vat_amt,
-        })
+        result.append(
+            {
+                "description": desc,
+                "total_price": total,
+                "vat_rate": vat_rate if (vat_rate is not None and 0 <= vat_rate <= 100) else None,
+                "vat_amount": vat_amt,
+            }
+        )
     return result
 
 
@@ -152,62 +168,65 @@ def _validate_agent4(raw: Optional[dict]) -> list:
 # Model builder
 # ---------------------------------------------------------------------------
 
+
 def _build_receipt_data(
-    meta:         dict,
+    meta: dict,
     counterparty: dict,
-    amounts:      dict,
-    items:        list,
-    raw_text:     str,
+    amounts: dict,
+    items: list,
+    raw_text: str,
     receipt_type: str,
 ) -> ReceiptData:
 
     # Counterparty
-    cp: Optional[Counterparty] = None
+    cp: Counterparty | None = None
     if counterparty:
         address = Address(
-            street_and_number=  counterparty.get("street_and_number"),
-            address_supplement= counterparty.get("address_supplement"),
-            postcode=           counterparty.get("postcode"),
-            city=               counterparty.get("city"),
-            state=              counterparty.get("state"),
-            country=            counterparty.get("country"),
+            street_and_number=counterparty.get("street_and_number"),
+            address_supplement=counterparty.get("address_supplement"),
+            postcode=counterparty.get("postcode"),
+            city=counterparty.get("city"),
+            state=counterparty.get("state"),
+            country=counterparty.get("country"),
         )
         cp = Counterparty(
-            name=       counterparty.get("name"),
-            vat_id=     counterparty.get("vat_id"),
-            tax_number= counterparty.get("tax_number"),
-            address=    address,
+            name=counterparty.get("name"),
+            vat_id=counterparty.get("vat_id"),
+            tax_number=counterparty.get("tax_number"),
+            address=address,
         )
 
     # Line items
     receipt_items: list[ReceiptItem] = []
     for idx, item in enumerate(items, start=1):
         try:
-            receipt_items.append(ReceiptItem(
-                description= item.get("description") or "",
-                quantity=    None,
-                unit_price=  None,
-                total_price= parse_decimal(item.get("total_price")),
-                vat_rate=    parse_decimal(item.get("vat_rate")),
-                vat_amount=  parse_decimal(item.get("vat_amount")),
-                category=    ReceiptCategory("other"),
-                position=    idx,
-            ))
+            receipt_items.append(
+                ReceiptItem(
+                    description=item.get("description") or "",
+                    quantity=None,
+                    unit_price=None,
+                    total_price=parse_decimal(item.get("total_price")),
+                    vat_rate=parse_decimal(item.get("vat_rate")),
+                    vat_amount=parse_decimal(item.get("vat_amount")),
+                    category=ReceiptCategory("other"),
+                    position=idx,
+                )
+            )
         except Exception:
             pass
 
     return ReceiptData(
-        raw_text=       raw_text,
-        receipt_type=   ReceiptType(receipt_type),
-        counterparty=   cp,
-        receipt_number= meta.get("receipt_number"),
-        receipt_date=   meta.get("receipt_date"),
-        total_amount=   parse_decimal(amounts.get("total_amount")),
-        vat_percentage= parse_decimal(amounts.get("vat_percentage")),
-        vat_amount=     parse_decimal(amounts.get("vat_amount")),
-        currency=       amounts.get("currency", "EUR"),
-        category=       meta.get("category", ReceiptCategory("other")),
-        items=          receipt_items,
+        raw_text=raw_text,
+        receipt_type=ReceiptType(receipt_type),
+        counterparty=cp,
+        receipt_number=meta.get("receipt_number"),
+        receipt_date=meta.get("receipt_date"),
+        total_amount=parse_decimal(amounts.get("total_amount")),
+        vat_percentage=parse_decimal(amounts.get("vat_percentage")),
+        vat_amount=parse_decimal(amounts.get("vat_amount")),
+        currency=amounts.get("currency", "EUR"),
+        category=meta.get("category", ReceiptCategory("other")),
+        items=receipt_items,
     )
 
 
@@ -215,7 +234,8 @@ def _build_receipt_data(
 # Taxpayer-info cleanup
 # ---------------------------------------------------------------------------
 
-def _strip_taxpayer_fields(counterparty: dict, taxpayer_info: Optional[dict]) -> dict:
+
+def _strip_taxpayer_fields(counterparty: dict, taxpayer_info: dict | None) -> dict:
     """Silently null out counterparty fields that are exact copies of the taxpayer's
     own data (case-insensitive, whitespace-normalised).  No warnings are emitted.
 
@@ -225,19 +245,19 @@ def _strip_taxpayer_fields(counterparty: dict, taxpayer_info: Optional[dict]) ->
     if not taxpayer_info:
         return counterparty
 
-    def _norm(v: Optional[str]) -> str:
+    def _norm(v: str | None) -> str:
         return (v or "").strip().casefold()
 
     checks = {
-        "name":               taxpayer_info.get("name"),
-        "vat_id":             taxpayer_info.get("vat_id"),
-        "tax_number":         taxpayer_info.get("tax_number"),
+        "name": taxpayer_info.get("name"),
+        "vat_id": taxpayer_info.get("vat_id"),
+        "tax_number": taxpayer_info.get("tax_number"),
         # Address sub-fields — mapped from the individual taxpayer profile fields
-        "street_and_number":  taxpayer_info.get("street"),
-        "postcode":           taxpayer_info.get("postcode"),
-        "city":               taxpayer_info.get("city"),
-        "state":              taxpayer_info.get("state"),
-        "country":            taxpayer_info.get("country"),
+        "street_and_number": taxpayer_info.get("street"),
+        "postcode": taxpayer_info.get("postcode"),
+        "city": taxpayer_info.get("city"),
+        "state": taxpayer_info.get("state"),
+        "country": taxpayer_info.get("country"),
     }
 
     result = dict(counterparty)
@@ -252,21 +272,22 @@ def _strip_taxpayer_fields(counterparty: dict, taxpayer_info: Optional[dict]) ->
 # Pipeline
 # ---------------------------------------------------------------------------
 
+
 def run_pipeline(
-    raw_text:      str,
-    pdf_path:      Optional[Union[str, Path]],   # kept for API compat, not used
-    receipt_type:  str,
-    cfg:           Optional[AgentsConfig] = None,
-    receipt_id:    Optional[str] = None,
-    debug_root:    Optional[Path] = _DEFAULT_DEBUG_ROOT,
-    taxpayer_info: Optional[dict] = None,
+    raw_text: str,
+    pdf_path: str | Path | None,  # kept for API compat, not used
+    receipt_type: str,
+    cfg: AgentsConfig | None = None,
+    receipt_id: str | None = None,
+    debug_root: Path | None = _DEFAULT_DEBUG_ROOT,
+    taxpayer_info: dict | None = None,
 ) -> ReceiptData:
     if cfg is None:
         cfg = AgentsConfig()
 
     agent_cfg = cfg.get_agent_config()
 
-    debug_dir: Optional[Path] = None
+    debug_dir: Path | None = None
     if debug_root is not None and receipt_id:
         debug_dir = Path(debug_root) / receipt_id
         debug_dir.mkdir(parents=True, exist_ok=True)
@@ -274,23 +295,32 @@ def run_pipeline(
     # ── Agent 1: metadata ──────────────────────────────────────────────────
     _progress.emit(f"  {_ts()} → Agent 1: metadata")
     raw1 = call_llm(
-        prompt=        build_agent1_prompt(raw_text),
-        cfg=           agent_cfg,
-        agent_name=    "agent1",
-        expected_keys= ["receipt_number", "receipt_date", "category"],
-        debug_dir=     debug_dir,
+        prompt=build_agent1_prompt(raw_text),
+        cfg=agent_cfg,
+        agent_name="agent1",
+        expected_keys=["receipt_number", "receipt_date", "category"],
+        debug_dir=debug_dir,
     )
     meta = _validate_agent1(raw1)
 
     # ── Agent 2: counterparty ──────────────────────────────────────────────
     _progress.emit(f"  {_ts()} → Agent 2: counterparty")
     raw2 = call_llm(
-        prompt=        build_agent2_prompt(raw_text, receipt_type, taxpayer_info),
-        cfg=           agent_cfg,
-        agent_name=    "agent2",
-        expected_keys= ["name", "vat_id", "tax_number", "street_and_number",
-                        "address_supplement", "postcode", "city", "state", "country"],
-        debug_dir=     debug_dir,
+        prompt=build_agent2_prompt(raw_text, receipt_type, taxpayer_info),
+        cfg=agent_cfg,
+        agent_name="agent2",
+        expected_keys=[
+            "name",
+            "vat_id",
+            "tax_number",
+            "street_and_number",
+            "address_supplement",
+            "postcode",
+            "city",
+            "state",
+            "country",
+        ],
+        debug_dir=debug_dir,
     )
     counterparty = _validate_agent2(raw2)
     counterparty = _strip_taxpayer_fields(counterparty, taxpayer_info)
@@ -298,32 +328,32 @@ def run_pipeline(
     # ── Agent 3: amounts ───────────────────────────────────────────────────
     _progress.emit(f"  {_ts()} → Agent 3: amounts")
     raw3 = call_llm(
-        prompt=        build_agent3_prompt(raw_text),
-        cfg=           agent_cfg,
-        agent_name=    "agent3",
-        expected_keys= ["total_amount", "vat_percentage", "vat_amount", "currency"],
-        debug_dir=     debug_dir,
+        prompt=build_agent3_prompt(raw_text),
+        cfg=agent_cfg,
+        agent_name="agent3",
+        expected_keys=["total_amount", "vat_percentage", "vat_amount", "currency"],
+        debug_dir=debug_dir,
     )
     amounts = _validate_agent3(raw3)
 
     # ── Agent 4: line items ────────────────────────────────────────────────
     _progress.emit(f"  {_ts()} → Agent 4: line items")
     raw4 = call_llm(
-        prompt=        build_agent4_prompt(raw_text),
-        cfg=           agent_cfg,
-        agent_name=    "agent4",
-        expected_keys= ["items"],
-        debug_dir=     debug_dir,
+        prompt=build_agent4_prompt(raw_text),
+        cfg=agent_cfg,
+        agent_name="agent4",
+        expected_keys=["items"],
+        debug_dir=debug_dir,
     )
     items = _validate_agent4(raw4)
 
     # ── Debug: save final merge ────────────────────────────────────────────
     if debug_dir is not None:
         final_debug = {
-            "meta":         {**meta, "receipt_date": str(meta.get("receipt_date", ""))},
+            "meta": {**meta, "receipt_date": str(meta.get("receipt_date", ""))},
             "counterparty": counterparty,
-            "amounts":      amounts,
-            "items":        items,
+            "amounts": amounts,
+            "items": items,
         }
         (debug_dir / "final.json").write_text(
             json.dumps(final_debug, indent=2, ensure_ascii=False, default=str),
