@@ -1,5 +1,7 @@
 # Changelog
 
+## Version 0.17.3 (2026-05-03)
+
 ## Version 0.17.2 (2026-05-03)
 
 ### Tooling / code quality

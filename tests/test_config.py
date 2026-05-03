@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from dataclasses import FrozenInstanceError
 from unittest.mock import patch
 
 import pytest
@@ -126,7 +127,7 @@ class TestModelConfig:
 
     def test_model_config_is_frozen(self):
         mc = Config().get_model_config()
-        with pytest.raises(ValidationError):
+        with pytest.raises(FrozenInstanceError):
             mc.model = "changed"  # type: ignore[misc]
 
 
@@ -148,7 +149,7 @@ class TestAgentsConfig:
 
     def test_agent_model_config_is_frozen(self):
         ac = AgentsConfig().get_agent_config()
-        with pytest.raises(ValidationError):
+        with pytest.raises(FrozenInstanceError):
             ac.model = "changed"  # type: ignore[misc]
 
 
