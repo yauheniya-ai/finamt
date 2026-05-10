@@ -401,17 +401,17 @@ Every receipt is tagged with a category and optional subcategory. Categories map
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-change`)
-3. Make your changes
+2. Create a feature branch (`git checkout -b feature/my-change`) and make your changes
+3. Run the test suite:
+   ```bash
+   pytest --cov=src --cov-report=term-missing
+   ```
 4. Lint and format with Ruff:
    ```bash
    ruff check --fix src/ tests/
    ruff format src/ tests/
    ```
-5. Run the test suite:
-   ```bash
-   pytest --cov=src --cov-report=term-missing
-   ```
+5. Update the documentation
 6. Submit a pull request
 
 ## License
