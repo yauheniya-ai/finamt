@@ -87,7 +87,7 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull qwen2.5:7b-instruct-q4_K_M
 ```
 
-Weitere gut funktionierende Modelle: `qwen3:8b`, `llama3.2`, `llama3.1`.
+Weitere gut funktionierende Modelle: `qwen2.5:14b-instruct` und `mistral:7b`.
 
 #### Tesseract OCR (optionaler Fallback für PaddleOCR)
 
@@ -197,7 +197,7 @@ from finamt.agents.config import Config, AgentsConfig
 
 agent = FinanceAgent(
     config=Config(ocr_language="deu+eng", pdf_dpi=150),
-    agents_cfg=AgentsConfig(agent_model="qwen3:8b"),
+    agents_cfg=AgentsConfig(agent_model="mistral:7b"),
 )
 ```
 

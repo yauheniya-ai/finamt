@@ -198,7 +198,7 @@ from finamt.agents.config import Config, AgentsConfig
 
 agent = FinanceAgent(
     config=Config(ocr_language="deu+eng", pdf_dpi=150),
-    agents_cfg=AgentsConfig(agent_model="qwen3:8b"),
+    agents_cfg=AgentsConfig(agent_model="mistral:7b"),
 )
 ```
 
