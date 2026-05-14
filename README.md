@@ -38,7 +38,8 @@ managing receipts
 - ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16&color=%23363FE5) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR for scanned PDFs 
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR for scanned PDFs and images when PaddleOCR fails or times out
 - ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — local LLMs for structured extraction of information from receipts and invoices
-    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – laptop-compatible LLMs with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – laptop-compatible LLMs, with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
+    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) – alternative open-weight performant models, with mistral:7b showing similar results to qwen2.5:7b-instruct-q4_K_M.
 - ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) – local database for original receipts and extracted data
 
 **Frontend**
@@ -88,7 +89,7 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull qwen2.5:7b-instruct-q4_K_M
 ```
 
-Other models that work well: `qwen2.5:14b-instruct` and `mistral:7b` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
+Other models that work well: `qwen2.5:14b-instruct`, `qwen3:8b`, `llama3.2`, `llama3.1`, `mistral:7b` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
 
 #### Tesseract OCR (optional fallback from PaddleOCR)
 
