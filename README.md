@@ -88,7 +88,7 @@ curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull qwen2.5:7b-instruct-q4_K_M
 ```
 
-Other models that work well: `qwen2.5:14b-instruct`, `qwen3:8b`, `llama3.2`, `llama3.1`.
+Other models that work well: `qwen2.5:14b-instruct`, `qwen3:8b`, `llama3.2`, `llama3.1` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
 
 #### Tesseract OCR (optional fallback from PaddleOCR)
 
