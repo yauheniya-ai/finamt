@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.18.0 (2026-05-17)
+
+### New features / improvements
+
+- **Frontend: financial returns overview with submission tracking** — a new collapsible "Eingereichte Erklärungen" section in the dashboard lists all relevant tax returns (UStVA, UStE, GewStE, KStE, E-Bilanz) for the active reporting year. Each return is represented by a checkbox that the user can tick to mark it as submitted. The state is persisted in the project database and restored across sessions. A progress indicator shows how many of the returns have been filed.
+
+- **Frontend: Agent Config selector in the header** — a new `AgentConfigSelector` component is added to the app header, left of the database selector. It displays the active LLM model name with its brand icon (`IconQwen` / `IconMistral` / `IconAgent` fallback) preceded by a robot `IconAgent` icon and the "Agent Config" label. Clicking the model pill opens a dropdown panel with three sections: **Model** (preset radio buttons for `qwen2.5:7b-instruct-q4_K_M`, `qwen2.5:14b-instruct`, `mistral:7b` plus a free-text custom model input), **Agent settings** (`agent_timeout`, `agent_num_ctx`, `agent_max_retries`, `ollama_base_url`), and **OCR settings** (`ocr_language`, `ocr_timeout`, `ocr_preprocess`, `tesseract_cmd`, `pdf_dpi`). Changes are applied via `PUT /config` and take effect immediately without restarting the server. The panel shows an amber border while unsaved and a "Saved ✓" confirmation on success.
+
+- **Backend: `GET /config` expanded + `PUT /config` endpoint** — `GET /config` now returns all runtime-configurable fields: `agent_model`, `agent_timeout`, `agent_num_ctx`, `agent_max_retries`, `ollama_base_url`, `ocr_language`, `ocr_timeout`, `ocr_preprocess`, `tesseract_cmd`, `pdf_dpi`, `categories`, and `default_db`. A new `PUT /config` endpoint accepts a partial JSON body, validates the keys against the known config schema, merges them into an in-process `_runtime_cfg` dict, and returns the updated effective config. Both `FinanceAgent` call sites now use `_effective_agents_cfg()` and `_effective_ocr_cfg()` helpers that merge the persisted settings with any runtime overrides, so model or OCR changes are picked up immediately for the next receipt processed.
+
+- **Frontend: signature in the footer**.
+
+
 ## Version 0.17.3 (2026-05-17)
 
 ### Repository / licensing
