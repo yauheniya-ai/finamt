@@ -54,7 +54,7 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 try:
     from finamt.agents.agent import FinanceAgent
-    from finamt.agents.config import Config
+    from finamt.agents.config import AgentsConfig, Config
     from finamt.agents.prompts import RECEIPT_CATEGORIES
     from finamt.storage.project import (
         DB_FILENAME,
@@ -72,6 +72,7 @@ try:
 
     _LIB_AVAILABLE = True
     _cfg = Config()
+    _agents_cfg = AgentsConfig()
 except ImportError as _import_err:
     import sys
     import traceback
@@ -81,6 +82,7 @@ except ImportError as _import_err:
     print(file=sys.stderr)
     _LIB_AVAILABLE = False
     _cfg = None  # type: ignore
+    _agents_cfg = None  # type: ignore
     RECEIPT_CATEGORIES = [
         "material",
         "equipment",
@@ -109,6 +111,25 @@ except ImportError as _import_err:
 
     def layout_from_db_path(p):
         return None  # type: ignore
+
+
+# Runtime config overrides — values set via PUT /config are stored here.
+# Reconstructed Config / AgentsConfig objects are rebuilt on each update.
+_runtime_cfg: dict = {}
+
+
+def _effective_agents_cfg():
+    """Return an AgentsConfig reflecting current runtime overrides."""
+    if not _LIB_AVAILABLE or _agents_cfg is None:
+        return None
+    return AgentsConfig(**{**_agents_cfg.model_dump(), **_runtime_cfg})
+
+
+def _effective_ocr_cfg():
+    """Return a Config (OCR) reflecting current runtime overrides."""
+    if not _LIB_AVAILABLE or _cfg is None:
+        return None
+    return Config(**{**_cfg.model_dump(), **_runtime_cfg})
 
 
 # Computed once at startup — never relies on sqlite.py's DEFAULT_DB_PATH
@@ -285,17 +306,62 @@ def fx_rate(
 
 @app.get("/config", tags=["meta"])
 def get_config():
-    if not _LIB_AVAILABLE or _cfg is None:
+    if not _LIB_AVAILABLE or _cfg is None or _agents_cfg is None:
         return {"error": "finamt library not available", "categories": RECEIPT_CATEGORIES}
-    mc = _cfg.get_model_config()
+    effective_agents = _effective_agents_cfg()
+    effective_ocr = _effective_ocr_cfg()
+    ac = effective_agents.get_agent_config()
     return {
-        "ollama_base_url": mc.base_url,
-        "model": mc.model,
-        "max_retries": mc.max_retries,
-        "request_timeout": mc.timeout,
+        # agent settings
+        "agent_model": ac.model,
+        "agent_timeout": ac.timeout,
+        "agent_num_ctx": ac.num_ctx,
+        "agent_max_retries": ac.max_retries,
+        # ollama / shared
+        "ollama_base_url": ac.base_url,
+        # OCR settings
+        "ocr_language": effective_ocr.ocr_language,
+        "ocr_timeout": effective_ocr.ocr_timeout,
+        "ocr_preprocess": effective_ocr.ocr_preprocess,
+        "tesseract_cmd": effective_ocr.tesseract_cmd,
+        "pdf_dpi": effective_ocr.pdf_dpi,
+        # meta
         "categories": RECEIPT_CATEGORIES,
         "default_db": str(_DEFAULT_DB),
     }
+
+
+@app.put("/config", tags=["meta"])
+def put_config(body: dict = Body(...)):
+    """Update runtime config overrides. Accepts any subset of config keys."""
+    global _runtime_cfg
+    if not _LIB_AVAILABLE or _agents_cfg is None or _cfg is None:
+        raise HTTPException(status_code=503, detail="finamt library not available")
+    # Allowed keys — map frontend names to pydantic field names
+    _AGENT_KEYS = {
+        "agent_model": str,
+        "agent_timeout": int,
+        "agent_num_ctx": int,
+        "agent_max_retries": int,
+        "ollama_base_url": str,
+    }
+    _OCR_KEYS = {
+        "ocr_language": str,
+        "ocr_timeout": int,
+        "ocr_preprocess": bool,
+        "tesseract_cmd": str,
+        "pdf_dpi": int,
+    }
+    allowed = {**_AGENT_KEYS, **_OCR_KEYS}
+    updates: dict = {}
+    for k, cast in allowed.items():
+        if k in body:
+            try:
+                updates[k] = cast(body[k])
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid value for {k}: {exc}") from exc
+    _runtime_cfg = {**_runtime_cfg, **updates}
+    return get_config()
 
 
 # ---------------------------------------------------------------------------
@@ -642,7 +708,11 @@ async def upload_receipt_stream(
             tmp_path = Path(tmp.name)
         try:
             _progress.set_callback(lambda msg: loop.call_soon_threadsafe(queue.put_nowait, msg))
-            agent = FinanceAgent(db_path=db_path)
+            agent = FinanceAgent(
+                db_path=db_path,
+                config=_effective_ocr_cfg(),
+                agents_cfg=_effective_agents_cfg(),
+            )
             result = agent.process_receipt(
                 tmp_path, receipt_type=receipt_type, taxpayer_info=_taxpayer_info
             )
@@ -727,7 +797,11 @@ async def upload_receipt(
         # Pass db_path explicitly so FinanceAgent uses this exact layout.
         # layout_from_db_path in agent.py will re-derive the project folder
         # correctly from the path we resolved above.
-        agent = FinanceAgent(db_path=db_path)
+        agent = FinanceAgent(
+            db_path=db_path,
+            config=_effective_ocr_cfg(),
+            agents_cfg=_effective_agents_cfg(),
+        )
         result = agent.process_receipt(tmp_path, receipt_type=receipt_type)
     finally:
         tmp_path.unlink(missing_ok=True)
