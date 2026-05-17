@@ -5,9 +5,9 @@ finamt
    :target: https://www.python.org/downloads/
    :alt: Python 3.10+
 
-.. image:: https://img.shields.io/badge/License-MIT-purple.svg
-   :target: https://opensource.org/licenses/MIT
-   :alt: License: MIT
+.. image:: https://img.shields.io/badge/License-AGPL%20v3-blue.svg
+   :target: https://www.gnu.org/licenses/agpl-3.0
+   :alt: License: AGPL v3
 
 .. image:: https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI
    :target: https://pypi.org/project/finamt/

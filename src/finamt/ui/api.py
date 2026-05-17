@@ -451,6 +451,20 @@ def add_submission(body: dict = Body(...), db: str | None = Query(default=None))
     return {"submission": body, "total": len(records)}
 
 
+@app.delete("/submissions", tags=["projects"])
+def remove_submission(type: str = Query(...), year: int = Query(...), db: str | None = Query(default=None)):
+    """Remove all submission records matching {type, year}."""
+    db_path = _resolve_db(db)
+    if not db_path.exists():
+        return {"removed": 0}
+    with _repo(db_path) as repo:
+        records = repo.get_metadata(_SUBMISSIONS_KEY) or []
+        before  = len(records)
+        records = [r for r in records if not (r.get("type") == type and r.get("year") == year)]
+        repo.set_metadata(_SUBMISSIONS_KEY, records)
+    return {"removed": before - len(records), "total": len(records)}
+
+
 # ---------------------------------------------------------------------------
 # Receipts
 # ---------------------------------------------------------------------------
