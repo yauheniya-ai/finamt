@@ -1,6 +1,6 @@
 # finamt
 
-<img src="https://raw.githubusercontent.com/yauheniya-ai/finamt/main/.github/images/finamt-wordmark.svg" width="50%" alt="finamt"/>
+<img src="https://raw.githubusercontent.com/spaceoctahedron/finamt/main/.github/images/finamt-wordmark.svg" width="50%" alt="finamt"/>
 
 <div>
 <br>
@@ -11,12 +11,13 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
-[![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
-[![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finamt)](https://github.com/yauheniya-ai/finamt/commits/main)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://github.com/spaceoctahedron/finamt/blob/main/LICENSE)
+[![Tests](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/spaceoctahedron/finamt)](https://github.com/spaceoctahedron/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 
-![US](https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg?height=16) [English](https://github.com/yauheniya-ai/finamt/blob/main/README.md) | ![DE](https://api.iconify.design/noto-v1:flag-for-flag-germany.svg?height=16) Deutsch
+![US](https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg?height=16) [English](https://github.com/spaceoctahedron/finamt/blob/main/README.md) | ![DE](https://api.iconify.design/noto-v1:flag-for-flag-germany.svg?height=16) Deutsch
 
 </div>
 
@@ -38,6 +39,7 @@ Eine agentische Python-Bibliothek zur strukturierten Extraktion von Daten aus Be
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR für gescannte PDFs und Bilder als Fallback bei PaddleOCR-Fehlern oder Timeouts
 - ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — Lokale LLMs zur strukturierten Extraktion von Beleginformationen
     - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M ist derzeit das empfohlene Standardmodell für textbasierte Extraktion
+    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) — Alternative Open-Weight-Modelle; mistral:7b zeigt ähnliche Ergebnisse wie qwen2.5:7b-instruct-q4_K_M.
 - ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) — Lokale Datenbank für Originalbelege und extrahierte Daten
 
 **Frontend**
@@ -114,7 +116,7 @@ finamt serve
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yauheniya-ai/finamt/main/docs/images/Demo.webp" width="100%" />
+  <img src="https://raw.githubusercontent.com/spaceoctahedron/finamt/main/docs/images/Demo.webp" width="100%" />
   <em>Interaktive Oberfläche zum Hochladen von Belegen und Verwalten von Steuererklärungen</em>
 </p>
 
@@ -400,19 +402,70 @@ Jeder Beleg wird mit einer Kategorie und einer optionalen Unterkategorie versehe
 ## Mitwirken
 
 1. Repository forken
-2. Feature-Branch erstellen (`git checkout -b feature/meine-änderung`)
-3. Änderungen vornehmen
+2. Feature-Branch erstellen (`git checkout -b feature/meine-änderung`) und Änderungen vornehmen
+3. Testsuite ausführen:
+   ```bash
+   pytest --cov=src --cov-report=term-missing
+   ```
 4. Lint und Formatierung mit Ruff:
    ```bash
    ruff check --fix src/ tests/
    ruff format src/ tests/
    ```
-5. Testsuite ausführen:
-   ```bash
-   pytest --cov=src --cov-report=term-missing
-   ```
+5. Dokumentation aktualisieren
 6. Pull Request einreichen
 
 ## Lizenz
 
-MIT — siehe [LICENSE](https://raw.githubusercontent.com/yauheniya-ai/finamt/main/LICENSE) für Details.
+AGPL-3.0 — siehe [LICENSE](https://raw.githubusercontent.com/spaceoctahedron/finamt/main/LICENSE) für Details.
+
+## Kommerzielle Lizenzierung
+
+finamt ist unter der AGPL-3.0-Lizenz verfügbar.
+
+Wer finamt in einem proprietären Umfeld nutzen möchte, ohne die AGPL-Pflichten zu erfüllen (z. B. ohne Offenlegung des Quellcodes oder für kommerzielle SaaS-Produkte), kann eine kommerzielle Lizenz erwerben.
+
+Anfragen bitte an: info@spaceoctahedron.com
+
+## Drittanbieter-Komponenten und Modelle
+
+Diese Software ist abhängig von externen Bibliotheken und Diensten, darunter:
+
+- PaddleOCR (Apache License 2.0)
+- Tesseract OCR (Apache License 2.0)
+- Ollama (MIT License)
+
+finamt verwendet lokal installierte Sprachmodelle (z. B. Qwen) über Ollama.
+
+Diese Modelle werden **nicht** mit dieser Software ausgeliefert und unterliegen ihren eigenen Lizenzbedingungen.
+Die Nutzerinnen und Nutzer sind dafür verantwortlich, die jeweiligen Nutzungsbedingungen beim Herunterladen und Verwenden dieser Modelle einzuhalten.
+
+## Haftungsausschluss
+
+Diese Software wird ausschließlich zu Informations- und Automatisierungszwecken bereitgestellt.
+
+Sie stellt **keine** steuerliche, rechtliche oder buchhalterische Beratung dar.
+
+Obwohl finamt darauf ausgelegt ist, die Vorbereitung deutscher steuerrelevanter Daten (z. B. Umsatzsteuervoranmeldungen, EÜR, ELSTER-Übermittlungen) zu unterstützen, wird keine Gewähr übernommen für:
+
+- Korrektheit der extrahierten Daten
+- Vollständigkeit der Buchführungsunterlagen
+- Einhaltung der geltenden Steuergesetze und -vorschriften
+- Akzeptanz durch die Steuerbehörden
+
+Die Nutzerinnen und Nutzer sind allein dafür verantwortlich, alle Ausgaben vor der Einreichung bei einer Behörde zu überprüfen.
+
+**Bei rechtlich verbindlichen Fragen wenden Sie sich stets an eine zugelassene Steuerberaterin oder einen zugelassenen Steuerberater.**
+
+Im größtmöglichen gesetzlich zulässigen Umfang übernimmt Space Octahedron GmbH keine Haftung für:
+
+- Fehler bei der OCR- oder KI-gestützten Extraktion
+- Fehlerhafte Klassifizierungen oder Berechnungen
+- Abgelehnte oder fehlerhafte Steuererklärungen
+- Finanzielle Verluste oder Bußgelder, die durch die Nutzung dieser Software entstehen
+
+## Produktinformationen (ELSTER)
+
+- **Produktname:** Space Octahedron® finamt
+- **Hersteller:** Space Octahedron GmbH
+- **Kontakt:** info@spaceoctahedron.com

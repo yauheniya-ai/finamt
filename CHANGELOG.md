@@ -1,6 +1,14 @@
 # Changelog
 
-## Version 0.17.3 (2026-05-03)
+## Version 0.17.3 (2026-05-17)
+
+### Repository / licensing
+
+- **License changed from MIT to AGPL-3.0** — `pyproject.toml` updated: `license = {text = "AGPL-3.0"}`, PyPI classifier `License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)` added.
+- **Repository ownership transferred to Space Octahedron GmbH** — all GitHub URLs updated from `yauheniya-ai/finamt` to `spaceoctahedron/finamt` across `README.md`, `readme/README_de.md`, and `pyproject.toml` project URLs.
+- **AGPL-3.0 license badge** added to both `README.md` and `readme/README_de.md`.
+- **README.md** — minor copy fix in Features bullet (stray line break removed).
+- **readme/README_de.md** — synced with English version: Mistral entry added to backend tech stack, Contributing steps reordered to match English (tests → lint), License section updated to AGPL-3.0, Commercial Licensing section added.
 
 ## Version 0.17.2 (2026-05-03)
 

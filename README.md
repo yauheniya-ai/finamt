@@ -1,6 +1,6 @@
 # finamt
 
-<img src="https://raw.githubusercontent.com/yauheniya-ai/finamt/main/.github/images/finamt-wordmark.svg" width="50%" alt="finamt"/>
+<img src="https://raw.githubusercontent.com/spaceoctahedron/finamt/main/.github/images/finamt-wordmark.svg" width="50%" alt="finamt"/>
 
 <div>
 <br>
@@ -11,12 +11,13 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyPI version](https://img.shields.io/pypi/v/finamt?color=blue&label=PyPI)](https://pypi.org/project/finamt/)
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
-[![Tests](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/yauheniya-ai/finamt/actions/workflows/tests.yml)
-[![GitHub last commit](https://img.shields.io/github/last-commit/yauheniya-ai/finamt)](https://github.com/yauheniya-ai/finamt/commits/main)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://github.com/spaceoctahedron/finamt/blob/main/LICENSE)
+[![Tests](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
+[![GitHub last commit](https://img.shields.io/github/last-commit/spaceoctahedron/finamt)](https://github.com/spaceoctahedron/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 
-![US](https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg?height=16) English | ![DE](https://api.iconify.design/noto-v1:flag-for-flag-germany.svg?height=16) [German](https://github.com/yauheniya-ai/finamt/blob/main/readme/README_de.md)
+![US](https://api.iconify.design/noto-v1:flag-for-flag-united-states.svg?height=16) English | ![DE](https://api.iconify.design/noto-v1:flag-for-flag-germany.svg?height=16) [German](https://github.com/spaceoctahedron/finamt/blob/main/readme/README_de.md)
 
 </div>
 
@@ -24,8 +25,7 @@ An agentic Python library for extracting structured data from receipts and invoi
 
 ## Features
 
-- **German Tax Alignment** — Category taxonomy and VAT handling aligned with German fiscal practice 
-managing receipts
+- **German Tax Alignment** — Category taxonomy and VAT handling aligned with German fiscal practice
 - **Local-First** — Everything runs completely offline, with data stored in a local database
 - **4-Agent Pipeline** — Sequential specialised agents for metadata, counterparty, amounts, and line items; short focused prompts for reliable local model performance
 - **Web UI** — Full browser interface for uploading, reviewing, editing, and managing receipts and invoices and preparing tax returns 
@@ -85,11 +85,11 @@ pipx install finamt
 # Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Pull a model — qwen2.5 7B is the recommended default
+# Pull a model — qwen2.5:7b-instruct-q4_K_M is the recommended default
 ollama pull qwen2.5:7b-instruct-q4_K_M
 ```
 
-Other models that work well: `qwen2.5:14b-instruct`, `qwen3:8b`, `llama3.2`, `llama3.1`, `mistral:7b` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
+Other models that work well: `qwen2.5:14b-instruct`, `mistral:7b` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
 
 #### Tesseract OCR (optional fallback from PaddleOCR)
 
@@ -116,7 +116,7 @@ finamt serve
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/yauheniya-ai/finamt/main/docs/images/Demo.webp" width="100%" />
+  <img src="https://raw.githubusercontent.com/spaceoctahedron/finamt/main/docs/images/Demo.webp" width="100%" />
   <em>Interactive UI to upload receipts and manage tax statements</em>
 </p>
 
@@ -417,7 +417,15 @@ Every receipt is tagged with a category and optional subcategory. Categories map
 
 ## License
 
-MIT — see [LICENSE](https://raw.githubusercontent.com/yauheniya-ai/finamt/main/LICENSE) for details.
+AGPL-3.0 — see [LICENSE](https://raw.githubusercontent.com/spaceoctahedron/finamt/main/LICENSE) for details.
+
+## Commercial Licensing
+
+finamt is available under the AGPL-3.0 license.
+
+If you wish to use finamt in a proprietary setting, without the obligations of the AGPL (e.g. without releasing source code or for use in a commercial SaaS product), a commercial license is available.
+
+For inquiries, contact: info@spaceoctahedron.com
 
 ## Third-Party Components and Models
 
@@ -455,3 +463,9 @@ To the maximum extent permitted by law, Space Octahedron GmbH assumes no liabili
 - incorrect classifications or calculations
 - rejected or incorrect tax filings
 - financial losses or penalties arising from use of this software
+
+## Product Information (ELSTER)
+
+- **Produktname:** Space Octahedron® finamt  
+- **Hersteller:** Space Octahedron GmbH  
+- **Kontakt:** info@spaceoctahedron.com
