@@ -23,7 +23,7 @@ file in the working directory or exported to the shell environment.
      - ``http://localhost:11434``
      - Base URL of the Ollama API server.
    * - ``FINAMT_AGENT_MODEL``
-     - ``qwen2.5:7b-instruct-q4_K_M``
+     - ``mistral:7b``
      - Model used by all four extraction agents.
    * - ``FINAMT_AGENT_TIMEOUT``
      - ``60``
@@ -75,7 +75,7 @@ Copy ``env.example`` from the repository root and adjust it to your setup:
 .. code-block:: ini
 
    FINAMT_OLLAMA_BASE_URL=http://localhost:11434
-   FINAMT_AGENT_MODEL=qwen2.5:7b-instruct-q4_K_M
+   FINAMT_AGENT_MODEL=mistral:7b
    FINAMT_AGENT_TIMEOUT=60
    FINAMT_OCR_TIMEOUT=60
    FINAMT_PROJECT=default

@@ -13,7 +13,7 @@
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://github.com/spaceoctahedron/finamt/blob/main/LICENSE)
 [![Tests](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/yauheniya-ai/d09f6edc7b1928aeea1fbde834a6080b/raw/coverage.json)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/spaceoctahedron/a44d923694c52f0711d3f84be0aaf644/raw/coverage.json)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
 [![GitHub last commit](https://img.shields.io/github/last-commit/spaceoctahedron/finamt)](https://github.com/spaceoctahedron/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 
@@ -38,8 +38,8 @@ An agentic Python library for extracting structured data from receipts and invoi
 - ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16&color=%23363FE5) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR for scanned PDFs 
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR for scanned PDFs and images when PaddleOCR fails or times out
 - ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — local LLMs for structured extraction of information from receipts and invoices
-    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – laptop-compatible LLMs, with qwen2.5:7b-instruct-q4_K_M currently as preferred default for text-based extraction
-    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) – alternative open-weight performant models, with mistral:7b showing similar results to qwen2.5:7b-instruct-q4_K_M.
+    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) – open-weight performant models, with mistral:7b as the preferred default for text-based extraction
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – laptop-compatible LLMs; qwen2.5:7b-instruct-q4_K_M and qwen2.5:14b-instruct are good alternatives.
 - ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) – local database for original receipts and extracted data
 
 **Frontend**
@@ -85,11 +85,11 @@ pipx install finamt
 # Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Pull a model — qwen2.5:7b-instruct-q4_K_M is the recommended default
-ollama pull qwen2.5:7b-instruct-q4_K_M
+# Pull a model — mistral:7b is the recommended default
+ollama pull mistral:7b
 ```
 
-Other models that work well: `qwen2.5:14b-instruct`, `mistral:7b` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
+Other models that work well: `qwen2.5:7b-instruct-q4_K_M`, `qwen2.5:14b-instruct` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
 
 #### Tesseract OCR (optional fallback from PaddleOCR)
 
@@ -185,7 +185,7 @@ FINAMT_OCR_PREPROCESS=true
 FINAMT_PDF_DPI=150
 
 # Extraction agents — all 4 agents use this model
-FINAMT_AGENT_MODEL=qwen2.5:7b-instruct-q4_K_M
+FINAMT_AGENT_MODEL=mistral:7b
 FINAMT_AGENT_TIMEOUT=60
 FINAMT_AGENT_NUM_CTX=4096
 FINAMT_AGENT_MAX_RETRIES=2

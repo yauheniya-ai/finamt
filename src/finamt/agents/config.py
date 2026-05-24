@@ -10,13 +10,12 @@ All configuration for finamt in one place.
 
 Override via environment variables or a .env file:
   FINAMT_OLLAMA_BASE_URL=http://localhost:11434
-  FINAMT_AGENT_MODEL=qwen2.5:7b-instruct-q4_K_M
+  FINAMT_AGENT_MODEL=mistral:7b
 
 Recommended models (text-only, no vision required):
-  qwen2.5:7b-instruct-q4_K_M  ← works well, recommended default
-  qwen3:8b
-  llama3.2
-  llama3.1
+  mistral:7b  ← works well, recommended default
+  qwen2.5:7b-instruct-q4_K_M
+
 """
 
 from __future__ import annotations

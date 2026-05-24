@@ -38,8 +38,8 @@ Eine agentische Python-Bibliothek zur strukturierten Extraktion von Daten aus Be
 - ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16&color=%23363FE5) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR für gescannte PDFs
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR für gescannte PDFs und Bilder als Fallback bei PaddleOCR-Fehlern oder Timeouts
 - ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — Lokale LLMs zur strukturierten Extraktion von Beleginformationen
-    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M ist derzeit das empfohlene Standardmodell für textbasierte Extraktion
-    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) — Alternative Open-Weight-Modelle; mistral:7b zeigt ähnliche Ergebnisse wie qwen2.5:7b-instruct-q4_K_M.
+    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) — Open-Weight-Modelle; mistral:7b ist das empfohlene Standardmodell für textbasierte Extraktion
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M und qwen2.5:14b-instruct sind gute Alternativen.
 - ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) — Lokale Datenbank für Originalbelege und extrahierte Daten
 
 **Frontend**
@@ -85,11 +85,11 @@ pipx install finamt
 # Ollama installieren
 curl -fsSL https://ollama.ai/install.sh | sh
 
-# Modell laden — qwen2.5 7B ist der empfohlene Standard
-ollama pull qwen2.5:7b-instruct-q4_K_M
+# Modell laden — mistral:7b ist der empfohlene Standard
+ollama pull mistral:7b
 ```
 
-Weitere gut funktionierende Modelle: `qwen2.5:14b-instruct` und `mistral:7b`.
+Weitere gut funktionierende Modelle: `qwen2.5:7b-instruct-q4_K_M` und `qwen2.5:14b-instruct`.
 
 #### Tesseract OCR (optionaler Fallback für PaddleOCR)
 
@@ -185,7 +185,7 @@ FINAMT_OCR_PREPROCESS=true
 FINAMT_PDF_DPI=150
 
 # Extraktionsagenten — alle 4 Agenten verwenden dieses Modell
-FINAMT_AGENT_MODEL=qwen2.5:7b-instruct-q4_K_M
+FINAMT_AGENT_MODEL=mistral:7b
 FINAMT_AGENT_TIMEOUT=60
 FINAMT_AGENT_NUM_CTX=4096
 FINAMT_AGENT_MAX_RETRIES=2

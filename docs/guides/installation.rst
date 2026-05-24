@@ -48,9 +48,9 @@ Setting up Ollama
    curl -fsSL https://ollama.ai/install.sh | sh
 
    # Pull the recommended model
-   ollama pull qwen2.5:7b-instruct-q4_K_M
+   ollama pull mistral:7b
 
-The library targets **qwen2.5:7b-instruct-q4_K_M** by default — it provides a
+The library targets **mistral:7b** by default — it provides a
 good balance between accuracy and speed on a laptop CPU. Any Ollama-compatible
 model can be used; see :doc:`configuration` for details.
 
