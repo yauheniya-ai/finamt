@@ -179,7 +179,7 @@ class AgentsConfig(BaseSettings):
     )
 
     ollama_base_url: str = Field(default="http://localhost:11434")
-    agent_model: str = Field(default="qwen2.5:7b-instruct-q4_K_M")
+    agent_model: str = Field(default="mistral:7b")
     agent_timeout: int = Field(default=60)
     agent_num_ctx: int = Field(default=4096)
     agent_max_retries: int = Field(default=2)
