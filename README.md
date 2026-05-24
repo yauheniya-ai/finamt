@@ -13,7 +13,7 @@
 [![Downloads](https://pepy.tech/badge/finamt)](https://pepy.tech/project/finamt)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://github.com/spaceoctahedron/finamt/blob/main/LICENSE)
 [![Tests](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml/badge.svg)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/spaceoctahedron/a44d923694c52f0711d3f84be0aaf644/raw/coverage.json)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/spaceoctahedron-user/a44d923694c52f0711d3f84be0aaf644/raw/coverage.json)](https://github.com/spaceoctahedron/finamt/actions/workflows/tests.yml)
 [![GitHub last commit](https://img.shields.io/github/last-commit/spaceoctahedron/finamt)](https://github.com/spaceoctahedron/finamt/commits/main)
 [![Documentation Status](https://readthedocs.org/projects/finamt/badge/?version=latest)](https://readthedocs.org/projects/finamt/)
 
