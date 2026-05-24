@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.19.0 (2026-05-25)
+
+### New features / improvements
+
+- **Frontend: KYC / KYS relationship map** — a new collapsible dashboard panel visualises business relationships on an interactive world map. The **KYC** tab plots customers (revenue / sales receipts) and the **KYS** tab plots suppliers (expense / purchase receipts). Each location is represented by a circle whose radius is proportional to the total amount exchanged on a logarithmic scale, keeping visual differences meaningful without outliers dominating. Hovering a dot shows the counterparty name, total amount, and transaction count.
+
+- **Frontend: address geocoding via Nominatim** — counterparty addresses (city + postcode + country) are resolved to coordinates using the OpenStreetMap Nominatim API. To stay within the 1 req/s rate limit, calls are throttled and only fired for addresses that are not already cached. Multiple counterparties sharing the same city are merged into a single dot.
+
+- **Backend + Frontend: persistent geocode cache in project DB** — resolved coordinates are stored in the `project_metadata` table under the key `geocode_cache` via two new API endpoints (`GET /geocode-cache`, `POST /geocode-cache`). On subsequent loads the cache is fetched first, so Nominatim is only called for addresses that have never been seen before; already-resolved addresses render instantly with no network round-trip.
+
+- **Frontend: unmapped amount disclosure** — the panel legend explicitly reports the number of transactions and the total amount that could not be placed on the map due to missing or unresolvable address data, making the gap between the map total and the dashboard expense total transparent.
+
+
 ## Version 0.18.0 (2026-05-17)
 
 ### New features / improvements
