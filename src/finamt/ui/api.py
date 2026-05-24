@@ -532,6 +532,44 @@ def remove_submission(type: str = Query(...), year: int = Query(...), db: str | 
 
 
 # ---------------------------------------------------------------------------
+# Geocode cache  (stored in project_metadata under the key "geocode_cache")
+# Maps query strings → [lat, lon] or null; persisted so Nominatim is only
+# called once per address across sessions.
+# ---------------------------------------------------------------------------
+
+_GEOCODE_CACHE_KEY = "geocode_cache"
+
+
+@app.get("/geocode-cache", tags=["projects"])
+def get_geocode_cache(db: str | None = Query(default=None)):
+    """Return the full geocode cache for this project."""
+    db_path = _resolve_db(db)
+    if not db_path.exists():
+        return {"cache": {}}
+    with _repo(db_path) as repo:
+        cache = repo.get_metadata(_GEOCODE_CACHE_KEY) or {}
+    return {"cache": cache}
+
+
+@app.post("/geocode-cache", tags=["projects"])
+def upsert_geocode_entry(body: dict = Body(...), db: str | None = Query(default=None)):
+    """Upsert a single geocode entry: {query, lat, lon} — lat/lon may be null."""
+    query  = body.get("query")
+    if not query:
+        raise HTTPException(status_code=400, detail="query is required")
+    lat = body.get("lat")
+    lon = body.get("lon")
+    coords = [lat, lon] if lat is not None and lon is not None else None
+    db_path = _resolve_db(db)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with _repo(db_path) as repo:
+        cache = repo.get_metadata(_GEOCODE_CACHE_KEY) or {}
+        cache[query] = coords
+        repo.set_metadata(_GEOCODE_CACHE_KEY, cache)
+    return {"query": query, "coords": coords}
+
+
+# ---------------------------------------------------------------------------
 # Receipts
 # ---------------------------------------------------------------------------
 
