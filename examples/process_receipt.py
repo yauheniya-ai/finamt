@@ -120,8 +120,8 @@ def process_receipt(
     else:
         resolved_db_display = db_path or DEFAULT_DB_PATH
         layout = layout_from_db_path(Path(resolved_db_display))
-        actual_db    = layout["db"]
-        actual_debug = layout["debug"]
+        actual_db    = layout.db_path
+        actual_debug = layout.debug_dir
         data_missing = (
             not data.total_amount and not data.receipt_date and not data.counterparty
         )
