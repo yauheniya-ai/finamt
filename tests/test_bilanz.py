@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
-
-import pytest
 
 from finamt.models import Counterparty, ReceiptCategory, ReceiptData, ReceiptType
 from finamt.tax.bilanz import (

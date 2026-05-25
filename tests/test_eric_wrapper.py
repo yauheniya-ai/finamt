@@ -9,8 +9,6 @@ No real ERiC shared library is required.
 
 from __future__ import annotations
 
-import platform
-from ctypes import c_uint32
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -68,7 +66,7 @@ class TestEnc:
         assert _enc(None) is None
 
     def test_unicode_str(self):
-        assert _enc("München") == "München".encode("utf-8")
+        assert _enc("München") == "München".encode()
 
 
 class TestDec:
@@ -190,13 +188,14 @@ class TestEricSession:
                 assert session._buf_read(h) == b""
 
     def test_buf_read_nonempty(self, tmp_path):
-        from ctypes import cast, c_char_p, create_string_buffer
+        from ctypes import create_string_buffer
         lib = _mock_lib()
         data = b"hello eric"
         lib.EricRueckgabepufferLaenge.return_value = len(data)
         # string_at(ptr, n) needs a real pointer; use create_string_buffer
         buf = create_string_buffer(data)
-        from ctypes import POINTER, c_char, cast as ctypes_cast
+        from ctypes import POINTER, c_char
+        from ctypes import cast as ctypes_cast
         lib.EricRueckgabepufferInhalt.return_value = ctypes_cast(buf, POINTER(c_char))
         with patch("finamt.tax.eric_wrapper._load_library", return_value=lib):
             with EricSession(str(tmp_path)) as session:

@@ -11,8 +11,6 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-import pytest
-
 from finamt.models import Counterparty, ReceiptCategory, ReceiptData, ReceiptType
 from finamt.tax.eur import EURLinie, EURReport, generate_eur
 

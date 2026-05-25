@@ -9,13 +9,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
 from finamt.models import Counterparty, ReceiptCategory, ReceiptData, ReceiptType
 from finamt.tax.bilanz import generate_jahresabschluss
-from finamt.tax.ebilanz import EBilanzConfig, NS_GAAP, NS_XBRLI, build_xbrl, write_xbrl
+from finamt.tax.ebilanz import NS_GAAP, NS_XBRLI, EBilanzConfig, build_xbrl, write_xbrl
 
 try:
     from lxml import etree as ET
