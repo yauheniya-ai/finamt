@@ -23,7 +23,7 @@ class TestConfigDefaults:
         assert Config(_env_file=None).ollama_base_url == "http://localhost:11434"  # type: ignore[call-arg]
 
     def test_model_default(self):
-        assert Config(_env_file=None).model == "llama3.2"  # type: ignore[call-arg]
+        assert Config(_env_file=None).model == "mistral:7b"  # type: ignore[call-arg]
 
     def test_ocr_language_default(self):
         assert Config(_env_file=None).ocr_language == "german"  # type: ignore[call-arg]

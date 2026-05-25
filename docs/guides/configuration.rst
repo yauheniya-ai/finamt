@@ -97,7 +97,7 @@ Pass ``Config`` and / or ``AgentsConfig`` directly when constructing the agent:
    )
 
    agents_cfg = AgentsConfig(
-       agent_model="llama3.2",
+       agent_model="qwen2.5:7b-instruct-q4_K_M  ",
        agent_timeout=90,
    )
 
@@ -124,7 +124,7 @@ models are faster but may extract data less accurately:
 
 .. code-block:: bash
 
-   ollama pull llama3.2:3b
+   ollama pull qwen2.5:7b-instruct-q4_K_M  
 
 .. code-block:: python
 
@@ -132,5 +132,5 @@ models are faster but may extract data less accurately:
    from finamt.agents.config import AgentsConfig
 
    agent = FinanceAgent(
-       agents_cfg=AgentsConfig(agent_model="llama3.2:3b")
+       agents_cfg=AgentsConfig(agent_model="qwen2.5:7b-instruct-q4_K_M  ")
    )

@@ -72,7 +72,7 @@ class Config(BaseSettings):
     )
 
     ollama_base_url: str = Field(default="http://localhost:11434")
-    model: str = Field(default="llama3.2")
+    model: str = Field(default="mistral:7b")
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
     num_ctx: int = Field(default=8192, ge=512)
