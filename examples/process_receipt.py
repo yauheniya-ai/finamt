@@ -10,6 +10,22 @@ Usage
     python -m examples.process_receipt --file invoice1 --type sale
     python -m examples.process_receipt --output-dir results/     # also save JSON
     python -m examples.process_receipt --db /tmp/test.db
+
+Output layout (default project)
+-------------------------------
+    ~/.finamt/default/
+        finamt.db           ← SQLite database
+        pdfs/               ← archived copy of the receipt PDF
+        debug/
+            <receipt-id>/   ← one folder per receipt (SHA-256 prefix)
+                agent1_prompt.txt   agent1_raw.txt   agent1_parsed.json
+                agent2_prompt.txt   agent2_raw.txt   agent2_parsed.json
+                agent3_prompt.txt   agent3_raw.txt   agent3_parsed.json
+                agent4_prompt.txt   agent4_raw.txt   agent4_parsed.json
+
+If an agent returns no data, inspect the corresponding *_raw.txt file to
+see the raw model output — this is the first place to look for prompt or
+parsing issues.
 """
 
 from __future__ import annotations
@@ -23,6 +39,7 @@ from pathlib import Path
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s  %(name)s — %(message)s")
 
 from finamt import FinanceAgent
+from finamt.storage.project import layout_from_db_path
 from finamt.storage.sqlite import DEFAULT_DB_PATH
 
 
@@ -30,7 +47,7 @@ def process_receipt(
     file_stem: str,
     input_dir: Path = Path("examples/receipts"),
     output_dir: Path | None = None,
-    db_path: Path | None = None,       # None → use default ~/.finamt/finamt.db
+    db_path: Path | None = None,       # None → use default ~/.finamt/default/finamt.db
     no_db: bool = False,               # True → disable persistence entirely
     receipt_type: str = "purchase",
 ) -> bool:
@@ -101,8 +118,19 @@ def process_receipt(
     if no_db:
         print("  DB persistence  : disabled")
     else:
-        db_display = db_path or "~/.finamt/finamt.db"
-        print(f"  Saved to DB     : {db_display}")
+        resolved_db_display = db_path or DEFAULT_DB_PATH
+        layout = layout_from_db_path(Path(resolved_db_display))
+        actual_db    = layout["db"]
+        actual_debug = layout["debug"]
+        data_missing = (
+            not data.total_amount and not data.receipt_date and not data.counterparty
+        )
+        print(f"  Saved to DB     : {actual_db}")
+        print(f"  LLM debug logs  : {actual_debug}/")
+        if data_missing:
+            print(f"  \u26a0  No data extracted \u2014 inspect debug output:")
+            print(f"     {actual_debug}/")
+            print(f"     Tip: cat '{actual_debug}/<receipt-id>/agent1_raw.txt'")
 
     # ------------------------------------------------------------------
     # Optionally save JSON
@@ -132,7 +160,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--type",       default="purchase",         choices=["purchase", "sale"],
                    help="purchase = Eingangsrechnung; sale = Ausgangsrechnung.")
     p.add_argument("--db",         default=None,               metavar="FILE",
-                   help="SQLite DB path (default: ~/.finamt/finamt.db).")
+                   help="SQLite DB path (default: ~/.finamt/default/finamt.db).")
     p.add_argument("--no-db",      action="store_true",
                    help="Disable DB persistence (JSON extraction only).")
     p.add_argument("--verbose", "-v", action="store_true")
