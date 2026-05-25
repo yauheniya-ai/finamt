@@ -1,21 +1,24 @@
 """
 examples/process_receipt.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Process a single receipt PDF. Results are automatically saved to the local DB.
+Process a single receipt or all receipts in a folder.
+Accepts PDF, PNG, JPG, JPEG, TIFF, BMP, WEBP.
+Results are automatically saved to the local DB.
 
 Usage
 -----
-    python -m examples.process_receipt
-    python -m examples.process_receipt --file receipt1 --input-dir examples/receipts
-    python -m examples.process_receipt --file invoice1 --type sale
-    python -m examples.process_receipt --output-dir results/     # also save JSON
+    python -m examples.process_receipt                          # all receipts in examples/receipts/
+    python -m examples.process_receipt --file receipt1.pdf      # single file
+    python -m examples.process_receipt --input-dir my/scans/
+    python -m examples.process_receipt --file invoice1.pdf --type sale
+    python -m examples.process_receipt --output-dir results/    # also save JSON
     python -m examples.process_receipt --db /tmp/test.db
 
 Output layout (default project)
 -------------------------------
     ~/.finamt/default/
         finamt.db           ← SQLite database
-        pdfs/               ← archived copy of the receipt PDF
+        pdfs/               ← archived copy of every receipt file
         debug/
             <receipt-id>/   ← one folder per receipt (SHA-256 prefix)
                 agent1_prompt.txt   agent1_raw.txt   agent1_parsed.json
@@ -43,15 +46,36 @@ from finamt.storage.project import layout_from_db_path
 from finamt.storage.sqlite import DEFAULT_DB_PATH
 
 
+SUPPORTED_SUFFIXES = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp"}
+
+
+def _collect_files(input_dir: Path, file_name: str | None) -> list[Path]:
+    """Return an ordered list of receipt files to process."""
+    if file_name:
+        candidate = input_dir / file_name
+        # also try appending .pdf if no extension given
+        if not candidate.exists() and "." not in file_name:
+            candidate = input_dir / f"{file_name}.pdf"
+        if not candidate.exists():
+            print(f"[error] File not found: {candidate}", file=sys.stderr)
+            return []
+        return [candidate]
+    files = sorted(
+        p for p in input_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in SUPPORTED_SUFFIXES
+    )
+    if not files:
+        print(f"[error] No supported files found in {input_dir}", file=sys.stderr)
+    return files
+
+
 def process_receipt(
-    file_stem: str,
-    input_dir: Path = Path("examples/receipts"),
+    receipt_path: Path,
     output_dir: Path | None = None,
     db_path: Path | None = None,       # None → use default ~/.finamt/default/finamt.db
     no_db: bool = False,               # True → disable persistence entirely
     receipt_type: str = "purchase",
 ) -> bool:
-    receipt_path = input_dir / f"{file_stem}.pdf"
     if not receipt_path.exists():
         print(f"[error] File not found: {receipt_path}", file=sys.stderr)
         return False
@@ -137,7 +161,7 @@ def process_receipt(
     # ------------------------------------------------------------------
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
-        out_path = output_dir / f"{file_stem}_extracted.json"
+        out_path = output_dir / f"{receipt_path.stem}_extracted.json"
         out_path.write_text(
             json.dumps(result.to_dict(), indent=2, ensure_ascii=False),
             encoding="utf-8",
@@ -150,10 +174,11 @@ def process_receipt(
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Process a German receipt PDF (auto-saves to DB).",
+        description="Process German receipt files (PDF/PNG/JPG/…); auto-saves to DB.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    p.add_argument("--file",       default="receipt1",         metavar="STEM")
+    p.add_argument("--file",       default=None,               metavar="FILENAME",
+                   help="Single file name (with or without extension). Omit to process all files in --input-dir.")
     p.add_argument("--input-dir",  default="examples/receipts", metavar="DIR")
     p.add_argument("--output-dir", default=None,               metavar="DIR",
                    help="Also write extracted JSON here (optional).")
@@ -171,12 +196,25 @@ if __name__ == "__main__":
     args = _build_parser().parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    ok = process_receipt(
-        file_stem=args.file,
-        input_dir=Path(args.input_dir),
-        output_dir=Path(args.output_dir) if args.output_dir else None,
-        db_path=Path(args.db) if args.db else None,
-        no_db=args.no_db,
-        receipt_type=args.type,
-    )
-    sys.exit(0 if ok else 1)
+
+    input_dir  = Path(args.input_dir)
+    output_dir = Path(args.output_dir) if args.output_dir else None
+    db_path    = Path(args.db) if args.db else None
+
+    files = _collect_files(input_dir, args.file)
+    if not files:
+        sys.exit(1)
+
+    failed = 0
+    for receipt_path in files:
+        ok = process_receipt(
+            receipt_path=receipt_path,
+            output_dir=output_dir,
+            db_path=db_path,
+            no_db=args.no_db,
+            receipt_type=args.type,
+        )
+        if not ok:
+            failed += 1
+
+    sys.exit(1 if failed else 0)

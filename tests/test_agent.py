@@ -33,14 +33,14 @@ def _make_agent(ocr_text: str = "") -> tuple[FinanceAgent, MagicMock]:
     return agent, mock_ocr
 
 
-def _ollama_resp(data: dict) -> str:
+def _llm_resp(data: dict) -> str:
     """Build a JSON string as the local LLM backend would return."""
     return json.dumps(data)
 
 
 def _four_responses(a1, a2, a3, a4):
     """Return a side_effect list for 4 sequential llm_backend.generate calls."""
-    return [_ollama_resp(a1), _ollama_resp(a2), _ollama_resp(a3), _ollama_resp(a4)]
+    return [_llm_resp(a1), _llm_resp(a2), _llm_resp(a3), _llm_resp(a4)]
 
 
 # ---------------------------------------------------------------------------
