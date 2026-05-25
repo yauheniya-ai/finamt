@@ -54,13 +54,13 @@ Q1_E = date(YEAR, 3, 31)
 
 
 def _cfg(**kwargs) -> ElsterConfig:
-    defaults = dict(
-        cert_path="/tmp/test.pfx",
-        cert_password="secret",
-        steuernummer="21/815/08150",
-        finanzamt_nr="2181",
-        bundesland_kz="21",
-    )
+    defaults = {
+        "cert_path": "/tmp/test.pfx",
+        "cert_password": "secret",
+        "steuernummer": "21/815/08150",
+        "finanzamt_nr": "2181",
+        "bundesland_kz": "21",
+    }
     defaults.update(kwargs)
     return ElsterConfig(**defaults)
 

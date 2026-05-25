@@ -31,13 +31,13 @@ YEAR = 2024
 
 
 def _cfg(**kwargs) -> EBilanzConfig:
-    defaults = dict(
-        steuernummer="21/815/08150",
-        company_name="Muster GmbH",
-        legal_form="GmbH",
-        fiscal_year_start=f"{YEAR}-01-01",
-        fiscal_year_end=f"{YEAR}-12-31",
-    )
+    defaults = {
+        "steuernummer": "21/815/08150",
+        "company_name": "Muster GmbH",
+        "legal_form": "GmbH",
+        "fiscal_year_start": f"{YEAR}-01-01",
+        "fiscal_year_end": f"{YEAR}-12-31",
+    }
     defaults.update(kwargs)
     return EBilanzConfig(**defaults)
 
