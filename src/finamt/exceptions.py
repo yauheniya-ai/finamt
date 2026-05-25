@@ -26,7 +26,7 @@ class OCRProcessingError(FinanceAgentError):
 
 
 class LLMExtractionError(FinanceAgentError):
-    """Raised when the Ollama LLM fails to return valid structured JSON."""
+    """Raised when the local LLM fails to return valid structured JSON."""
 
 
 class InvalidReceiptError(FinanceAgentError):

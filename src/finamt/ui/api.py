@@ -317,8 +317,6 @@ def get_config():
         "agent_timeout": ac.timeout,
         "agent_num_ctx": ac.num_ctx,
         "agent_max_retries": ac.max_retries,
-        # ollama / shared
-        "ollama_base_url": ac.base_url,
         # OCR settings
         "ocr_language": effective_ocr.ocr_language,
         "ocr_timeout": effective_ocr.ocr_timeout,
@@ -343,7 +341,6 @@ def put_config(body: dict = Body(...)):
         "agent_timeout": int,
         "agent_num_ctx": int,
         "agent_max_retries": int,
-        "ollama_base_url": str,
     }
     _OCR_KEYS = {
         "ocr_language": str,
@@ -359,7 +356,9 @@ def put_config(body: dict = Body(...)):
             try:
                 updates[k] = cast(body[k])
             except (ValueError, TypeError) as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid value for {k}: {exc}") from exc
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid value for {k}: {exc}"
+                ) from exc
     _runtime_cfg = {**_runtime_cfg, **updates}
     return get_config()
 
@@ -518,14 +517,16 @@ def add_submission(body: dict = Body(...), db: str | None = Query(default=None))
 
 
 @app.delete("/submissions", tags=["projects"])
-def remove_submission(type: str = Query(...), year: int = Query(...), db: str | None = Query(default=None)):
+def remove_submission(
+    type: str = Query(...), year: int = Query(...), db: str | None = Query(default=None)
+):
     """Remove all submission records matching {type, year}."""
     db_path = _resolve_db(db)
     if not db_path.exists():
         return {"removed": 0}
     with _repo(db_path) as repo:
         records = repo.get_metadata(_SUBMISSIONS_KEY) or []
-        before  = len(records)
+        before = len(records)
         records = [r for r in records if not (r.get("type") == type and r.get("year") == year)]
         repo.set_metadata(_SUBMISSIONS_KEY, records)
     return {"removed": before - len(records), "total": len(records)}
@@ -554,7 +555,7 @@ def get_geocode_cache(db: str | None = Query(default=None)):
 @app.post("/geocode-cache", tags=["projects"])
 def upsert_geocode_entry(body: dict = Body(...), db: str | None = Query(default=None)):
     """Upsert a single geocode entry: {query, lat, lon} — lat/lon may be null."""
-    query  = body.get("query")
+    query = body.get("query")
     if not query:
         raise HTTPException(status_code=400, detail="query is required")
     lat = body.get("lat")

@@ -139,7 +139,11 @@ class TestGenerateEur:
         assert report.ausgaben_lines["software"].net_amount == Decimal("100.00")  # 119-19
 
     def test_sale_goes_to_einnahmen(self):
-        receipts = [_receipt(category="services", receipt_type="sale", total_amount="595.00", vat_amount="95.00")]
+        receipts = [
+            _receipt(
+                category="services", receipt_type="sale", total_amount="595.00", vat_amount="95.00"
+            )
+        ]
         report = generate_eur(receipts, YEAR)
         assert "services" in report.einnahmen_lines
         assert report.einnahmen_lines["services"].net_amount == Decimal("500.00")
@@ -186,15 +190,32 @@ class TestGenerateEur:
     def test_gewinn_calculated_correctly(self):
         receipts = [
             # sale: total=1190, vat=190, net=1000
-            _receipt(category="services", receipt_type="sale", total_amount="1190.00", vat_amount="190.00"),
+            _receipt(
+                category="services",
+                receipt_type="sale",
+                total_amount="1190.00",
+                vat_amount="190.00",
+            ),
             # purchase: total=357, vat=57, net=300
-            _receipt(category="software", receipt_type="purchase", total_amount="357.00", vat_amount="57.00"),
+            _receipt(
+                category="software",
+                receipt_type="purchase",
+                total_amount="357.00",
+                vat_amount="57.00",
+            ),
         ]
         report = generate_eur(receipts, YEAR)
         assert report.gewinn == Decimal("700.00")
 
     def test_vat_tracked_separately(self):
-        receipts = [_receipt(category="software", total_amount="119.00", vat_amount="19.00", receipt_type="purchase")]
+        receipts = [
+            _receipt(
+                category="software",
+                total_amount="119.00",
+                vat_amount="19.00",
+                receipt_type="purchase",
+            )
+        ]
         report = generate_eur(receipts, YEAR)
         ln = report.ausgaben_lines["software"]
         assert ln.vat_amount == Decimal("19.00")

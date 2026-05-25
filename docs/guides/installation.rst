@@ -5,8 +5,13 @@ Requirements
 ------------
 
 - Python 3.10 or newer
-- `Ollama <https://ollama.ai>`_ running locally with a supported model
 - Tesseract OCR *(optional — used as a fallback when PaddleOCR times out)*
+
+.. note::
+
+   **No Ollama required.** LLM models are downloaded automatically from HuggingFace on first
+   use (~4 GB per model) and cached in ``~/.cache/huggingface/hub``. On Apple Silicon the
+   ``mlx-lm`` backend is used; on other platforms ``transformers`` is used.
 
 Install from PyPI
 -----------------
@@ -38,21 +43,6 @@ Install documentation tools:
 .. code-block:: bash
 
    pip install "finamt[docs]"
-
-Setting up Ollama
------------------
-
-.. code-block:: bash
-
-   # macOS / Linux
-   curl -fsSL https://ollama.ai/install.sh | sh
-
-   # Pull the recommended model
-   ollama pull mistral:7b
-
-The library targets **mistral:7b** by default — it provides a
-good balance between accuracy and speed on a laptop CPU. Any Ollama-compatible
-model can be used; see :doc:`configuration` for details.
 
 Installing Tesseract (optional)
 --------------------------------

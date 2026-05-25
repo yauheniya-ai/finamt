@@ -33,16 +33,13 @@ def _make_agent(ocr_text: str = "") -> tuple[FinanceAgent, MagicMock]:
     return agent, mock_ocr
 
 
-def _ollama_resp(data: dict) -> MagicMock:
-    """Build a mock requests.Response returning data as Ollama JSON payload."""
-    m = MagicMock()
-    m.status_code = 200
-    m.json.return_value = {"response": json.dumps(data)}
-    return m
+def _ollama_resp(data: dict) -> str:
+    """Build a JSON string as the local LLM backend would return."""
+    return json.dumps(data)
 
 
 def _four_responses(a1, a2, a3, a4):
-    """Return a side_effect list for 4 sequential requests.post calls."""
+    """Return a side_effect list for 4 sequential llm_backend.generate calls."""
     return [_ollama_resp(a1), _ollama_resp(a2), _ollama_resp(a3), _ollama_resp(a4)]
 
 
@@ -84,7 +81,7 @@ class TestProcessReceiptSuccess:
     ):
         agent, mock_ocr = _make_agent("Bürobedarf GmbH\nGesamt 21,36 €")
 
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -101,7 +98,7 @@ class TestProcessReceiptSuccess:
     ):
         agent, _ = _make_agent("some text")
 
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -114,7 +111,7 @@ class TestProcessReceiptSuccess:
     ):
         agent, _ = _make_agent("some text")
 
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -127,7 +124,7 @@ class TestProcessReceiptSuccess:
         self, agent1_response, agent2_response, agent3_response, agent4_response
     ):
         agent, _ = _make_agent("text")
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -140,7 +137,7 @@ class TestProcessReceiptSuccess:
         self, agent1_response, agent2_response, agent3_response, agent4_response
     ):
         agent, _ = _make_agent("text")
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -152,7 +149,7 @@ class TestProcessReceiptSuccess:
     ):
         bad_a1 = {"receipt_number": None, "receipt_date": "2024-03-15", "category": "flying_cars"}
         agent, _ = _make_agent("text")
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 bad_a1, agent2_response, agent3_response, agent4_response
             )
@@ -162,7 +159,7 @@ class TestProcessReceiptSuccess:
     def test_no_items_in_agent4_response(self, agent1_response, agent2_response, agent3_response):
         a4_empty = {"items": []}
         agent, _ = _make_agent("text")
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, a4_empty
             )
@@ -204,11 +201,9 @@ class TestProcessReceiptFailures:
 
     def test_llm_connection_error_still_produces_result(self):
         """LLM failure → all agents return None → ReceiptData with nulls built anyway."""
-        import requests as req
-
         agent, _ = _make_agent("Müller GmbH\nGesamt 49,99 €")
         with patch(
-            "finamt.agents.llm_caller.requests.post", side_effect=req.exceptions.ConnectionError
+            "finamt.agents.llm_backend.generate", side_effect=RuntimeError("connection refused")
         ):
             result = agent.process_receipt("receipt.pdf")
         # No unhandled exception — result is either success or graceful failure
@@ -231,7 +226,7 @@ class TestBatchProcess:
 
         agent, _ = _make_agent("Gesamt 10,00 €")
 
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             ) + _four_responses(agent1_response, agent2_response, agent3_response, agent4_response)
@@ -265,7 +260,7 @@ class TestBatchProcess:
 
         mock_ocr.extract_text_from_pdf.side_effect = ocr_side_effect
 
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -321,7 +316,7 @@ class TestProcessReceiptExtra:
     ):
         """Passing PDF as raw bytes — pdf_file_path should be None internally."""
         agent, mock_ocr = _make_agent("Gesamt 21,36 €")
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )
@@ -342,7 +337,7 @@ class TestProcessReceiptExtra:
             agent = FinanceAgent(db_path=str(db_path))
             agent.ocr = mock_ocr
 
-        with patch("finamt.agents.llm_caller.requests.post") as mock_post:
+        with patch("finamt.agents.llm_backend.generate") as mock_post:
             mock_post.side_effect = _four_responses(
                 agent1_response, agent2_response, agent3_response, agent4_response
             )

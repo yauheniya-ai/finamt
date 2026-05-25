@@ -9,7 +9,6 @@ All configuration for finamt in one place.
   AgentModelConfig — immutable snapshot returned by AgentsConfig.get_agent_config()
 
 Override via environment variables or a .env file:
-  FINAMT_OLLAMA_BASE_URL=http://localhost:11434
   FINAMT_AGENT_MODEL=mistral:7b
 
 Recommended models (text-only, no vision required):
@@ -35,7 +34,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class ModelConfig:
     """Snapshot of general LLM settings (used by OCR pipeline)."""
 
-    base_url: str
     model: str
     temperature: float
     top_p: float
@@ -48,7 +46,6 @@ class ModelConfig:
 class AgentModelConfig:
     """Snapshot of extraction agent LLM settings."""
 
-    base_url: str
     model: str
     temperature: float
     top_p: float
@@ -71,7 +68,6 @@ class Config(BaseSettings):
         extra="ignore",
     )
 
-    ollama_base_url: str = Field(default="http://localhost:11434")
     model: str = Field(default="mistral:7b")
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
@@ -89,11 +85,6 @@ class Config(BaseSettings):
     # HTTP / retry
     max_retries: int = Field(default=3, ge=0, le=10)
     request_timeout: int = Field(default=30, ge=1)
-
-    @field_validator("ollama_base_url")
-    @classmethod
-    def _strip_slash(cls, v: str) -> str:
-        return v.rstrip("/")
 
     @field_validator("ocr_language")
     @classmethod
@@ -115,7 +106,6 @@ class Config(BaseSettings):
 
     def get_model_config(self) -> ModelConfig:
         return ModelConfig(
-            base_url=self.ollama_base_url,
             model=self.model,
             temperature=self.temperature,
             top_p=self.top_p,
@@ -125,10 +115,6 @@ class Config(BaseSettings):
         )
 
     # Backward-compatible uppercase aliases used by ocr_processor / cli
-    @property
-    def OLLAMA_BASE_URL(self) -> str:
-        return self.ollama_base_url
-
     @property
     def DEFAULT_MODEL(self) -> str:
         return self.model
@@ -178,7 +164,6 @@ class AgentsConfig(BaseSettings):
         extra="ignore",
     )
 
-    ollama_base_url: str = Field(default="http://localhost:11434")
     agent_model: str = Field(default="mistral:7b")
     agent_timeout: int = Field(default=60)
     agent_num_ctx: int = Field(default=4096)
@@ -188,7 +173,6 @@ class AgentsConfig(BaseSettings):
 
     def get_agent_config(self) -> AgentModelConfig:
         return AgentModelConfig(
-            base_url=self.ollama_base_url.rstrip("/"),
             model=self.agent_model,
             temperature=self.temperature,
             top_p=self.top_p,

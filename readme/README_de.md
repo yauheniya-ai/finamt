@@ -26,7 +26,7 @@ Eine agentische Python-Bibliothek zur strukturierten Extraktion von Daten aus Be
 ## Funktionen
 
 - **Deutsche Steuerkonformität** — Kategoriensystem und Umsatzsteuerbehandlung ausgerichtet auf die deutsche Buchführungspraxis
-- **Lokal & Offline** — Alles läuft vollständig offline; Daten werden in einer lokalen Datenbank gespeichert
+- **Lokal & Offline** — Alles läuft vollständig offline; Modelle werden automatisch von HuggingFace heruntergeladen und lokal gecacht, Daten werden in einer lokalen Datenbank gespeichert
 - **4-Agenten-Pipeline** — Vier sequenzielle, spezialisierte Agenten für Metadaten, Geschäftspartner, Beträge und Positionen; kurze, fokussierte Prompts für zuverlässige Leistung mit lokalen Modellen
 - **Web-Oberfläche** — Vollständige Browseroberfläche zum Hochladen, Prüfen, Bearbeiten und Verwalten von Belegen
 
@@ -37,9 +37,11 @@ Eine agentische Python-Bibliothek zur strukturierten Extraktion von Daten aus Be
 - ![FastAPI](https://api.iconify.design/devicon:fastapi.svg?height=16) [FastAPI](https://fastapi.tiangolo.com) — Backend der Web-Oberfläche
 - ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16&color=%23363FE5) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR für gescannte PDFs
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR für gescannte PDFs und Bilder als Fallback bei PaddleOCR-Fehlern oder Timeouts
-- ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — Lokale LLMs zur strukturierten Extraktion von Beleginformationen
-    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) — Open-Weight-Modelle; mistral:7b ist das empfohlene Standardmodell für textbasierte Extraktion
-    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — Laptop-kompatible LLMs; qwen2.5:7b-instruct-q4_K_M und qwen2.5:14b-instruct sind gute Alternativen.
+- ![HuggingFace](https://api.iconify.design/simple-icons:huggingface.svg?height=16&color=%23FFD21E) [HuggingFace Hub](https://huggingface.co) — Modelle werden beim ersten Start automatisch heruntergeladen und gecacht; kein separater Server erforderlich
+    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) — `mistral:7b` ist das empfohlene Standardmodell (auf Apple Silicon: `mlx-community/Mistral-7B-Instruct-v0.3-4bit`)
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) — `qwen2.5:7b-instruct-q4_K_M` ist eine gute Alternative (auf Apple Silicon: `mlx-community/Qwen2.5-7B-Instruct-4bit`)
+    - ![mlx-lm](https://api.iconify.design/simple-icons:apple.svg?height=16) [mlx-lm](https://github.com/ml-explore/mlx-lm) — 4-Bit-Inferenz auf Apple Silicon (M-Serie) via MLX; ca. 13 % schneller als Ollama
+    - ![transformers](https://api.iconify.design/simple-icons:huggingface.svg?height=16&color=%23FFD21E) [transformers](https://huggingface.co/docs/transformers) — Plattformübergreifender Inferenz-Fallback (Linux / Windows / Intel Mac)
 - ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) — Lokale Datenbank für Originalbelege und extrahierte Daten
 
 **Frontend**
@@ -76,20 +78,9 @@ pipx install finamt
 ### Systemvoraussetzungen
 
 - Python 3.10+
-- Ollama läuft lokal mit einem unterstützten, heruntergeladenen Modell
 - Tesseract OCR (optionaler Fallback bei PaddleOCR-Timeout)
 
-#### Ollama
-
-```bash
-# Ollama installieren
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Modell laden — mistral:7b ist der empfohlene Standard
-ollama pull mistral:7b
-```
-
-Weitere gut funktionierende Modelle: `qwen2.5:7b-instruct-q4_K_M` und `qwen2.5:14b-instruct`.
+> **Kein Ollama erforderlich.** LLM-Modelle werden beim ersten Start automatisch von HuggingFace heruntergeladen (ca. 4 GB pro Modell) und unter `~/.cache/huggingface/hub` gecacht. Auf Apple Silicon wird das `mlx-lm`-Backend verwendet; auf anderen Plattformen `transformers`.
 
 #### Tesseract OCR (optionaler Fallback für PaddleOCR)
 
@@ -177,7 +168,6 @@ Einstellungen werden in folgender Prioritätsreihenfolge eingelesen: Umgebungsva
 # .env
 
 # OCR und allgemeine Einstellungen
-FINAMT_OLLAMA_BASE_URL=http://localhost:11434
 FINAMT_OCR_LANGUAGE=german
 FINAMT_OCR_TIMEOUT=60
 FINAMT_TESSERACT_CMD=tesseract
@@ -321,7 +311,7 @@ Alle Ausnahmen erben von `FinanceAgentError`.
 | Ausnahme | Wird ausgelöst bei |
 |---|---|
 | `OCRProcessingError` | PDF kann nicht geöffnet werden oder Textextraktion schlägt fehl |
-| `LLMExtractionError` | Ollama nicht erreichbar oder gibt nach allen Versuchen kein gültiges JSON zurück |
+| `LLMExtractionError` | Modell gibt nach allen Versuchen kein gültiges JSON zurück |
 | `InvalidReceiptError` | Extrahierte Daten bestehen die fachliche Validierung nicht |
 
 ```python
@@ -407,7 +397,7 @@ Jeder Beleg wird mit einer Kategorie und einer optionalen Unterkategorie versehe
    ```bash
    pytest --cov=src --cov-report=term-missing
    ```
-4. Lint und Formatierung mit Ruff:
+4. Lint und Formatierung mit ![Ruff](https://api.iconify.design/catppuccin:ruff.svg?height=16) Ruff:
    ```bash
    ruff check --fix src/ tests/
    ruff format src/ tests/
@@ -433,9 +423,10 @@ Diese Software ist abhängig von externen Bibliotheken und Diensten, darunter:
 
 - PaddleOCR (Apache License 2.0)
 - Tesseract OCR (Apache License 2.0)
-- Ollama (MIT License)
+- HuggingFace Hub / transformers (Apache License 2.0)
+- mlx-lm (MIT License, nur Apple Silicon)
 
-finamt verwendet lokal installierte Sprachmodelle (z. B. Qwen) über Ollama.
+finamt lädt Sprachmodelle (z. B. Mistral, Qwen) beim ersten Start von HuggingFace herunter und speichert sie lokal zwischen.
 
 Diese Modelle werden **nicht** mit dieser Software ausgeliefert und unterliegen ihren eigenen Lizenzbedingungen.
 Die Nutzerinnen und Nutzer sind dafür verantwortlich, die jeweiligen Nutzungsbedingungen beim Herunterladen und Verwenden dieser Modelle einzuhalten.

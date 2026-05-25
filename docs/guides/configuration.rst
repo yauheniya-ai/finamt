@@ -19,12 +19,9 @@ file in the working directory or exported to the shell environment.
    * - Variable
      - Default
      - Description
-   * - ``FINAMT_OLLAMA_BASE_URL``
-     - ``http://localhost:11434``
-     - Base URL of the Ollama API server.
    * - ``FINAMT_AGENT_MODEL``
      - ``mistral:7b``
-     - Model used by all four extraction agents.
+     - Model used by all four extraction agents. Supported values: ``mistral:7b``, ``qwen2.5:7b-instruct-q4_K_M``.
    * - ``FINAMT_AGENT_TIMEOUT``
      - ``60``
      - HTTP timeout in seconds per agent LLM call.
@@ -74,7 +71,6 @@ Copy ``env.example`` from the repository root and adjust it to your setup:
 
 .. code-block:: ini
 
-   FINAMT_OLLAMA_BASE_URL=http://localhost:11434
    FINAMT_AGENT_MODEL=mistral:7b
    FINAMT_AGENT_TIMEOUT=60
    FINAMT_OCR_TIMEOUT=60
@@ -91,13 +87,12 @@ Pass ``Config`` and / or ``AgentsConfig`` directly when constructing the agent:
    from finamt.agents.config import AgentsConfig
 
    config = Config(
-       ollama_base_url="http://localhost:11434",
        ocr_timeout=90,
        pdf_dpi=200,
    )
 
    agents_cfg = AgentsConfig(
-       agent_model="qwen2.5:7b-instruct-q4_K_M  ",
+       agent_model="qwen2.5:7b-instruct-q4_K_M",
        agent_timeout=90,
    )
 
@@ -119,12 +114,7 @@ Data is stored under the named project directory by default:
 Using a different model
 -----------------------
 
-Any model available in your local Ollama installation can be used.  Smaller
-models are faster but may extract data less accurately:
-
-.. code-block:: bash
-
-   ollama pull qwen2.5:7b-instruct-q4_K_M  
+Change the model by setting ``FINAMT_AGENT_MODEL`` or passing ``AgentsConfig``:
 
 .. code-block:: python
 
@@ -132,5 +122,10 @@ models are faster but may extract data less accurately:
    from finamt.agents.config import AgentsConfig
 
    agent = FinanceAgent(
-       agents_cfg=AgentsConfig(agent_model="qwen2.5:7b-instruct-q4_K_M  ")
+       agents_cfg=AgentsConfig(agent_model="qwen2.5:7b-instruct-q4_K_M")
    )
+
+The model is downloaded automatically on first use. Supported short names:
+
+- ``mistral:7b`` — default; maps to ``mlx-community/Mistral-7B-Instruct-v0.3-4bit`` (Apple Silicon) or ``mistralai/Mistral-7B-Instruct-v0.3`` (other)
+- ``qwen2.5:7b-instruct-q4_K_M`` — maps to ``mlx-community/Qwen2.5-7B-Instruct-4bit`` (Apple Silicon) or ``Qwen/Qwen2.5-7B-Instruct`` (other)

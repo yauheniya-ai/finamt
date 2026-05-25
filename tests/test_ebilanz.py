@@ -135,7 +135,11 @@ class TestBuildXbrl:
 
     def test_with_sale_receipts(self):
         # total=595, vat=95, net=500
-        receipts = [_receipt(category="services", receipt_type="sale", total_amount="595.00", vat_amount="95.00")]
+        receipts = [
+            _receipt(
+                category="services", receipt_type="sale", total_amount="595.00", vat_amount="95.00"
+            )
+        ]
         jab = generate_jahresabschluss(
             receipts,
             year=YEAR,
@@ -150,7 +154,14 @@ class TestBuildXbrl:
 
     def test_with_material_purchase(self):
         # total=238, vat=38, net=200
-        receipts = [_receipt(category="material", receipt_type="purchase", total_amount="238.00", vat_amount="38.00")]
+        receipts = [
+            _receipt(
+                category="material",
+                receipt_type="purchase",
+                total_amount="238.00",
+                vat_amount="38.00",
+            )
+        ]
         jab = generate_jahresabschluss(
             receipts,
             year=YEAR,

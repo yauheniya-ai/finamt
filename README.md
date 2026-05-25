@@ -26,7 +26,7 @@ An agentic Python library for extracting structured data from receipts and invoi
 ## Features
 
 - **German Tax Alignment** — Category taxonomy and VAT handling aligned with German fiscal practice
-- **Local-First** — Everything runs completely offline, with data stored in a local database
+- **Local-First** — Everything runs completely offline; models are auto-downloaded from HuggingFace and cached locally, data is stored in a local database
 - **4-Agent Pipeline** — Sequential specialised agents for metadata, counterparty, amounts, and line items; short focused prompts for reliable local model performance
 - **Web UI** — Full browser interface for uploading, reviewing, editing, and managing receipts and invoices and preparing tax returns 
 
@@ -37,9 +37,11 @@ An agentic Python library for extracting structured data from receipts and invoi
 - ![FastAPI](https://api.iconify.design/devicon:fastapi.svg?height=16) [FastAPI](https://fastapi.tiangolo.com) — backend for the web UI
 - ![PaddleOCR](https://api.iconify.design/simple-icons:paddlepaddle.svg?height=16&color=%23363FE5) [PaddleOCR](https://github.com/PADDLEPADDLE/PADDLEOCR) — OCR for scanned PDFs 
 - ![Tesseract](https://api.iconify.design/devicon:google.svg?height=16) [Tesseract](https://github.com/tesseract-ocr/tesseract) — OCR for scanned PDFs and images when PaddleOCR fails or times out
-- ![Ollama](https://api.iconify.design/devicon:ollama.svg?height=16) [Ollama](https://ollama.com) — local LLMs for structured extraction of information from receipts and invoices
-    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) – open-weight performant models, with mistral:7b as the preferred default for text-based extraction
-    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – laptop-compatible LLMs; qwen2.5:7b-instruct-q4_K_M and qwen2.5:14b-instruct are good alternatives.
+- ![HuggingFace](https://api.iconify.design/simple-icons:huggingface.svg?height=16&color=%23FFD21E) [HuggingFace Hub](https://huggingface.co) — models downloaded and cached automatically on first use; no separate server required
+    - ![Mistral](https://api.iconify.design/logos:mistral-ai-icon.svg?height=16) [Mistral](https://mistral.ai) – `mistral:7b` is the recommended default (maps to `mlx-community/Mistral-7B-Instruct-v0.3-4bit` on Apple Silicon)
+    - ![Qwen](https://api.iconify.design/simple-icons:qwen.svg?height=16&color=%237B2FBF) [Qwen](https://qwen.ai/home) – `qwen2.5:7b-instruct-q4_K_M` is a good alternative (maps to `mlx-community/Qwen2.5-7B-Instruct-4bit` on Apple Silicon)
+    - ![mlx-lm](https://api.iconify.design/simple-icons:apple.svg?height=16) [mlx-lm](https://github.com/ml-explore/mlx-lm) — 4-bit inference on Apple Silicon (M-series) via the MLX framework; ~13 % faster than Ollama
+    - ![transformers](https://api.iconify.design/simple-icons:huggingface.svg?height=16&color=%23FFD21E) [transformers](https://huggingface.co/docs/transformers) — cross-platform inference fallback (Linux / Windows / Intel Mac)
 - ![SQLite](https://api.iconify.design/devicon:sqlite.svg?height=16) [SQLite](https://sqlite.org) – local database for original receipts and extracted data
 
 **Frontend**
@@ -76,20 +78,9 @@ pipx install finamt
 ### System Requirements
 
 - Python 3.10+
-- Ollama running locally with a supported model pulled
 - Tesseract OCR (optional fallback when PaddleOCR times out)
 
-#### Ollama
-
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull a model — mistral:7b is the recommended default
-ollama pull mistral:7b
-```
-
-Other models that work well: `qwen2.5:7b-instruct-q4_K_M`, `qwen2.5:14b-instruct` — similar extraction quality, with `qwen2.5:14b-instruct` requiring roughly 2× the processing time.
+> **No Ollama required.** LLM models are downloaded automatically from HuggingFace on first use (~4 GB per model) and cached at `~/.cache/huggingface/hub`. On Apple Silicon the `mlx-lm` backend is used; on other platforms `transformers` is used.
 
 #### Tesseract OCR (optional fallback from PaddleOCR)
 
@@ -177,7 +168,6 @@ Settings are read in priority order from: environment variables → `.env` file 
 # .env
 
 # OCR and general settings
-FINAMT_OLLAMA_BASE_URL=http://localhost:11434
 FINAMT_OCR_LANGUAGE=german
 FINAMT_OCR_TIMEOUT=60
 FINAMT_TESSERACT_CMD=tesseract
@@ -321,7 +311,7 @@ All exceptions inherit from `FinanceAgentError`.
 | Exception | Raised when |
 |---|---|
 | `OCRProcessingError` | PDF cannot be opened or text extraction fails |
-| `LLMExtractionError` | Ollama is unreachable or returns invalid JSON after all retries |
+| `LLMExtractionError` | Model returns invalid JSON after all retries |
 | `InvalidReceiptError` | Extracted data fails business-logic validation |
 
 ```python
@@ -407,7 +397,7 @@ Every receipt is tagged with a category and optional subcategory. Categories map
    ```bash
    pytest --cov=src --cov-report=term-missing
    ```
-4. Lint and format with Ruff:
+4. Lint and format with ![Ruff](https://api.iconify.design/catppuccin:ruff.svg?height=16) Ruff:
    ```bash
    ruff check --fix src/ tests/
    ruff format src/ tests/
@@ -433,9 +423,10 @@ This software depends on external libraries and services, including:
 
 - PaddleOCR (Apache License 2.0)
 - Tesseract OCR (Apache License 2.0)
-- Ollama (MIT License)
+- HuggingFace Hub / transformers (Apache License 2.0)
+- mlx-lm (MIT License, Apple Silicon only)
 
-finamt uses locally installed language models (e.g. Qwen) via Ollama.
+finamt downloads language models from HuggingFace (e.g. Mistral, Qwen) on first use and caches them locally.
 
 These models are **not distributed** with this software and are subject to their own licenses.
 Users are responsible for complying with the respective terms when downloading and using such models.

@@ -19,9 +19,6 @@ from finamt.agents.config import AgentModelConfig, AgentsConfig, Config, ModelCo
 
 
 class TestConfigDefaults:
-    def test_ollama_base_url_default(self):
-        assert Config(_env_file=None).ollama_base_url == "http://localhost:11434"  # type: ignore[call-arg]
-
     def test_model_default(self):
         assert Config(_env_file=None).model == "mistral:7b"  # type: ignore[call-arg]
 
@@ -48,14 +45,6 @@ class TestConfigDefaults:
 
 
 class TestConfigValidation:
-    def test_trailing_slash_stripped(self):
-        c = Config(ollama_base_url="http://localhost:11434/")
-        assert not c.ollama_base_url.endswith("/")
-
-    def test_multiple_trailing_slashes_stripped(self):
-        c = Config(ollama_base_url="http://localhost:11434///")
-        assert c.ollama_base_url == "http://localhost:11434"
-
     def test_pdf_dpi_minimum(self):
         with pytest.raises(ValidationError):
             Config(pdf_dpi=10)

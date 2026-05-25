@@ -199,20 +199,28 @@ class TestUstvaKennzahlen:
         assert Decimal(kz["Kz66"]) == Decimal("19.00")
 
     def test_single_sale_19pct_gets_kz81(self):
-        receipts = [_receipt(
-            total_amount="119.00", vat_amount="19.00", vat_percentage="19",
-            receipt_type="sale",
-        )]
+        receipts = [
+            _receipt(
+                total_amount="119.00",
+                vat_amount="19.00",
+                vat_percentage="19",
+                receipt_type="sale",
+            )
+        ]
         report = generate_ustva(receipts, Q1_S, Q1_E)
         kz = _ustva_kennzahlen(report)
         assert "Kz81" in kz
         assert int(kz["Kz81"]) == 100  # net, whole euros
 
     def test_sale_7pct_gets_kz86(self):
-        receipts = [_receipt(
-            total_amount="107.00", vat_amount="7.00", vat_percentage="7",
-            receipt_type="sale",
-        )]
+        receipts = [
+            _receipt(
+                total_amount="107.00",
+                vat_amount="7.00",
+                vat_percentage="7",
+                receipt_type="sale",
+            )
+        ]
         report = generate_ustva(receipts, Q1_S, Q1_E)
         kz = _ustva_kennzahlen(report)
         assert "Kz86" in kz
@@ -224,20 +232,28 @@ class TestUstvaKennzahlen:
 
     def test_sale_net_rounded_down(self):
         # Net = 100.99 → should be truncated to 100
-        receipts = [_receipt(
-            total_amount="107.06", vat_amount="7.07", vat_percentage="7",
-            receipt_type="sale",
-        )]
+        receipts = [
+            _receipt(
+                total_amount="107.06",
+                vat_amount="7.07",
+                vat_percentage="7",
+                receipt_type="sale",
+            )
+        ]
         report = generate_ustva(receipts, Q1_S, Q1_E)
         kz = _ustva_kennzahlen(report)
         if "Kz86" in kz:
             assert "." not in kz["Kz86"]  # whole euros — no decimal point
 
     def test_nonstandard_rate_gets_kz35_kz36(self):
-        receipts = [_receipt(
-            total_amount="110.00", vat_amount="10.00", vat_percentage="10",
-            receipt_type="sale",
-        )]
+        receipts = [
+            _receipt(
+                total_amount="110.00",
+                vat_amount="10.00",
+                vat_percentage="10",
+                receipt_type="sale",
+            )
+        ]
         report = generate_ustva(receipts, Q1_S, Q1_E)
         kz = _ustva_kennzahlen(report)
         assert "Kz35" in kz
@@ -368,9 +384,7 @@ class TestElsterXMLBuilder:
             builder.build_ustva(self._report(), YEAR, 1)
 
     def test_kz10_berichtigung_flag(self):
-        xml = ElsterXMLBuilder(_cfg()).build_ustva(
-            self._report(), YEAR, 1, is_berichtigung=True
-        )
+        xml = ElsterXMLBuilder(_cfg()).build_ustva(self._report(), YEAR, 1, is_berichtigung=True)
         assert b"<ns0:Kz10>1<" in xml or b">1<" in xml
 
     def test_import_error_without_lxml(self, monkeypatch):

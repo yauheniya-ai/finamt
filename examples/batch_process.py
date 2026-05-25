@@ -11,6 +11,22 @@ Usage
     python -m examples.batch_process --type sale          # all are sales invoices
     python -m examples.batch_process --db /tmp/test.db
     python -m examples.batch_process --no-db              # JSON only, no DB
+
+Output layout (default project)
+-------------------------------
+    ~/.finamt/default/
+        finamt.db           ← SQLite database
+        pdfs/               ← archived copies of every receipt PDF
+        debug/
+            <receipt-id>/   ← one folder per receipt (SHA-256 prefix)
+                agent1_prompt.txt   agent1_raw.txt   agent1_parsed.json
+                agent2_prompt.txt   agent2_raw.txt   agent2_parsed.json
+                agent3_prompt.txt   agent3_raw.txt   agent3_parsed.json
+                agent4_prompt.txt   agent4_raw.txt   agent4_parsed.json
+
+If an agent returns no data, inspect the corresponding *_raw.txt file to
+see the raw model output — this is the first place to look for prompt or
+parsing issues.
 """
 
 from __future__ import annotations
@@ -31,6 +47,7 @@ logging.basicConfig(
 
 from finamt import FinanceAgent
 from finamt.models import ExtractionResult
+from finamt.storage.project import layout_from_db_path, resolve_project
 from finamt.storage.sqlite import DEFAULT_DB_PATH
 
 
@@ -82,6 +99,18 @@ def generate_report(
     if not results:
         print("No receipts processed.")
         return
+
+    # ── Resolve actual output paths ───────────────────────────────────────
+    effective_db = db_path or DEFAULT_DB_PATH
+    try:
+        layout = layout_from_db_path(effective_db)
+        actual_db    = layout.db_path
+        actual_pdfs  = layout.pdfs_dir
+        actual_debug = layout.debug_dir
+    except Exception:
+        actual_db    = effective_db
+        actual_pdfs  = effective_db.parent / "pdfs"
+        actual_debug = effective_db.parent / "debug"
 
     successful  = [r for r in results.values() if r.success and not r.duplicate]
     duplicates  = [r for r in results.values() if r.duplicate]
@@ -147,10 +176,14 @@ def generate_report(
             vat = f"{d.vat_percentage}%" if d.vat_percentage else "—"
             t   = f"{result.processing_time:.1f}s" if result.processing_time else ""
             cp  = d.counterparty.name if d.counterparty else "—"
+            data_missing = not d.total_amount and not d.receipt_date and not d.counterparty
             print(f"\n  ✓  {name}  ({t})")
             print(f"     {str(d.receipt_type).upper():<10} {cp}")
             print(f"     Date     : {dt}   Total: {amt}   VAT: {vat}")
             print(f"     Category : {d.category}   Items: {len(d.items)}")
+            if data_missing and not no_db:
+                print(f"     ⚠  No data extracted — inspect debug output:")
+                print(f"        {actual_debug}/")
         else:
             print(f"\n  ✗  {name}")
             print(f"     Error: {result.error_message}")
@@ -159,7 +192,10 @@ def generate_report(
     if no_db:
         print(f"  DB persistence : disabled")
     else:
-        print(f"  Saved to DB    : {db_path or '~/.finamt/finamt.db'}")
+        print(f"  Database       : {actual_db}")
+        print(f"  PDFs archived  : {actual_pdfs}/")
+        print(f"  LLM debug logs : {actual_debug}/")
+        print(f"  Tip: cat '{actual_debug}/<receipt-id>/agent1_raw.txt'")
     print(f"{hdiv}\n")
 
 

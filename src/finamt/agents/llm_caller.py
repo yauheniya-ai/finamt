@@ -1,20 +1,19 @@
 """
 finamt.agents.llm_caller
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Generic Ollama LLM caller used by all 4 extraction agents.
-Handles retries, debug output, and JSON parsing with fallback.
+Local LLM caller used by all 4 extraction agents.
+Handles debug output and JSON parsing with fallback.
+Inference is delegated to llm_backend (mlx-lm on Apple Silicon, transformers elsewhere).
 """
 
 from __future__ import annotations
 
 import json
 import re
-import time
 from pathlib import Path
 
-import requests
-
 from ..utils import clean_json_response
+from . import llm_backend
 from .config import AgentModelConfig
 
 
@@ -45,7 +44,7 @@ def call_llm(
     debug_dir: Path | None = None,
 ) -> dict | None:
     """
-    Send prompt to Ollama, parse JSON response, return dict or None.
+    Send prompt to the local LLM backend, parse JSON response, return dict or None.
 
     Saves to debug_dir:
       {agent_name}_prompt.txt
@@ -59,29 +58,18 @@ def call_llm(
     raw = ""
     for attempt in range(1, cfg.max_retries + 1):
         try:
-            resp = requests.post(
-                f"{cfg.base_url}/api/generate",
-                json={
-                    "model": cfg.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": cfg.temperature,
-                        "top_p": cfg.top_p,
-                        "num_ctx": cfg.num_ctx,
-                    },
-                },
-                timeout=cfg.timeout,
+            raw = llm_backend.generate(
+                prompt,
+                cfg.model,
+                temperature=cfg.temperature,
+                top_p=cfg.top_p,
+                max_tokens=cfg.num_ctx,
             )
-            if resp.status_code != 200:
-                continue
-            raw = resp.json().get("response", "")
-            break
-        except requests.exceptions.Timeout:
-            pass
-        except requests.exceptions.RequestException:
-            if attempt < cfg.max_retries:
-                time.sleep(1)
+            if raw:
+                break
+        except Exception:
+            if attempt == cfg.max_retries:
+                raw = ""
 
     if debug_dir is not None:
         (debug_dir / f"{agent_name}_raw.txt").write_text(

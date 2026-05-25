@@ -127,6 +127,7 @@ class TestEricError:
 # EricSession (mocked library)
 # ---------------------------------------------------------------------------
 
+
 def _mock_lib() -> MagicMock:
     """Return a MagicMock mimicking the ERiC CDLL."""
     lib = MagicMock()
@@ -189,6 +190,7 @@ class TestEricSession:
 
     def test_buf_read_nonempty(self, tmp_path):
         from ctypes import create_string_buffer
+
         lib = _mock_lib()
         data = b"hello eric"
         lib.EricRueckgabepufferLaenge.return_value = len(data)
@@ -196,6 +198,7 @@ class TestEricSession:
         buf = create_string_buffer(data)
         from ctypes import POINTER, c_char
         from ctypes import cast as ctypes_cast
+
         lib.EricRueckgabepufferInhalt.return_value = ctypes_cast(buf, POINTER(c_char))
         with patch("finamt.tax.eric_wrapper._load_library", return_value=lib):
             with EricSession(str(tmp_path)) as session:

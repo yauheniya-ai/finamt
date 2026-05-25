@@ -1,5 +1,17 @@
 # Changelog
 
+## Version 0.20.0 (2026-05-25)
+
+### Removed system dependency: Ollama → HuggingFace direct inference
+
+- **Ollama removed** — finamt no longer requires a running Ollama server. Models are downloaded automatically from HuggingFace on first use and cached in `~/.cache/huggingface/hub`. No install step, no background daemon, no admin rights needed.
+- **Apple Silicon optimisation (mlx-lm)** — on Apple Silicon Macs the inference backend switches to `mlx-lm` with 4-bit quantised MLX models from `mlx-community`. Benchmarks show ~13 % lower wall-clock time per receipt compared to the equivalent Ollama run (mistral:7b: 79 s vs 92 s for 5 receipts; qwen2.5:7b: 79 s vs 90 s), because MLX exploits the unified memory architecture directly.
+- **Cross-platform transformers fallback** — on Linux / Windows / Intel Macs the `transformers` pipeline is used with optional 4-bit quantisation via `bitsandbytes` on CUDA hardware.
+- **New dependency** — `huggingface-hub>=0.23.0`, `transformers>=4.40.0`, `accelerate>=0.30.0`; `mlx-lm>=0.22.0` added as a conditional dependency for `sys_platform == 'darwin' and platform_machine == 'arm64'`.
+- **Supported models** — `mistral:7b` (default) and `qwen2.5:7b-instruct-q4_K_M`; mapped to `mlx-community/Mistral-7B-Instruct-v0.3-4bit` / `mlx-community/Qwen2.5-7B-Instruct-4bit` on Apple Silicon and to `mistralai/Mistral-7B-Instruct-v0.3` / `Qwen/Qwen2.5-7B-Instruct` elsewhere.
+- **Config** — `FINAMT_OLLAMA_BASE_URL` environment variable removed; all config dataclass fields referencing Ollama removed.
+
+
 ## Version 0.19.0 (2026-05-25)
 
 ### New features / improvements

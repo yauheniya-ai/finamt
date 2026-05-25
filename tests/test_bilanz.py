@@ -210,7 +210,11 @@ class TestGenerateJahresabschluss:
 
     def test_sale_increases_kassenbestand(self):
         # total=595, vat=95, net=500
-        receipts = [_receipt(category="services", receipt_type="sale", total_amount="595.00", vat_amount="95.00")]
+        receipts = [
+            _receipt(
+                category="services", receipt_type="sale", total_amount="595.00", vat_amount="95.00"
+            )
+        ]
         jab = generate_jahresabschluss(
             receipts,
             year=YEAR,
