@@ -169,16 +169,14 @@ class TestNormaliseSteuernummer:
         assert normalise_steuernummer("2181508150001", "21") == "2181508150001"
 
     def test_slash_format_normalised(self):
+        # SH: FF/BBB/UUUUP → 21FF0BBBUUUUP
         result = normalise_steuernummer("21/815/08150", "21")
-        assert len(result) == 13
-        assert result.isdigit()
-        assert result.startswith("21")
+        assert result == "2121081508150"
 
     def test_strips_leading_bundesland(self):
-        # Already starts with "21"
+        # 2108150001 — FA=21, rest=08150001 → 21 + 21 + 0 + 08150001
         result = normalise_steuernummer("2108150001", "21")
-        assert result.startswith("21")
-        assert len(result) == 13
+        assert result == "2121008150001"
 
     def test_pads_short_number(self):
         result = normalise_steuernummer("12345678", "09")
@@ -366,7 +364,8 @@ class TestElsterXMLBuilder:
 
     def test_steuernummer_present(self):
         xml = ElsterXMLBuilder(_cfg()).build_ustva(self._report(), YEAR, 1)
-        assert b"21815081500" in xml or b"21/815/08150" in xml
+        # SH: 21/815/08150 + bundesland_kz="21" → 21 + 21 + 0 + 815 + 08150 = 2121081508150
+        assert b"2121081508150" in xml
 
     def test_year_in_xml(self):
         xml = ElsterXMLBuilder(_cfg()).build_ustva(self._report(), YEAR, 6)

@@ -287,14 +287,61 @@ class SubmissionResult:
 # ---------------------------------------------------------------------------
 # Steuernummer normalisation
 # ---------------------------------------------------------------------------
-
-
-# FA digit count in the *local printed* Steuernummer format per Bundesland.
-# Most states use 3-digit FA:  FFF/BBBB/UUUUP  →  11 local digits
-# Berlin uses 2-digit FA:      FF/BBB/UUUUP    →  10 local digits
-# The ELSTER unified 11-digit local format inserts a '0' after the FA part.
-_BL_FA_LOCAL_LEN: dict[str, int] = {
-    "11": 2,  # Berlin
+#
+# Official conversion table (Bundesministerium der Finanzen):
+# Bundesland             Local format         Unified 13-digit
+# Baden-Württemberg      FF/BBB/UUUUP         28FF0BBBUUUUP
+# Bayern                 FFF/BBB/UUUUP         9FFF0BBBUUUUP
+# Berlin                 FF/BBB/UUUUP         11FF0BBBUUUUP
+# Brandenburg            0FF/BBB/UUUUP        30FF0BBBUUUUP
+# Bremen                 FF/BBB/UUUUP         24FF0BBBUUUUP
+# Hamburg                FF/BBB/UUUUP         22FF0BBBUUUUP
+# Hessen                 0FF/BBB/UUUUP        26FF0BBBUUUUP
+# Mecklenburg-Vorpommern 0FF/BBB/UUUUP        40FF0BBBUUUUP
+# Niedersachsen          FF/BBB/UUUUP         23FF0BBBUUUUP
+# Nordrhein-Westfalen    FFF/BBBB/UUUP         5FFF0BBBBUUUP
+# Rheinland-Pfalz        FF/BBB/UUUUP         27FF0BBBUUUUP
+# Saarland               0FF/BBB/UUUUP        10FF0BBBUUUUP
+# Sachsen                2FF/BBB/UUUUP        32FF0BBBUUUUP
+# Sachsen-Anhalt         1FF/BBB/UUUUP        31FF0BBBUUUUP
+# Schleswig-Holstein     FF/BBB/UUUUP         21FF0BBBUUUUP
+# Thüringen              1FF/BBB/UUUUP        41FF0BBBUUUUP
+#
+# Key: bundesland_kz as used by the caller → (bl_prefix_in_unified, fa_offset, fa_len)
+#   fa_offset: how many leading local digits to skip before the FA part
+#   fa_len:    number of FA digits in the unified number
+# The inserted '0' always goes between FA and the remaining (Bezirk+Prüfziffer) digits.
+_BL_STRUCTURE: dict[str, tuple[str, int, int]] = {
+    "28": ("28", 0, 2),  # Baden-Württemberg:       FF/BBB/UUUUP
+    "08": ("28", 0, 2),  # Baden-Württemberg alt kz
+    "9":  ("9",  0, 3),  # Bayern:                 FFF/BBB/UUUUP
+    "09": ("9",  0, 3),  # Bayern alt kz
+    "11": ("11", 0, 2),  # Berlin:                  FF/BBB/UUUUP
+    "30": ("30", 1, 2),  # Brandenburg:            0FF/BBB/UUUUP
+    "12": ("30", 1, 2),  # Brandenburg alt kz
+    "24": ("24", 0, 2),  # Bremen:                  FF/BBB/UUUUP
+    "04": ("24", 0, 2),  # Bremen alt kz
+    "22": ("22", 0, 2),  # Hamburg:                 FF/BBB/UUUUP
+    "02": ("22", 0, 2),  # Hamburg alt kz
+    "26": ("26", 1, 2),  # Hessen:                 0FF/BBB/UUUUP
+    "06": ("26", 1, 2),  # Hessen alt kz
+    "40": ("40", 1, 2),  # Mecklenburg-Vorpommern: 0FF/BBB/UUUUP
+    "13": ("40", 1, 2),  # Mecklenburg-Vorpommern alt kz
+    "23": ("23", 0, 2),  # Niedersachsen:           FF/BBB/UUUUP
+    "03": ("23", 0, 2),  # Niedersachsen alt kz
+    "5":  ("5",  0, 3),  # Nordrhein-Westfalen:    FFF/BBBB/UUUP
+    "05": ("5",  0, 3),  # Nordrhein-Westfalen alt kz
+    "27": ("27", 0, 2),  # Rheinland-Pfalz:         FF/BBB/UUUUP
+    "07": ("27", 0, 2),  # Rheinland-Pfalz alt kz
+    "10": ("10", 1, 2),  # Saarland:               0FF/BBB/UUUUP
+    "32": ("32", 1, 2),  # Sachsen:                2FF/BBB/UUUUP
+    "14": ("32", 1, 2),  # Sachsen alt kz
+    "31": ("31", 1, 2),  # Sachsen-Anhalt:         1FF/BBB/UUUUP
+    "15": ("31", 1, 2),  # Sachsen-Anhalt alt kz
+    "21": ("21", 0, 2),  # Schleswig-Holstein:      FF/BBB/UUUUP
+    "01": ("21", 0, 2),  # Schleswig-Holstein alt kz
+    "41": ("41", 1, 2),  # Thüringen:              1FF/BBB/UUUUP
+    "16": ("41", 1, 2),  # Thüringen alt kz
 }
 
 
@@ -302,38 +349,33 @@ def normalise_steuernummer(raw: str, bundesland_kz: str) -> str:
     """
     Normalise a Steuernummer to the 13-digit ELSTER unified format.
 
-    The ELSTER unified format is:  BL(2) + local(11) = 13 digits total.
-    The *local* 11-digit form = FA-padded + BEZIRK + account digits.
+    Applies the official BMF conversion table.  The unified 13-digit number
+    is assembled as:  bl_prefix + FA + '0' + Bezirk+Prüfziffer.
 
-    State-specific zero-insertion rules
-    ------------------------------------
-    * Most states (3-digit FA locally):
-        FFF / BBBB / UUUUP  →  11 local digits  →  prepend BL only
-    * Berlin (2-digit FA locally):
-        FF / BBB / UUUUP    →  10 local digits
-        ELSTER inserts a '0' after the 2-digit FA:
-          e.g. 37/539/50531  →  37 + 0 + 53950531 = 37053950531
-          full 13-digit:  11 + 37053950531 = 1137053950531
+    Pass the 13-digit form directly (returned unchanged) if already normalised.
 
-    For unusual cases, pass the 13-digit form directly (returned unchanged).
-
-    Reference: https://www.bundesfinanzministerium.de (Steuernummer-Aufbau)
+    Reference: Bundesministerium der Finanzen — Steuernummer-Aufbau
     """
     digits = "".join(c for c in raw if c.isdigit())
     if len(digits) == 13:
         return digits
-    # Strip leading Länderkennzeichen if already present
-    if digits.startswith(bundesland_kz):
-        digits = digits[len(bundesland_kz) :]
-    # Insert/pad to reach the 11-digit ELSTER local format
-    fa_local_len = _BL_FA_LOCAL_LEN.get(bundesland_kz, 3)
-    if fa_local_len == 2 and len(digits) == 10:
-        # Berlin-style: insert '0' after the 2-digit FA part
-        digits = digits[:2] + "0" + digits[2:]
-    else:
-        # General case: left-pad to 11 digits
-        digits = digits.zfill(11)
-    return bundesland_kz + digits
+
+    struct = _BL_STRUCTURE.get(bundesland_kz)
+    if struct is None:
+        # Unknown state: left-pad local digits to 11 and prepend BL as-is
+        local = digits.zfill(11)
+        return bundesland_kz + local
+
+    bl_prefix, fa_offset, fa_len = struct
+    # rest_expected = digits after FA in the unified number (between '0' and end)
+    rest_expected = 13 - len(bl_prefix) - fa_len - 1  # subtract BL, FA, and the '0'
+
+    local = digits[fa_offset:]          # skip leading state-specific digit(s)
+    fa = local[:fa_len]                 # Finanzamt digits
+    rest = local[fa_len:]               # Bezirk + Prüfziffer
+    rest = rest.zfill(rest_expected)    # left-pad if input was short
+
+    return bl_prefix + fa + "0" + rest
 
 
 # ---------------------------------------------------------------------------
@@ -653,19 +695,19 @@ class ElsterXMLBuilder:
             etree.SubElement(abz_sum, _e("E3006901")).text = _dec(input_vat)
 
         # Berech_USt — calculation cross-reference section
-        # E3009201 = transfer from Umsaetze/Ums_Sum/E3006001; only when output_vat > 0.
-        #   Writing it as 0,00 when no Umsaetze section exists triggers ERiC rule 30452.
-        # E3009801 = Zwischensumme (output-side subtotal before Vorsteuer); always required.
+        # E3009201 (Zeile 102) = output VAT transferred from Ums_Sum; always written,
+        #   even as 0,00 when there are no sales. The ELSTER portal always sends this
+        #   field regardless of whether a Umsaetze section exists.
+        # E3009801 (Zeile 107) = Zwischensumme; always written alongside E3009201.
+        #   ERiC rule 30905/30452: if E3009801 is present, E3009201 must also be present.
+        #   Writing both as 0,00 when output_vat=0 matches what the ELSTER portal does.
         # E3009701/E3010001 are §15a adjustment fields — omitted unless §15a data exists.
         if output_vat > 0 or input_vat > 0:
             berech = etree.SubElement(ust2a, _e("Berech_USt"))
             tab_b = etree.SubElement(berech, _e("Tabelle")) if _use_tabelle else berech
-            if output_vat > 0 and has_ums_detail:
-                etree.SubElement(tab_b, _e("E3009201")).text = _dec(output_vat)
-            # E3009801 = Zwischensumme — only write when output_vat > 0;
-            # ERiC rule 30905 rejects it when no Zeilen 102-106 were declared.
-            if output_vat > 0:
-                etree.SubElement(tab_b, _e("E3009801")).text = _dec(output_vat)
+            # Always write Zeile 102 + Zeile 107 (both 0,00 when no sales)
+            etree.SubElement(tab_b, _e("E3009201")).text = _dec(output_vat)
+            etree.SubElement(tab_b, _e("E3009801")).text = _dec(output_vat)
             if input_vat > 0:
                 etree.SubElement(tab_b, _e("E3009901")).text = _dec(input_vat)
             etree.SubElement(tab_b, _e("E3010201")).text = _dec(net)
