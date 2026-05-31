@@ -1122,7 +1122,7 @@ def post_uste_submit(
 
     from datetime import date as _date
 
-    from finamt.tax.elster import ElsterClient, ElsterConfig
+    from finamt.tax.elster import ElsterConfig, ElsterEricClient
 
     year = body.year
     layout = _resolve_layout(db)
@@ -1139,7 +1139,7 @@ def post_uste_submit(
 
     # ── Resolve cert ──────────────────────────────────────────────────
     stored_cert = layout.root / "elster_cert.pfx"
-    cert_path = body.cert_path or _os.environ.get("FINAMT_ELSTER_CERT_PATH")
+    cert_path = body.cert_path or _os.path.expanduser(_os.environ.get("FINAMT_ELSTER_CERT_PATH") or "")
     cert_password = body.cert_password or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
 
     if body.cert_data_b64:
@@ -1200,24 +1200,31 @@ def post_uste_submit(
         bundesland_kz=bundesland_kz,
         hersteller_id=hersteller_id,
     )
-    client = ElsterClient(elster_cfg, use_test=body.use_test)
+
+    # ── ERiC home ─────────────────────────────────────────────────────
+    eric_home = _os.environ.get("FINAMT_ERIC_HOME", "")
+    if not eric_home and db_path.exists():
+        with _repo(db_path) as _r:
+            _em = _r.get_metadata("elster_eric_home") or {}
+        eric_home = _em.get("path") or ""
+    if not eric_home:
+        raise HTTPException(
+            status_code=400,
+            detail="ERiC library path not configured. Set FINAMT_ERIC_HOME environment variable.",
+        )
+
+    client = ElsterEricClient(elster_cfg, eric_home=eric_home, use_test=body.use_test)
 
     try:
         if body.validate_only:
-            xml_bytes = client._builder.build_ustva(
-                report, year=year, period=0, use_test=body.use_test
-            )
-            xml_signed = client._signer.sign(xml_bytes)
-            import tempfile, os as _os
-            debug_path = _os.path.join(tempfile.gettempdir(), "elster_last_sent.xml")
-            with open(debug_path, "wb") as _f:
-                _f.write(xml_signed)
+            result = client.validate_ust(report, year=year, period=0)
             return {
-                "success": True,
+                "success": result.success,
                 "validate_only": True,
-                "message": f"XML built+signed OK ({len(xml_signed)} bytes) — not submitted. Saved to: {debug_path}",
+                "message": result.error_message or "ERiC validation passed — not submitted.",
+                "error_code": result.error_code,
             }
-        result = client.submit_ustva(report, year=year, period=0)
+        result = client.submit_ust(report, year=year, period=0)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -1269,7 +1276,7 @@ def post_uste_xml(
     if not _LIB_AVAILABLE:
         raise HTTPException(status_code=503, detail="finamt library not available")
 
-    from finamt.tax.elster import ElsterClient, ElsterConfig
+    from finamt.tax.elster import ElsterConfig, ElsterXMLBuilder
 
     year = body.year
     layout = _resolve_layout(db)
@@ -1296,7 +1303,7 @@ def post_uste_xml(
         tf.close()
         cert_path = tf.name
     if not cert_path:
-        cert_path = _os.environ.get("FINAMT_ELSTER_CERT_PATH", "")
+        cert_path = _os.path.expanduser(_os.environ.get("FINAMT_ELSTER_CERT_PATH", ""))
 
     cert_password  = body.cert_password  or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
     steuernummer   = body.steuernummer   or _os.environ.get("FINAMT_ELSTER_STEUERNUMMER", "")
@@ -1316,13 +1323,11 @@ def post_uste_xml(
         hersteller_id=hersteller_id,
     )
     try:
-        client = ElsterClient(elster_cfg, use_test=body.use_test)
-        xml_unsigned = client._builder.build_ustva(report, year=year, period=0, use_test=body.use_test)
-        xml_signed   = client._signer.sign(xml_unsigned)
+        xml_bytes = ElsterXMLBuilder(elster_cfg).build_ustva(report, year=year, period=0, use_test=body.use_test)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    return Response(content=xml_signed, media_type="text/xml; charset=UTF-8")
+    return Response(content=xml_bytes, media_type="text/xml; charset=UTF-8")
 
 
 # ---------------------------------------------------------------------------
@@ -1715,7 +1720,7 @@ def post_ebilanz_submit(
 
     stored_cert = layout.root / "elster_cert.pfx"
 
-    cert_path = body.cert_path or _os.environ.get("FINAMT_ELSTER_CERT_PATH")
+    cert_path = body.cert_path or _os.path.expanduser(_os.environ.get("FINAMT_ELSTER_CERT_PATH") or "")
     cert_password = body.cert_password or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
     finanzamt_nr = body.finanzamt_nr or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
     bundesland_kz = body.bundesland_kz or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")

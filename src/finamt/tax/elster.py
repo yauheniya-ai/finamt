@@ -438,8 +438,10 @@ class ElsterXMLBuilder:
         is_annual = (period == 0)
         daten_art = "USt" if is_annual else "UStVA"
 
+        # Annual USt uses "ElsterErklaerung"; periodic UStVA uses "ElsterAnmeldung"
+        verfahren = "ElsterErklaerung" if is_annual else "ElsterAnmeldung"
         th = etree.SubElement(root, _t("TransferHeader"), version="11")
-        etree.SubElement(th, _t("Verfahren")).text = "ElsterAnmeldung"
+        etree.SubElement(th, _t("Verfahren")).text = verfahren
         etree.SubElement(th, _t("DatenArt")).text = daten_art
         etree.SubElement(th, _t("Vorgang")).text = "send-Auth"
         etree.SubElement(th, _t("TransferTicket")).text = ticket
@@ -448,18 +450,11 @@ class ElsterXMLBuilder:
         emp_th = etree.SubElement(th, _t("Empfaenger"), id="L")  # L = Landesfinanzbehörde
         etree.SubElement(emp_th, _t("Ziel")).text = _bundesland_ziel(bund_kz)
         etree.SubElement(th, _t("HerstellerID")).text = self.config.hersteller_id
-        etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
+        etree.SubElement(th, _t("DatenLieferant")).text = steuernr
         datei = etree.SubElement(th, _t("Datei"))
-        etree.SubElement(datei, _t("Verschluesselung")).text = "keine"
-        etree.SubElement(datei, _t("Kompression")).text = "keine"
+        etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
+        etree.SubElement(datei, _t("Kompression")).text = "GZIP"
         etree.SubElement(datei, _t("TransportSchluessel"))
-        # Signaturen — placeholders filled by ElsterSigner.sign()
-        sigs = etree.SubElement(th, _t("Signaturen"))
-        sig = etree.SubElement(sigs, _t("Signatur"))
-        etree.SubElement(sig, _t("Algorithmus")).text = "RSA-SHA256"
-        etree.SubElement(sig, _t("DigestValue"))
-        etree.SubElement(sig, _t("SignatureValue"))
-        etree.SubElement(sig, _t("X509Certificate"))
 
         # ── DatenTeil ─────────────────────────────────────────────────
         dt = etree.SubElement(root, _t("DatenTeil"))
@@ -469,14 +464,6 @@ class ElsterXMLBuilder:
         ndh = etree.SubElement(ndb, _t("NutzdatenHeader"), version="11")
         etree.SubElement(ndh, _t("NutzdatenTicket")).text = ticket
         etree.SubElement(ndh, _t("Empfaenger"), id="F").text = fa_nr
-        herst = etree.SubElement(ndh, _t("Hersteller"))
-        etree.SubElement(herst, _t("ProduktName")).text = PRODUKT_NAME
-        etree.SubElement(herst, _t("ProduktVersion")).text = PRODUKT_VERSION
-        # SigUser — user certificate signature placeholder
-        sig_user = etree.SubElement(ndh, _t("SigUser"))
-        etree.SubElement(sig_user, _t("DigestValue"))
-        etree.SubElement(sig_user, _t("SignatureValue"))
-        etree.SubElement(sig_user, _t("X509Certificate"))
 
         # Nutzdaten payload
         # Annual:   <Anmeldungssteuern art="USt">  / <Umsatzsteuererklarung>
@@ -579,7 +566,7 @@ class ElsterSigner:
         fill_all("SignatureValue", sig_b64)
         fill_all("X509Certificate", cert_b64)
 
-        return etree.tostring(tree, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+        return etree.tostring(tree, xml_declaration=True, encoding="UTF-8", pretty_print=False)
 
 
 # ---------------------------------------------------------------------------
@@ -959,6 +946,111 @@ class ElsterEricClient:
         before attempting a real transmission.
         """
         return self._run(xbrl_bytes, year, send=False)
+
+    def validate_ust(
+        self,
+        report: "USTVAReport",
+        year: int,
+        period: int = 0,
+        is_berichtigung: bool = False,
+    ) -> SubmissionResult:
+        """Validate the USt/UStVA XML via ERiC without sending to ELSTER."""
+        return self._run_ust(report, year, period, is_berichtigung, send=False)
+
+    def submit_ust(
+        self,
+        report: "USTVAReport",
+        year: int,
+        period: int = 0,
+        is_berichtigung: bool = False,
+    ) -> SubmissionResult:
+        """Validate and transmit the USt/UStVA to ELSTER via ERiC."""
+        return self._run_ust(report, year, period, is_berichtigung, send=True)
+
+    def _run_ust(
+        self,
+        report: "USTVAReport",
+        year: int,
+        period: int,
+        is_berichtigung: bool,
+        send: bool,
+    ) -> SubmissionResult:
+        from pathlib import Path as _Path
+
+        from .eric_wrapper import (
+            ERIC_SENDE,
+            ERIC_VALIDIERE,
+            EricBuffer,
+            EricCertificate,
+            EricError,
+            EricSession,
+        )
+
+        builder = ElsterXMLBuilder(self.config)
+        try:
+            envelope_xml = builder.build_ustva(
+                report, year=year, period=period,
+                is_berichtigung=is_berichtigung, use_test=self.use_test,
+            )
+        except Exception as exc:
+            return SubmissionResult(success=False, error_code="XML_BUILD_ERROR", error_message=str(exc))
+
+        # USt_{year} for annual (period==0), UStVA_{year} for periodic
+        datenart_version = f"USt_{year}" if period == 0 else f"UStVA_{year}"
+
+        flags = ERIC_VALIDIERE
+        if send:
+            flags |= ERIC_SENDE
+
+        log_dir = self.log_dir or str(_Path.home() / ".finamt" / "eric_logs")
+        _Path(log_dir).mkdir(parents=True, exist_ok=True)
+
+        rc: int = 0
+        response_xml: bytes = b""
+        server_xml: bytes = b""
+        eric_text: str = ""
+        try:
+            with EricSession(self.eric_home, log_dir=log_dir) as eric:
+                with EricBuffer(eric) as resp_buf, EricBuffer(eric) as srv_buf:
+                    with EricCertificate(
+                        eric, str(self.config.cert_path), self.config.cert_password
+                    ) as cert:
+                        rc, _th = eric.bearbeite_vorgang(
+                            xml_bytes=envelope_xml,
+                            datenart_version=datenart_version,
+                            flags=flags,
+                            crypto_params=cert.verschluesselungs_parameter,
+                            response_buffer=resp_buf.handle(),
+                            server_buffer=srv_buf.handle(),
+                        )
+                        response_xml = resp_buf.content()
+                        server_xml = srv_buf.content()
+                        if rc != 0:
+                            eric_text = eric.get_error_text(rc)
+        except EricError as exc:
+            return SubmissionResult(success=False, error_code=str(exc.code), error_message=str(exc))
+        except OSError as exc:
+            return SubmissionResult(
+                success=False, error_code="ERIC_LOAD_ERROR",
+                error_message=f"Could not load ERiC library from {self.eric_home}: {exc}",
+            )
+        except Exception as exc:
+            return SubmissionResult(success=False, error_code="ERIC_ERROR", error_message=str(exc))
+
+        if rc != 0:
+            err_msg = self._extract_eric_error(rc, response_xml, server_xml, eric_text)
+            return SubmissionResult(
+                success=False, error_code=str(rc), error_message=err_msg,
+                raw_response=(
+                    (response_xml or b"") + (b"\n" if response_xml and server_xml else b"") + (server_xml or b"")
+                ).decode("utf-8", errors="replace"),
+            )
+
+        telenummer = self._extract_telenummer(server_xml)
+        return SubmissionResult(
+            success=True, telenummer=telenummer,
+            raw_response=(server_xml or b"").decode("utf-8", errors="replace"),
+        )
 
     def submit_ebilanz(self, xbrl_bytes: bytes, year: int) -> SubmissionResult:
         """
