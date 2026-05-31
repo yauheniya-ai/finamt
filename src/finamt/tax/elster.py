@@ -69,7 +69,7 @@ import logging
 import os
 import random
 from base64 import b64encode
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 
@@ -242,6 +242,15 @@ class ElsterConfig:
     finanzamt_nr: str
     bundesland_kz: str
     hersteller_id: str = ""  # register at https://www.elster.de/eportal/softwareentwickler
+
+    # Annual USt 2A sender / taxpayer address details
+    company_name: str = ""      # Absender name + E3000901 (max 45)
+    street: str = ""            # Straße for Vorsatz.AbsStr and Adr.E3001101
+    house_number: str = ""      # Hausnummer for Adr.E3001203 (max 4)
+    postal_code: str = ""       # PLZ for AbsPlz / Adr.E3001206 (5 digits)
+    city: str = ""              # Ort for AbsOrt / Adr.E3001207
+    besteuerungsart: str = "1"  # E3002203: 1=vereinbarte, 2=vereinnahmte, 3=mixed
+    vorauszahlungssoll: Decimal = field(default_factory=lambda: Decimal("0"))
 
     @classmethod
     def from_env(cls) -> ElsterConfig:
@@ -422,9 +431,13 @@ class ElsterXMLBuilder:
             )
         # Derive bundesland_kz from the normalised steuernummer prefix if not given
         bund_kz = self.config.bundesland_kz or steuernr[:2]
+        # period=0 → annual Umsatzsteuerjahreserklärung (USt 2A)
+        # period>0 → Umsatzsteuervoranmeldung (UStVA)
+        is_annual = (period == 0)
         # BUFA = first 4 digits of the 13-digit normalised steuernummer
-        fa_nr = self.config.finanzamt_nr or steuernr[:4]
-        kz = _ustva_kennzahlen(report)
+        # For annual E50, ERiC validates NutzdatenHeader/Empfaenger matches Vorsatz/StNr
+        # prefix — always derive from steuernr to guarantee consistency.
+        fa_nr = steuernr[:4] if is_annual else (self.config.finanzamt_nr or steuernr[:4])
 
         # Helper: Clark-notation tag in the ELSTER namespace
         def _t(tag: str) -> str:
@@ -433,9 +446,6 @@ class ElsterXMLBuilder:
         root = etree.Element(_t("Elster"), nsmap={None: NS})
 
         # ── TransferHeader ────────────────────────────────────────────
-        # period=0 → annual Umsatzsteuererklärung (USt 2A)
-        # period>0 → Umsatzsteuervoranmeldung (UStVA)
-        is_annual = (period == 0)
         daten_art = "USt" if is_annual else "UStVA"
 
         # Annual USt uses "ElsterErklaerung"; periodic UStVA uses "ElsterAnmeldung"
@@ -466,25 +476,157 @@ class ElsterXMLBuilder:
         etree.SubElement(ndh, _t("Empfaenger"), id="F").text = fa_nr
 
         # Nutzdaten payload
-        # Annual:   <Anmeldungssteuern art="USt">  / <Umsatzsteuererklarung>
-        # Periodic: <Anmeldungssteuern art="UStVA"> / <Umsatzsteuervoranmeldung>
         nd = etree.SubElement(ndb, _t("Nutzdaten"))
-        anm = etree.SubElement(nd, _t("Anmeldungssteuern"), art=daten_art, version=f"{year}01")
-        sf = etree.SubElement(anm, _t("Steuerfall"))
-        form_el_name = "Umsatzsteuererklarung" if is_annual else "Umsatzsteuervoranmeldung"
-        ustva = etree.SubElement(sf, _t(form_el_name))
 
-        etree.SubElement(ustva, _t("Jahr")).text = str(year)
-        etree.SubElement(ustva, _t("Zeitraum")).text = str(period).zfill(2)
-        etree.SubElement(ustva, _t("Steuernummer")).text = steuernr
-        etree.SubElement(ustva, _t("Kz09")).text = self.config.finanzamt_nr
-        etree.SubElement(ustva, _t("Kz10")).text = "1" if is_berichtigung else "0"
-
-        # Write Kennzahlen
-        for kz_name, kz_value in kz.items():
-            etree.SubElement(ustva, _t(kz_name)).text = kz_value
+        if is_annual:
+            self._build_ust_annual_e50(nd, report, year, steuernr)
+        else:
+            kz = _ustva_kennzahlen(report)
+            anm = etree.SubElement(nd, _t("Anmeldungssteuern"), art="UStVA", version=f"{year}01")
+            sf = etree.SubElement(anm, _t("Steuerfall"))
+            ustva = etree.SubElement(sf, _t("Umsatzsteuervoranmeldung"))
+            etree.SubElement(ustva, _t("Jahr")).text = str(year)
+            etree.SubElement(ustva, _t("Zeitraum")).text = str(period).zfill(2)
+            etree.SubElement(ustva, _t("Steuernummer")).text = steuernr
+            etree.SubElement(ustva, _t("Kz09")).text = self.config.finanzamt_nr
+            etree.SubElement(ustva, _t("Kz10")).text = "1" if is_berichtigung else "0"
+            for kz_name, kz_value in kz.items():
+                etree.SubElement(ustva, _t(kz_name)).text = kz_value
 
         return etree.tostring(root, xml_declaration=True, encoding="UTF-8", pretty_print=True)
+
+    # ------------------------------------------------------------------
+    # E50 — Umsatzsteuerjahreserklärung (annual USt 2A)
+    # ------------------------------------------------------------------
+
+    def _build_ust_annual_e50(
+        self,
+        nd: "etree._Element",
+        report: USTVAReport,
+        year: int,
+        steuernr: str,
+    ) -> None:
+        """Build the E50 annual USt XML subtree directly into *nd* (Nutzdaten element)."""
+        cfg = self.config
+        e50_ns = f"http://finkonsens.de/elster/elstererklaerung/ust/e50/v{year}"
+
+        def _e(tag: str) -> str:
+            return f"{{{e50_ns}}}{tag}"
+
+        e50 = etree.SubElement(nd, _e("E50"), nsmap={None: e50_ns}, version=str(year))
+
+        # ── Vorsatz ───────────────────────────────────────────────────
+        # E50 Vorsatz/StNr expects the 11-digit local format (without the
+        # 2-digit Länderkennzeichen prefix).  Passing all 13 digits causes
+        # ERiC to extract the wrong FA portion → "Ungültige Bundesfinanzamtsnummer".
+        bund_kz_len = 2
+        steuernr_local = steuernr[bund_kz_len:] if len(steuernr) == 13 else steuernr
+        vor = etree.SubElement(e50, _e("Vorsatz"))
+        etree.SubElement(vor, _e("Unterfallart")).text = "50"
+        etree.SubElement(vor, _e("Vorgang")).text = "01"
+        etree.SubElement(vor, _e("StNr")).text = steuernr_local
+        etree.SubElement(vor, _e("Zeitraum")).text = str(year)
+        etree.SubElement(vor, _e("AbsName")).text = (cfg.company_name or steuernr).strip()[:45]
+        abs_str = f"{cfg.street} {cfg.house_number}".strip()[:30]
+        etree.SubElement(vor, _e("AbsStr")).text = abs_str
+        etree.SubElement(vor, _e("AbsPlz")).text = (cfg.postal_code or "00000")[:5]
+        etree.SubElement(vor, _e("AbsOrt")).text = (cfg.city or "")[:29]
+        etree.SubElement(vor, _e("Copyright")).text = "finamt"
+        etree.SubElement(vor, _e("OrdNrArt")).text = "S"
+        rueck = etree.SubElement(vor, _e("Rueckuebermittlung"))
+        # Bescheid=2: no Bescheid download — avoids requiring ArtDerAdresse=INTERNET
+        etree.SubElement(rueck, _e("Bescheid")).text = "2"
+
+        # ── USt2A ─────────────────────────────────────────────────────
+        ust2a = etree.SubElement(e50, _e("USt2A"))
+
+        # Allg / Unternehmen
+        allg = etree.SubElement(ust2a, _e("Allg"))
+        untern = etree.SubElement(allg, _e("Unternehmen"))
+        etree.SubElement(untern, _e("E3000901")).text = (cfg.company_name or "").strip()[:45]
+        adr = etree.SubElement(untern, _e("Adr"))
+        etree.SubElement(adr, _e("E3001101")).text = cfg.street or ""
+        # E3001203/E3001206 must not be empty strings — omit when no value
+        if cfg.house_number:
+            etree.SubElement(adr, _e("E3001203")).text = cfg.house_number[:4]
+        if cfg.postal_code:
+            etree.SubElement(adr, _e("E3001206")).text = cfg.postal_code[:5]
+        etree.SubElement(adr, _e("E3001207")).text = cfg.city or ""
+        best_art = etree.SubElement(allg, _e("Best_Art"))
+        etree.SubElement(best_art, _e("E3002203")).text = cfg.besteuerungsart or "1"
+
+        # Helpers
+        def _dec(v: Decimal) -> str:
+            return str(v.quantize(Decimal("0.01"))).replace(".", ",")
+
+        def _int(v: Decimal) -> str:
+            return str(int(v.to_integral_value(rounding=ROUND_DOWN)))
+
+        # Compute values from report
+        ln19 = report.line_19
+        basis_19 = (ln19.sale_net if ln19 else Decimal("0")) or Decimal("0")
+        vat_19 = (ln19.sale_vat if ln19 else Decimal("0")) or Decimal("0")
+        vat_19 = vat_19.quantize(Decimal("0.01"))
+
+        ln7 = report.line_7
+        basis_7 = (ln7.sale_net if ln7 else Decimal("0")) or Decimal("0")
+        vat_7 = (ln7.sale_vat if ln7 else Decimal("0")) or Decimal("0")
+        vat_7 = vat_7.quantize(Decimal("0.01"))
+
+        output_vat = (vat_19 + vat_7).quantize(Decimal("0.01"))
+        input_vat = report.total_input_vat.quantize(Decimal("0.01"))
+        einfuhr_vat = (report.einfuhr_vat or Decimal("0")).quantize(Decimal("0.01"))
+        net = (output_vat - input_vat).quantize(Decimal("0.01"))
+        vorausz = cfg.vorauszahlungssoll.quantize(Decimal("0.01"))
+        abschluss = (net - vorausz).quantize(Decimal("0.01"))
+
+        # Umsaetze — only write when there are taxable sales
+        has_ums_detail = False
+        if output_vat > 0:
+            umsaetze = etree.SubElement(ust2a, _e("Umsaetze"))
+            tab_u = etree.SubElement(umsaetze, _e("Tabelle"))
+            if basis_19 > 0:
+                has_ums_detail = True
+                ums_allg = etree.SubElement(tab_u, _e("Ums_allg"))
+                etree.SubElement(ums_allg, _e("E3003303")).text = _int(basis_19)
+                etree.SubElement(ums_allg, _e("E3003304")).text = _dec(vat_19)
+            if basis_7 > 0:
+                has_ums_detail = True
+                ums_erm = etree.SubElement(tab_u, _e("Ums_erm"))
+                etree.SubElement(ums_erm, _e("E3004401")).text = _int(basis_7)
+                etree.SubElement(ums_erm, _e("E3004402")).text = _dec(vat_7)
+            if has_ums_detail:
+                # Ums_Sum only when at least one detail row is present
+                ums_sum = etree.SubElement(tab_u, _e("Ums_Sum"))
+                etree.SubElement(ums_sum, _e("E3006001")).text = _dec(output_vat)
+
+        # Abz_VoSt — only write when there is input VAT to deduct
+        invoice_vat = input_vat - einfuhr_vat
+        if input_vat > 0:
+            abz = etree.SubElement(ust2a, _e("Abz_VoSt"))
+            tab_v = etree.SubElement(abz, _e("Tabelle"))
+            if invoice_vat > 0:
+                etree.SubElement(tab_v, _e("E3006201")).text = _dec(invoice_vat)
+            if einfuhr_vat > 0:
+                etree.SubElement(tab_v, _e("E3006401")).text = _dec(einfuhr_vat)
+            abz_sum = etree.SubElement(tab_v, _e("Abz_VoSt_Sum"))
+            etree.SubElement(abz_sum, _e("E3006901")).text = _dec(input_vat)
+
+        # Berech_USt — cross-reference fields only when the referenced section exists
+        # E3009201 mirrors Ums_Sum/E3006001; E3009901 mirrors Abz_VoSt_Sum/E3006901
+        if output_vat > 0 or input_vat > 0:
+            berech = etree.SubElement(ust2a, _e("Berech_USt"))
+            tab_b = etree.SubElement(berech, _e("Tabelle"))
+            if output_vat > 0 and has_ums_detail:
+                etree.SubElement(tab_b, _e("E3009201")).text = _dec(output_vat)
+            if input_vat > 0:
+                etree.SubElement(tab_b, _e("E3009901")).text = _dec(input_vat)
+            etree.SubElement(tab_b, _e("E3010201")).text = _dec(net)
+            verbl = etree.SubElement(tab_b, _e("Verbl_USt"))
+            etree.SubElement(verbl, _e("E3011101")).text = _dec(net)
+            etree.SubElement(verbl, _e("E3011301")).text = _dec(vorausz)
+            zahl = etree.SubElement(tab_b, _e("Zahl_Erstatt"))
+            etree.SubElement(zahl, _e("E3011401")).text = _dec(abschluss)
 
 
 # ---------------------------------------------------------------------------

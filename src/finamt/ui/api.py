@@ -1099,6 +1099,14 @@ class UStESubmitRequest(BaseModel):
     cert_password: str | None = None
     use_test: bool = True
     validate_only: bool = False
+    # Annual USt 2A address / tax fields
+    company_name: str = ""
+    street: str = ""
+    house_number: str = ""
+    postal_code: str = ""
+    city: str = ""
+    besteuerungsart: str = "1"  # 1=vereinbarte, 2=vereinnahmte, 3=mixed
+    vorauszahlungssoll: float = 0.0
 
 
 @app.post("/tax/uste/submit", tags=["tax"])
@@ -1192,6 +1200,23 @@ def post_uste_submit(
                 bundesland_kz = _kz
                 break
 
+    # Load address details from taxpayer profile if not in request
+    company_name = body.company_name
+    street = body.street
+    house_number = body.house_number
+    postal_code = body.postal_code
+    city = body.city
+    if db_path.exists() and not all([company_name, street, postal_code, city]):
+        with _repo(db_path) as _r:
+            _tp2 = _r.get_metadata("taxpayer") or {}
+        company_name = company_name or _tp2.get("company_name") or _tp2.get("name") or ""
+        street = street or _tp2.get("street") or ""
+        house_number = house_number or _tp2.get("house_number") or ""
+        postal_code = postal_code or _tp2.get("postal_code") or ""
+        city = city or _tp2.get("city") or ""
+
+    from decimal import Decimal as _Decimal
+
     elster_cfg = ElsterConfig(
         cert_path=cert_path,
         cert_password=cert_password,
@@ -1199,6 +1224,13 @@ def post_uste_submit(
         finanzamt_nr=finanzamt_nr,
         bundesland_kz=bundesland_kz,
         hersteller_id=hersteller_id,
+        company_name=company_name,
+        street=street,
+        house_number=house_number,
+        postal_code=postal_code,
+        city=city,
+        besteuerungsart=body.besteuerungsart,
+        vorauszahlungssoll=_Decimal(str(body.vorauszahlungssoll)),
     )
 
     # ── ERiC home ─────────────────────────────────────────────────────
@@ -1314,6 +1346,8 @@ def post_uste_xml(
     if not hersteller_id:
         raise HTTPException(status_code=400, detail="ELSTER Hersteller-ID not configured")
 
+    from decimal import Decimal as _Decimal
+
     elster_cfg = ElsterConfig(
         cert_path=cert_path,
         cert_password=cert_password,
@@ -1321,6 +1355,13 @@ def post_uste_xml(
         finanzamt_nr=finanzamt_nr,
         bundesland_kz=bundesland_kz,
         hersteller_id=hersteller_id,
+        company_name=body.company_name,
+        street=body.street,
+        house_number=body.house_number,
+        postal_code=body.postal_code,
+        city=body.city,
+        besteuerungsart=body.besteuerungsart,
+        vorauszahlungssoll=_Decimal(str(body.vorauszahlungssoll)),
     )
     try:
         xml_bytes = ElsterXMLBuilder(elster_cfg).build_ustva(report, year=year, period=0, use_test=body.use_test)
