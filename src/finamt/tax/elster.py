@@ -433,9 +433,14 @@ class ElsterXMLBuilder:
         root = etree.Element(_t("Elster"), nsmap={None: NS})
 
         # ── TransferHeader ────────────────────────────────────────────
+        # period=0 → annual Umsatzsteuererklärung (USt 2A)
+        # period>0 → Umsatzsteuervoranmeldung (UStVA)
+        is_annual = (period == 0)
+        daten_art = "USt" if is_annual else "UStVA"
+
         th = etree.SubElement(root, _t("TransferHeader"), version="11")
         etree.SubElement(th, _t("Verfahren")).text = "ElsterAnmeldung"
-        etree.SubElement(th, _t("DatenArt")).text = "UStVA"
+        etree.SubElement(th, _t("DatenArt")).text = daten_art
         etree.SubElement(th, _t("Vorgang")).text = "send-Auth"
         etree.SubElement(th, _t("TransferTicket")).text = ticket
         if use_test:
@@ -445,9 +450,16 @@ class ElsterXMLBuilder:
         etree.SubElement(th, _t("HerstellerID")).text = self.config.hersteller_id
         etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
         datei = etree.SubElement(th, _t("Datei"))
-        etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
-        etree.SubElement(datei, _t("Kompression")).text = "GZIP"
+        etree.SubElement(datei, _t("Verschluesselung")).text = "keine"
+        etree.SubElement(datei, _t("Kompression")).text = "keine"
         etree.SubElement(datei, _t("TransportSchluessel"))
+        # Signaturen — placeholders filled by ElsterSigner.sign()
+        sigs = etree.SubElement(th, _t("Signaturen"))
+        sig = etree.SubElement(sigs, _t("Signatur"))
+        etree.SubElement(sig, _t("Algorithmus")).text = "RSA-SHA256"
+        etree.SubElement(sig, _t("DigestValue"))
+        etree.SubElement(sig, _t("SignatureValue"))
+        etree.SubElement(sig, _t("X509Certificate"))
 
         # ── DatenTeil ─────────────────────────────────────────────────
         dt = etree.SubElement(root, _t("DatenTeil"))
@@ -460,12 +472,20 @@ class ElsterXMLBuilder:
         herst = etree.SubElement(ndh, _t("Hersteller"))
         etree.SubElement(herst, _t("ProduktName")).text = PRODUKT_NAME
         etree.SubElement(herst, _t("ProduktVersion")).text = PRODUKT_VERSION
+        # SigUser — user certificate signature placeholder
+        sig_user = etree.SubElement(ndh, _t("SigUser"))
+        etree.SubElement(sig_user, _t("DigestValue"))
+        etree.SubElement(sig_user, _t("SignatureValue"))
+        etree.SubElement(sig_user, _t("X509Certificate"))
 
-        # Nutzdaten — UStVA payload
+        # Nutzdaten payload
+        # Annual:   <Anmeldungssteuern art="USt">  / <Umsatzsteuererklarung>
+        # Periodic: <Anmeldungssteuern art="UStVA"> / <Umsatzsteuervoranmeldung>
         nd = etree.SubElement(ndb, _t("Nutzdaten"))
-        anm = etree.SubElement(nd, _t("Anmeldungssteuern"), art="UStVA", version=f"{year}01")
+        anm = etree.SubElement(nd, _t("Anmeldungssteuern"), art=daten_art, version=f"{year}01")
         sf = etree.SubElement(anm, _t("Steuerfall"))
-        ustva = etree.SubElement(sf, _t("Umsatzsteuervoranmeldung"))
+        form_el_name = "Umsatzsteuererklarung" if is_annual else "Umsatzsteuervoranmeldung"
+        ustva = etree.SubElement(sf, _t(form_el_name))
 
         etree.SubElement(ustva, _t("Jahr")).text = str(year)
         etree.SubElement(ustva, _t("Zeitraum")).text = str(period).zfill(2)
@@ -550,15 +570,14 @@ class ElsterSigner:
         cert_der = self._certificate.public_bytes(serialization.Encoding.DER)
         cert_b64 = b64encode(cert_der).decode()
 
-        # 4. Fill placeholder nodes
-        def fill(xpath: str, value: str) -> None:
-            nodes = tree.xpath(f"//*[local-name()='{xpath}']")
-            if nodes:
-                nodes[0].text = value
+        # 4. Fill ALL placeholder nodes (TransferHeader Signatur + SigUser)
+        def fill_all(xpath: str, value: str) -> None:
+            for node in tree.xpath(f"//*[local-name()='{xpath}']"):
+                node.text = value
 
-        fill("DigestValue", digest_b64)
-        fill("SignatureValue", sig_b64)
-        fill("X509Certificate", cert_b64)
+        fill_all("DigestValue", digest_b64)
+        fill_all("SignatureValue", sig_b64)
+        fill_all("X509Certificate", cert_b64)
 
         return etree.tostring(tree, xml_declaration=True, encoding="UTF-8", pretty_print=True)
 
@@ -642,6 +661,14 @@ class ElsterClient:
 
     def _post(self, xml_bytes: bytes, timeout: int) -> SubmissionResult:
         """POST the signed XML and parse the ELSTER Rückmeldung."""
+        import tempfile, os as _os
+        # Always dump to a temp file for debugging
+        debug_path = _os.path.join(tempfile.gettempdir(), "elster_last_sent.xml")
+        try:
+            with open(debug_path, "wb") as _f:
+                _f.write(xml_bytes)
+        except Exception:
+            pass
         try:
             resp = _requests.post(
                 self._url,
@@ -655,6 +682,18 @@ class ElsterClient:
                 success=False,
                 error_code="HTTP_ERROR",
                 error_message=str(exc),
+            )
+
+        # Detect HTML error page (server rejected the request before XML parsing)
+        if raw.lstrip().startswith(("<!DOCTYPE", "<html", "<HTML")):
+            return SubmissionResult(
+                success=False,
+                error_code=f"HTTP_{resp.status_code}",
+                error_message=(
+                    f"Server returned HTML instead of XML (HTTP {resp.status_code}). "
+                    "The ELSTER server rejected the request. "
+                    f"Sent XML saved to: {debug_path}"
+                ),
             )
 
         return self._parse_response(raw)
@@ -822,8 +861,8 @@ class EBilanzEnvelopeBuilder:
         etree.SubElement(th, _t("HerstellerID")).text = self.config.hersteller_id
         etree.SubElement(th, _t("DatenLieferant")).text = self.config.steuernummer
         datei = etree.SubElement(th, _t("Datei"))
-        etree.SubElement(datei, _t("Verschluesselung")).text = "CMSEncryptedData"
-        etree.SubElement(datei, _t("Kompression")).text = "GZIP"
+        etree.SubElement(datei, _t("Verschluesselung")).text = "keine"
+        etree.SubElement(datei, _t("Kompression")).text = "keine"
         etree.SubElement(datei, _t("TransportSchluessel"))
 
         # ── DatenTeil ─────────────────────────────────────────────────

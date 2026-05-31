@@ -1,7 +1,7 @@
 """
 examples/batch_process.py
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-Batch-process all PDF receipts in a directory.
+Batch-process all receipts (PDF, PNG, JPG, TIFF) in a directory.
 Results are automatically saved to the local DB — no explicit save needed.
 
 Usage
@@ -59,14 +59,19 @@ def process_receipts(
     receipt_type: str = "purchase",
 ) -> Dict[str, ExtractionResult]:
     """
-    Process all PDFs in *input_dir*.
+    Process all receipts (PDF, PNG, JPG, TIFF) in *input_dir*.
 
     DB save happens automatically inside FinanceAgent.
     JSON files are written to *output_dir* only if it is specified.
     """
-    pdf_files = sorted(input_dir.glob("*.pdf"))
+    pdf_files = sorted(
+        f
+        for pattern in ("*.pdf", "*.png", "*.jpg", "*.jpeg", "*.tiff", "*.tif")
+        for f in input_dir.glob(pattern)
+    )
+    pdf_files = sorted(set(pdf_files))
     if not pdf_files:
-        logging.warning("No PDF files found in %s", input_dir.resolve())
+        logging.warning("No receipt files found in %s", input_dir.resolve())
         return {}
 
     if output_dir:
@@ -201,7 +206,7 @@ def generate_report(
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Batch-process German receipt PDFs (auto-saves to DB).",
+        description="Batch-process receipt files (auto-saves to DB).",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--input-dir",  default="examples/receipts", metavar="DIR")

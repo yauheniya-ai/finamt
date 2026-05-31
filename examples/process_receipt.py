@@ -174,7 +174,7 @@ def process_receipt(
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Process German receipt files (PDF/PNG/JPG/…); auto-saves to DB.",
+        description="Process receipt files (PDF/PNG/JPG/…); auto-saves to DB.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     p.add_argument("--file",       default=None,               metavar="FILENAME",

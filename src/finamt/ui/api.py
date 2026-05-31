@@ -43,6 +43,14 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+# Load .env from the project directory (or any parent) at import time
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    _load_dotenv(override=False)  # does not overwrite already-set env vars
+except ImportError:
+    pass  # python-dotenv not installed; rely on shell environment
+
 from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -1073,6 +1081,248 @@ def get_ustva(
         receipts = list(repo.find_by_period(start, end))
 
     return generate_ustva(receipts, start, end).to_dict()
+
+
+# ---------------------------------------------------------------------------
+# UStE — Umsatzsteuerjahreserklärung (annual VAT return, period=0 / Zeitraum 00)
+# ---------------------------------------------------------------------------
+
+
+class UStESubmitRequest(BaseModel):
+    year: int
+    steuernummer: str = ""
+    bundesland_kz: str = ""
+    finanzamt_nr: str = ""
+    hersteller_id: str = ""
+    cert_path: str | None = None
+    cert_data_b64: str | None = None  # base64-encoded .pfx
+    cert_password: str | None = None
+    use_test: bool = True
+    validate_only: bool = False
+
+
+@app.post("/tax/uste/submit", tags=["tax"])
+def post_uste_submit(
+    body: UStESubmitRequest,
+    db: str | None = Query(default=None),
+):
+    """
+    Build the Umsatzsteuerjahreserklärung (USt 2A) XML with
+    Zeitraum=00 (period 0 = annual), sign it, and transmit via
+    the ELSTER HTTP upload endpoint.
+
+    Set use_test=false ONLY for production filings — legally binding!
+    Set validate_only=true to build + sign without network submission.
+    """
+    import base64 as _b64
+    import os as _os
+
+    if not _LIB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="finamt library not available")
+
+    from datetime import date as _date
+
+    from finamt.tax.elster import ElsterClient, ElsterConfig
+
+    year = body.year
+    layout = _resolve_layout(db)
+    db_path = layout.db_path
+    start = _date(year, 1, 1)
+    end = _date(year, 12, 31)
+
+    # ── Receipts ──────────────────────────────────────────────────────
+    receipts = []
+    if db_path.exists():
+        with _repo(db_path) as repo:
+            receipts = list(repo.find_by_period(start, end))
+    report = generate_ustva(receipts, start, end)
+
+    # ── Resolve cert ──────────────────────────────────────────────────
+    stored_cert = layout.root / "elster_cert.pfx"
+    cert_path = body.cert_path or _os.environ.get("FINAMT_ELSTER_CERT_PATH")
+    cert_password = body.cert_password or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
+
+    if body.cert_data_b64:
+        raw_cert = _b64.b64decode(body.cert_data_b64)
+        layout.create_dirs()
+        stored_cert.write_bytes(raw_cert)
+        cert_path = str(stored_cert)
+
+    if not cert_path and stored_cert.exists():
+        cert_path = str(stored_cert)
+
+    if not cert_path:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "ELSTER certificate not configured. "
+                "Upload a .pfx file or set FINAMT_ELSTER_CERT_PATH."
+            ),
+        )
+
+    # ── Resolve ELSTER params ─────────────────────────────────────────
+    steuernummer = body.steuernummer or _os.environ.get("FINAMT_ELSTER_STEUERNUMMER", "")
+    finanzamt_nr = body.finanzamt_nr or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
+    bundesland_kz = body.bundesland_kz or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
+    hersteller_id = body.hersteller_id or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
+
+    if not hersteller_id and db_path.exists():
+        with _repo(db_path) as _r:
+            _misc = _r.get_metadata("elster_misc") or {}
+        hersteller_id = _misc.get("hersteller_id") or ""
+
+    if not hersteller_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "ELSTER Hersteller-ID not configured. "
+                "Set FINAMT_ELSTER_HERSTELLER_ID or pass hersteller_id in the request."
+            ),
+        )
+
+    # Derive bundesland_kz from taxpayer profile when not supplied
+    if not bundesland_kz and db_path.exists():
+        from finamt.tax.elster import bundesland_kz_from_city as _bkz
+
+        with _repo(db_path) as _r:
+            _tp = _r.get_metadata("taxpayer") or {}
+        for _field in ("state", "city"):
+            _kz = _bkz(_tp.get(_field) or "")
+            if _kz:
+                bundesland_kz = _kz
+                break
+
+    elster_cfg = ElsterConfig(
+        cert_path=cert_path,
+        cert_password=cert_password,
+        steuernummer=steuernummer,
+        finanzamt_nr=finanzamt_nr,
+        bundesland_kz=bundesland_kz,
+        hersteller_id=hersteller_id,
+    )
+    client = ElsterClient(elster_cfg, use_test=body.use_test)
+
+    try:
+        if body.validate_only:
+            xml_bytes = client._builder.build_ustva(
+                report, year=year, period=0, use_test=body.use_test
+            )
+            xml_signed = client._signer.sign(xml_bytes)
+            import tempfile, os as _os
+            debug_path = _os.path.join(tempfile.gettempdir(), "elster_last_sent.xml")
+            with open(debug_path, "wb") as _f:
+                _f.write(xml_signed)
+            return {
+                "success": True,
+                "validate_only": True,
+                "message": f"XML built+signed OK ({len(xml_signed)} bytes) — not submitted. Saved to: {debug_path}",
+            }
+        result = client.submit_ustva(report, year=year, period=0)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    # Persist a submission record on success
+    if result.success and db_path.exists():
+        with _repo(db_path) as _r:
+            _records = _r.get_metadata("submissions") or []
+            import datetime as _dt
+
+            _records.append(
+                {
+                    "type": "uste",
+                    "year": year,
+                    "submitted_at": _dt.datetime.utcnow().isoformat(),
+                    "telenummer": result.telenummer,
+                    "use_test": body.use_test,
+                }
+            )
+            _r.set_metadata("submissions", _records)
+
+    return {
+        "success": result.success,
+        "telenummer": result.telenummer,
+        "error_code": result.error_code,
+        "error_message": result.error_message,
+        "use_test": body.use_test,
+    }
+
+
+# ---------------------------------------------------------------------------
+# UStE XML preview
+# ---------------------------------------------------------------------------
+
+
+@app.post("/tax/uste/xml", tags=["tax"])
+def post_uste_xml(
+    body: UStESubmitRequest,
+    db: str | None = Query(default=None),
+):
+    """
+    Build and sign the Umsatzsteuerjahreserklärung XML (period=0, annual)
+    and return it as text/xml — no network submission.
+    """
+    import base64 as _b64
+    import os as _os
+    from datetime import date as _date
+    from fastapi.responses import Response
+
+    if not _LIB_AVAILABLE:
+        raise HTTPException(status_code=503, detail="finamt library not available")
+
+    from finamt.tax.elster import ElsterClient, ElsterConfig
+
+    year = body.year
+    layout = _resolve_layout(db)
+    db_path = layout.db_path
+    start = _date(year, 1, 1)
+    end = _date(year, 12, 31)
+
+    receipts = []
+    if db_path.exists():
+        with _repo(db_path) as r:
+            receipts = list(r.find_by_period(start, end))
+
+    from finamt.tax.ustva import generate_ustva
+    report = generate_ustva(receipts, start, end)
+
+    # ── Resolve cert ──────────────────────────────────────────────────
+    cert_path: str | None = body.cert_path
+    if body.cert_data_b64:
+        import base64 as _b64
+        import tempfile as _tmp
+        cert_bytes = _b64.b64decode(body.cert_data_b64)
+        tf = _tmp.NamedTemporaryFile(suffix=".pfx", delete=False)
+        tf.write(cert_bytes)
+        tf.close()
+        cert_path = tf.name
+    if not cert_path:
+        cert_path = _os.environ.get("FINAMT_ELSTER_CERT_PATH", "")
+
+    cert_password  = body.cert_password  or _os.environ.get("FINAMT_ELSTER_CERT_PASSWORD", "")
+    steuernummer   = body.steuernummer   or _os.environ.get("FINAMT_ELSTER_STEUERNUMMER", "")
+    finanzamt_nr   = body.finanzamt_nr   or _os.environ.get("FINAMT_ELSTER_FINANZAMT_NR", "")
+    bundesland_kz  = body.bundesland_kz  or _os.environ.get("FINAMT_ELSTER_BUNDESLAND_KZ", "")
+    hersteller_id  = body.hersteller_id  or _os.environ.get("FINAMT_ELSTER_HERSTELLER_ID", "")
+
+    if not hersteller_id:
+        raise HTTPException(status_code=400, detail="ELSTER Hersteller-ID not configured")
+
+    elster_cfg = ElsterConfig(
+        cert_path=cert_path,
+        cert_password=cert_password,
+        steuernummer=steuernummer,
+        finanzamt_nr=finanzamt_nr,
+        bundesland_kz=bundesland_kz,
+        hersteller_id=hersteller_id,
+    )
+    try:
+        client = ElsterClient(elster_cfg, use_test=body.use_test)
+        xml_unsigned = client._builder.build_ustva(report, year=year, period=0, use_test=body.use_test)
+        xml_signed   = client._signer.sign(xml_unsigned)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return Response(content=xml_signed, media_type="text/xml; charset=UTF-8")
 
 
 # ---------------------------------------------------------------------------

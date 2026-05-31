@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.21.0 (2026-05-31)
+
++++ Feat: Submit USt to Finanzamt via ELSTER cert + Hersteller ID
+
+
 ## Version 0.20.0 (2026-05-25)
 
 ### Removed system dependency: Ollama → HuggingFace direct inference
