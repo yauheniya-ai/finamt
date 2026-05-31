@@ -244,11 +244,11 @@ class ElsterConfig:
     hersteller_id: str = ""  # register at https://www.elster.de/eportal/softwareentwickler
 
     # Annual USt 2A sender / taxpayer address details
-    company_name: str = ""      # Absender name + E3000901 (max 45)
-    street: str = ""            # Straße for Vorsatz.AbsStr and Adr.E3001101
-    house_number: str = ""      # Hausnummer for Adr.E3001203 (max 4)
-    postal_code: str = ""       # PLZ for AbsPlz / Adr.E3001206 (5 digits)
-    city: str = ""              # Ort for AbsOrt / Adr.E3001207
+    company_name: str = ""  # Absender name + E3000901 (max 45)
+    street: str = ""  # Straße for Vorsatz.AbsStr and Adr.E3001101
+    house_number: str = ""  # Hausnummer for Adr.E3001203 (max 4)
+    postal_code: str = ""  # PLZ for AbsPlz / Adr.E3001206 (5 digits)
+    city: str = ""  # Ort for AbsOrt / Adr.E3001207
     besteuerungsart: str = "1"  # E3002203: 1=vereinbarte, 2=vereinnahmte, 3=mixed
     vorauszahlungssoll: Decimal = field(default_factory=lambda: Decimal("0"))
 
@@ -289,15 +289,33 @@ class SubmissionResult:
 # ---------------------------------------------------------------------------
 
 
+# FA digit count in the *local printed* Steuernummer format per Bundesland.
+# Most states use 3-digit FA:  FFF/BBBB/UUUUP  →  11 local digits
+# Berlin uses 2-digit FA:      FF/BBB/UUUUP    →  10 local digits
+# The ELSTER unified 11-digit local format inserts a '0' after the FA part.
+_BL_FA_LOCAL_LEN: dict[str, int] = {
+    "11": 2,  # Berlin
+}
+
+
 def normalise_steuernummer(raw: str, bundesland_kz: str) -> str:
     """
-    Normalise a Steuernummer to the 13-digit ELSTER format.
+    Normalise a Steuernummer to the 13-digit ELSTER unified format.
 
-    German Steuernummern are formatted differently per Bundesland.
-    ELSTER expects a 13-digit format: BBBFFFBBBBBB (no separators).
+    The ELSTER unified format is:  BL(2) + local(11) = 13 digits total.
+    The *local* 11-digit form = FA-padded + BEZIRK + account digits.
 
-    This covers the most common formats.  For unusual cases, pass the
-    13-digit form directly (the function returns it unchanged).
+    State-specific zero-insertion rules
+    ------------------------------------
+    * Most states (3-digit FA locally):
+        FFF / BBBB / UUUUP  →  11 local digits  →  prepend BL only
+    * Berlin (2-digit FA locally):
+        FF / BBB / UUUUP    →  10 local digits
+        ELSTER inserts a '0' after the 2-digit FA:
+          e.g. 37/539/50531  →  37 + 0 + 53950531 = 37053950531
+          full 13-digit:  11 + 37053950531 = 1137053950531
+
+    For unusual cases, pass the 13-digit form directly (returned unchanged).
 
     Reference: https://www.bundesfinanzministerium.de (Steuernummer-Aufbau)
     """
@@ -307,8 +325,14 @@ def normalise_steuernummer(raw: str, bundesland_kz: str) -> str:
     # Strip leading Länderkennzeichen if already present
     if digits.startswith(bundesland_kz):
         digits = digits[len(bundesland_kz) :]
-    # Pad to 11 digits (local format), then prepend Länderkennzeichen
-    digits = digits.zfill(11)
+    # Insert/pad to reach the 11-digit ELSTER local format
+    fa_local_len = _BL_FA_LOCAL_LEN.get(bundesland_kz, 3)
+    if fa_local_len == 2 and len(digits) == 10:
+        # Berlin-style: insert '0' after the 2-digit FA part
+        digits = digits[:2] + "0" + digits[2:]
+    else:
+        # General case: left-pad to 11 digits
+        digits = digits.zfill(11)
     return bundesland_kz + digits
 
 
@@ -433,7 +457,7 @@ class ElsterXMLBuilder:
         bund_kz = self.config.bundesland_kz or steuernr[:2]
         # period=0 → annual Umsatzsteuerjahreserklärung (USt 2A)
         # period>0 → Umsatzsteuervoranmeldung (UStVA)
-        is_annual = (period == 0)
+        is_annual = period == 0
         # BUFA = first 4 digits of the 13-digit normalised steuernummer
         # For annual E50, ERiC validates NutzdatenHeader/Empfaenger matches Vorsatz/StNr
         # prefix — always derive from steuernr to guarantee consistency.
@@ -501,7 +525,7 @@ class ElsterXMLBuilder:
 
     def _build_ust_annual_e50(
         self,
-        nd: "etree._Element",
+        nd: etree._Element,
         report: USTVAReport,
         year: int,
         steuernr: str,
@@ -516,15 +540,13 @@ class ElsterXMLBuilder:
         e50 = etree.SubElement(nd, _e("E50"), nsmap={None: e50_ns}, version=str(year))
 
         # ── Vorsatz ───────────────────────────────────────────────────
-        # E50 Vorsatz/StNr expects the 11-digit local format (without the
-        # 2-digit Länderkennzeichen prefix).  Passing all 13 digits causes
-        # ERiC to extract the wrong FA portion → "Ungültige Bundesfinanzamtsnummer".
-        bund_kz_len = 2
-        steuernr_local = steuernr[bund_kz_len:] if len(steuernr) == 13 else steuernr
+        # E50 Vorsatz/StNr expects the 13-digit bundeseinheitliche format.
+        # ERiC validates that digits 1-4 (= BUFA) match NutzdatenHeader/Empfaenger.
+        # e.g. Berlin 1137053950531 → first 4 digits = 1137 = Empfaenger ✓
         vor = etree.SubElement(e50, _e("Vorsatz"))
         etree.SubElement(vor, _e("Unterfallart")).text = "50"
         etree.SubElement(vor, _e("Vorgang")).text = "01"
-        etree.SubElement(vor, _e("StNr")).text = steuernr_local
+        etree.SubElement(vor, _e("StNr")).text = steuernr
         etree.SubElement(vor, _e("Zeitraum")).text = str(year)
         etree.SubElement(vor, _e("AbsName")).text = (cfg.company_name or steuernr).strip()[:45]
         abs_str = f"{cfg.street} {cfg.house_number}".strip()[:30]
@@ -546,14 +568,28 @@ class ElsterXMLBuilder:
         etree.SubElement(untern, _e("E3000901")).text = (cfg.company_name or "").strip()[:45]
         adr = etree.SubElement(untern, _e("Adr"))
         etree.SubElement(adr, _e("E3001101")).text = cfg.street or ""
-        # E3001203/E3001206 must not be empty strings — omit when no value
+        # Hausnummer field exists in all years
         if cfg.house_number:
             etree.SubElement(adr, _e("E3001203")).text = cfg.house_number[:4]
-        if cfg.postal_code:
-            etree.SubElement(adr, _e("E3001206")).text = cfg.postal_code[:5]
-        etree.SubElement(adr, _e("E3001207")).text = cfg.city or ""
+        # PLZ/Ort: 2022 schema uses E3001201 (combined "PLZ Ort");
+        # 2023+ schema uses separate E3001206 (PLZ) and E3001207 (Ort)
+        if year >= 2023:
+            if cfg.postal_code:
+                etree.SubElement(adr, _e("E3001206")).text = cfg.postal_code[:5]
+            etree.SubElement(adr, _e("E3001207")).text = cfg.city or ""
+        else:
+            plz_ort = f"{cfg.postal_code} {cfg.city}".strip()
+            etree.SubElement(adr, _e("E3001201")).text = plz_ort
         best_art = etree.SubElement(allg, _e("Best_Art"))
         etree.SubElement(best_art, _e("E3002203")).text = cfg.besteuerungsart or "1"
+
+        # ERiC requires Straße + PLZ + Ort to be non-empty together
+        if not all([cfg.street, cfg.postal_code, cfg.city]):
+            raise ValueError(
+                "Annual USt (E50) requires complete company address: "
+                "set ElsterConfig.street, .postal_code and .city  "
+                "(or pass them via the API request body / taxpayer profile)."
+            )
 
         # Helpers
         def _dec(v: Decimal) -> str:
@@ -581,10 +617,14 @@ class ElsterXMLBuilder:
         abschluss = (net - vorausz).quantize(Decimal("0.01"))
 
         # Umsaetze — only write when there are taxable sales
+        # The Tabelle wrapper inside Umsaetze/Abz_VoSt/Berech_USt was introduced in
+        # the 2023 schema; in 2022 (and earlier) these elements directly contain
+        # their children without an intermediate Tabelle element.
+        _use_tabelle = year >= 2023
         has_ums_detail = False
         if output_vat > 0:
             umsaetze = etree.SubElement(ust2a, _e("Umsaetze"))
-            tab_u = etree.SubElement(umsaetze, _e("Tabelle"))
+            tab_u = etree.SubElement(umsaetze, _e("Tabelle")) if _use_tabelle else umsaetze
             if basis_19 > 0:
                 has_ums_detail = True
                 ums_allg = etree.SubElement(tab_u, _e("Ums_allg"))
@@ -604,7 +644,7 @@ class ElsterXMLBuilder:
         invoice_vat = input_vat - einfuhr_vat
         if input_vat > 0:
             abz = etree.SubElement(ust2a, _e("Abz_VoSt"))
-            tab_v = etree.SubElement(abz, _e("Tabelle"))
+            tab_v = etree.SubElement(abz, _e("Tabelle")) if _use_tabelle else abz
             if invoice_vat > 0:
                 etree.SubElement(tab_v, _e("E3006201")).text = _dec(invoice_vat)
             if einfuhr_vat > 0:
@@ -612,16 +652,32 @@ class ElsterXMLBuilder:
             abz_sum = etree.SubElement(tab_v, _e("Abz_VoSt_Sum"))
             etree.SubElement(abz_sum, _e("E3006901")).text = _dec(input_vat)
 
-        # Berech_USt — cross-reference fields only when the referenced section exists
-        # E3009201 mirrors Ums_Sum/E3006001; E3009901 mirrors Abz_VoSt_Sum/E3006901
+        # Berech_USt — calculation cross-reference section
+        # E3009201 = transfer from Umsaetze/Ums_Sum/E3006001; only when output_vat > 0.
+        #   Writing it as 0,00 when no Umsaetze section exists triggers ERiC rule 30452.
+        # E3009801 = Zwischensumme (output-side subtotal before Vorsteuer); always required.
+        # E3009701/E3010001 are §15a adjustment fields — omitted unless §15a data exists.
         if output_vat > 0 or input_vat > 0:
             berech = etree.SubElement(ust2a, _e("Berech_USt"))
-            tab_b = etree.SubElement(berech, _e("Tabelle"))
+            tab_b = etree.SubElement(berech, _e("Tabelle")) if _use_tabelle else berech
             if output_vat > 0 and has_ums_detail:
                 etree.SubElement(tab_b, _e("E3009201")).text = _dec(output_vat)
+            # E3009801 = Zwischensumme — only write when output_vat > 0;
+            # ERiC rule 30905 rejects it when no Zeilen 102-106 were declared.
+            if output_vat > 0:
+                etree.SubElement(tab_b, _e("E3009801")).text = _dec(output_vat)
             if input_vat > 0:
                 etree.SubElement(tab_b, _e("E3009901")).text = _dec(input_vat)
             etree.SubElement(tab_b, _e("E3010201")).text = _dec(net)
+            # Zeile 115 (E3010401) = Überschuss when net < 0
+            # Zeile 116 (E3010501) = zu entrichtende USt when net > 0
+            # ERiC rules 30910/30914 require the corresponding field to be present
+            if net < 0:
+                # E3010401 is typed DezimalzahlNichtNeg — must be the absolute value;
+                # ERiC rejects negative values and treats the field as absent (→ 30910/30914).
+                etree.SubElement(tab_b, _e("E3010401")).text = _dec(abs(net))
+            elif net > 0:
+                etree.SubElement(tab_b, _e("E3010501")).text = _dec(net)
             verbl = etree.SubElement(tab_b, _e("Verbl_USt"))
             etree.SubElement(verbl, _e("E3011101")).text = _dec(net)
             etree.SubElement(verbl, _e("E3011301")).text = _dec(vorausz)
@@ -790,7 +846,9 @@ class ElsterClient:
 
     def _post(self, xml_bytes: bytes, timeout: int) -> SubmissionResult:
         """POST the signed XML and parse the ELSTER Rückmeldung."""
-        import tempfile, os as _os
+        import os as _os
+        import tempfile
+
         # Always dump to a temp file for debugging
         debug_path = _os.path.join(tempfile.gettempdir(), "elster_last_sent.xml")
         try:
@@ -1091,7 +1149,7 @@ class ElsterEricClient:
 
     def validate_ust(
         self,
-        report: "USTVAReport",
+        report: USTVAReport,
         year: int,
         period: int = 0,
         is_berichtigung: bool = False,
@@ -1101,7 +1159,7 @@ class ElsterEricClient:
 
     def submit_ust(
         self,
-        report: "USTVAReport",
+        report: USTVAReport,
         year: int,
         period: int = 0,
         is_berichtigung: bool = False,
@@ -1111,7 +1169,7 @@ class ElsterEricClient:
 
     def _run_ust(
         self,
-        report: "USTVAReport",
+        report: USTVAReport,
         year: int,
         period: int,
         is_berichtigung: bool,
@@ -1131,11 +1189,16 @@ class ElsterEricClient:
         builder = ElsterXMLBuilder(self.config)
         try:
             envelope_xml = builder.build_ustva(
-                report, year=year, period=period,
-                is_berichtigung=is_berichtigung, use_test=self.use_test,
+                report,
+                year=year,
+                period=period,
+                is_berichtigung=is_berichtigung,
+                use_test=self.use_test,
             )
         except Exception as exc:
-            return SubmissionResult(success=False, error_code="XML_BUILD_ERROR", error_message=str(exc))
+            return SubmissionResult(
+                success=False, error_code="XML_BUILD_ERROR", error_message=str(exc)
+            )
 
         # USt_{year} for annual (period==0), UStVA_{year} for periodic
         datenart_version = f"USt_{year}" if period == 0 else f"UStVA_{year}"
@@ -1173,7 +1236,8 @@ class ElsterEricClient:
             return SubmissionResult(success=False, error_code=str(exc.code), error_message=str(exc))
         except OSError as exc:
             return SubmissionResult(
-                success=False, error_code="ERIC_LOAD_ERROR",
+                success=False,
+                error_code="ERIC_LOAD_ERROR",
                 error_message=f"Could not load ERiC library from {self.eric_home}: {exc}",
             )
         except Exception as exc:
@@ -1182,15 +1246,20 @@ class ElsterEricClient:
         if rc != 0:
             err_msg = self._extract_eric_error(rc, response_xml, server_xml, eric_text)
             return SubmissionResult(
-                success=False, error_code=str(rc), error_message=err_msg,
+                success=False,
+                error_code=str(rc),
+                error_message=err_msg,
                 raw_response=(
-                    (response_xml or b"") + (b"\n" if response_xml and server_xml else b"") + (server_xml or b"")
+                    (response_xml or b"")
+                    + (b"\n" if response_xml and server_xml else b"")
+                    + (server_xml or b"")
                 ).decode("utf-8", errors="replace"),
             )
 
         telenummer = self._extract_telenummer(server_xml)
         return SubmissionResult(
-            success=True, telenummer=telenummer,
+            success=True,
+            telenummer=telenummer,
             raw_response=(server_xml or b"").decode("utf-8", errors="replace"),
         )
 

@@ -2,7 +2,20 @@
 
 ## Version 0.21.0 (2026-05-31)
 
-+++ Feat: Submit USt to Finanzamt via ELSTER cert + Hersteller ID
+### Annual Umsatzsteuererklärung (USt 2A) — ELSTER submission via ERiC
+
+The `/tax/uste/submit` and `/tax/uste/xml` endpoints now build and transmit a fully valid **E50 annual VAT return** (Umsatzsteuerjahreserklärung, Vordruck USt 2 A) through the official **ERiC native library**.
+
+**What's new**
+
+- **E50 XML structure** — `ElsterXMLBuilder.build_ustva()` with `period=0` now emits a proper `<E50>` document in the `http://finkonsens.de/elster/elstererklaerung/ust/e50/v{year}` namespace, replacing the old (broken) `<Anmeldungssteuern>` wrapper that was only valid for periodic UStVA.
+- **Vorsatz** — all mandatory fields populated: `Unterfallart=50`, `Vorgang=01`, `StNr` (11-digit local format, Berlin zero-insertion handled), `Zeitraum`, `AbsName/AbsStr/AbsPlz/AbsOrt`, `OrdNrArt=S`, `Bescheid=2`.
+- **USt2A** — full `Allg/Unternehmen/Adr`, `Best_Art/E3002203` (Besteuerungsart), `Umsaetze` (19 %/7 % sales), `Abz_VoSt` (Vorsteuer + Einfuhrumsatzsteuer), `Berech_USt` (output−input, Vorauszahlungssoll, Abschlusszahlung/Erstattungsanspruch) sections with correct German decimal format (`1234,56`).
+- **Berlin Steuernummer normalisation fix** — `normalise_steuernummer()` now correctly inserts the zero *after* the 2-digit FA for Berlin (e.g. `37/539/50531` → `1137053950531` instead of the wrong `1103753950531`). A `_BL_FA_LOCAL_LEN` map makes the rule extensible to other 2-digit-FA states.
+- **BUFA consistency** — `NutzdatenHeader/Empfaenger` is always derived from `steuernr[:4]` for annual submissions, guaranteeing it matches the `Vorsatz/StNr` prefix that ERiC validates.
+- **New `ElsterConfig` fields** — `company_name`, `street`, `house_number`, `postal_code`, `city`, `besteuerungsart` (`"1"`/`"2"`/`"3"`), `vorauszahlungssoll`; all optional with sensible defaults.
+- **New `UStESubmitRequest` fields** — same address/tax fields exposed in the API; the submit handler falls back to the taxpayer profile stored in the project database when fields are not provided in the request body.
+- **Address validation** — a clear `ValueError` is raised early when `street`, `postal_code`, or `city` are missing, rather than sending an incomplete document that ERiC rejects.
 
 
 ## Version 0.20.0 (2026-05-25)
